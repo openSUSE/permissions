@@ -1,0 +1,466 @@
+# /etc/permissions.secure
+#
+# Copyright (c) 2001 SuSE GmbH Nuernberg, Germany.  All rights reserved.
+#
+# Author: Roman Drahtmueller <draht@suse.de>, 2001
+#
+# 
+# See /etc/permissions for general hints on how to use this file.
+#
+# /etc/permissions.secure is designed for the use in a multi-user and
+# networked installation. Most privileged file modes are disabled here.
+# Many programs that still have their suid- or sgid-modes have had their
+# security problems in the past already.
+# The primary target of this configuration is to make the basic things
+# such as changing passwords, the basic networking programs as well as
+# some of the all-day work programs properly function for the unprivileged
+# user. The dial-out packages are executable for users belonging to the
+# "dialout" group - therefore, these users are to be treated "privileged".
+# Packages such as (remote-) batch queueing systems, games, programs for 
+# the linux text console, everything linked against OOP libraries and
+# most other exotic utilities are turned into unprivileged binary files
+# in order for them not to cause any security problems if one or more of
+# the programs turn out to have buffer overruns or otherwise locally 
+# exploitable programming errors.
+# This file is not designed to make your system as closed and as restrictive
+# as at all possible. In many cases, restricted access to a configuration 
+# file is of no use since the data used can be obtained from the /proc file
+# system or interface configuration as well. Also, system programs such as
+# /sbin/ifconfig or /sbin/route are not changed because nosey users can
+# bring their own. "Security by obscurity" will add any significant 
+# security-related advantage to the system. Keep in mind that curiosity
+# is a major motivation for your users to try to see behind the curtain.
+#
+# If you need the functionality of a program that usually runs as a
+# privileged user, then use it as root, or, if you are not root, ask your 
+# system administrator for advice. In many cases, adding a user to the 
+# "trusted" group gives her access to the resources that are not accessible
+# any more if the admin chose to select "secure" as the permissions default.
+#
+# Please make use of the diff program to see the differences between the
+# permissions.easy and permissions.secure files if things don't work as
+# they should and you suspect a permission or privilege problem.
+# The word "easy" is a reference for the /etc/permissions.easy file.
+#
+# As usual, these settings are "suggested". If you feel so inclined, 
+# please feel free to change the modes in this files, but keep a log 
+# of your changes for future reference.
+
+# Please always keep in mind that your system listens on network sockets
+# in the default configuration. Change this by disabling the services that 
+# you do not need or by restricting access to them using packet filters
+# or tcp wrappers (see hosts_access(5)) to gain a higher level of security
+# in your system.
+
+#
+# Directories
+#
+# no lock files for emacs:
+/var/lib/xemacs/lock/                                   root:trusted      1775
+# for screen's session sockets:
+/var/run/uscreens/                                      root:root         1777
+
+#
+# /etc
+#
+/etc/crontab                                            root:root          600
+/etc/exports                                            root:root          644
+/etc/fstab                                              root:root          644
+/etc/ftpaccess                                          root:root          644
+/etc/ftpusers                                           root:root          644
+/etc/inetd.conf                                         root:root          644
+/etc/inittab                                            root:root          644
+/etc/mtab                                               root:root          644
+/etc/rmtab                                              root:root          644
+/var/lib/nfs/rmtab                                      root:root          644
+/etc/syslog.conf                                        root:root          600
+
+#
+# suid system programs that need the suid bit to work:
+#
+/bin/su                                                 root:root         4755
+# disable at and cron for users that do not belnong to the group "trusted"
+/usr/bin/at                                             root:trusted      4750
+/usr/bin/crontab                                        root:trusted      4750
+/usr/bin/gpasswd                                        root:shadow       4755
+/usr/bin/newgrp                                         root:root         4755
+/usr/bin/passwd                                         root:shadow       4755
+/usr/bin/chfn                                           root:shadow       4755
+/usr/bin/chage                                          root:shadow       4755
+/usr/bin/chsh                                           root:shadow       4755
+/usr/bin/expiry                                         root:shadow       4755
+# the default configuration of the sudo package in SuSE distribution is to
+# intimidate users.
+/usr/bin/sudo                                           root:root         4755
+/usr/sbin/su-wrapper                                    root:root         0755
+# opie password system
+# #66303
+/usr/bin/opiepasswd                                     root:root         4755
+/usr/bin/opiesu                                         root:root         4755
+# "user" entries in /etc/fstab make mount work for non-root users:
+/usr/bin/ncpmount                                       root:trusted      4750
+/usr/bin/ncpumount                                      root:trusted      4750
+# #331020
+/sbin/mount.nfs                                         root:root         0755
+# mount/umount have had their problems already:
+/bin/mount                                              root:root         4755
+/bin/umount                                             root:root         4755
+/bin/eject                                              root:audio        4750
+#
+# #133657
+/usr/bin/fusermount                                     root:trusted      4750
+# #66203
+/usr/lib/majordomo/wrapper                              root:daemon       4750
+# glibc backwards compatibility
+/usr/lib/pt_chown                                       root:root         4755
+/usr/lib64/pt_chown                                     root:root         4755
+# needs setuid root when using shadow via NIS:
+# #216816
+/sbin/unix_chkpwd                                       root:shadow       4755
+/sbin/unix2_chkpwd                                      root:shadow       4755
+# qpopper
+/usr/sbin/popauth                                       pop:trusted       4750
+# from the squid package
+/usr/sbin/pam_auth                                      root:shadow       4755
+
+# still to be converted to utempter
+/usr/lib/vte/gnome-pty-helper                           root:tty          2755
+
+#
+# mixed section: most of it is disabled in this permissions.secure:
+#
+#########################################################################
+# rpm subsystem:
+/usr/src/packages/SOURCES/                              root:root          755
+/usr/src/packages/BUILD/                                root:root          755
+/usr/src/packages/RPMS/                                 root:root          755
+/usr/src/packages/RPMS/alpha/                           root:root          755
+/usr/src/packages/RPMS/alphaev56/                       root:root          755
+/usr/src/packages/RPMS/alphaev67/                       root:root          755
+/usr/src/packages/RPMS/alphaev6/                        root:root          755
+/usr/src/packages/RPMS/arm4l/                           root:root          755
+/usr/src/packages/RPMS/athlon/                          root:root          755
+/usr/src/packages/RPMS/i386/                            root:root          755
+/usr/src/packages/RPMS/i486/                            root:root          755
+/usr/src/packages/RPMS/i586/                            root:root          755
+/usr/src/packages/RPMS/i686/                            root:root          755
+/usr/src/packages/RPMS/ia64/                            root:root          755
+/usr/src/packages/RPMS/mips/                            root:root          755
+/usr/src/packages/RPMS/ppc/                             root:root          755
+/usr/src/packages/RPMS/ppc64/                           root:root          755
+/usr/src/packages/RPMS/powerpc/                         root:root          755
+/usr/src/packages/RPMS/powerpc64/                       root:root          755
+/usr/src/packages/RPMS/s390/                            root:root          755
+/usr/src/packages/RPMS/s390x/                           root:root          755
+/usr/src/packages/RPMS/sparc/                           root:root          755
+/usr/src/packages/RPMS/sparcv9/                         root:root          755
+/usr/src/packages/RPMS/sparc64/                         root:root          755
+/usr/src/packages/RPMS/x86_64/                          root:root          755
+/usr/src/packages/RPMS/armv4l/                          root:root          755
+/usr/src/packages/RPMS/hppa/                            root:root          755
+/usr/src/packages/RPMS/hppa2.0/                         root:root          755
+/usr/src/packages/RPMS/noarch/                          root:root          755
+/usr/src/packages/SPECS/                                root:root          755
+/usr/src/packages/SRPMS/                                root:root          755
+#########################################################################
+# video
+/usr/bin/v4l-conf                                       root:video        4750
+# Itanium ia32 emulator
+/usr/lib/ia32el/suid_ia32x_loader                       root:root         0755
+# scotty:
+# #66211
+/usr/bin/ntping                                         root:trusted      4750
+# This is not extensively tested.
+/usr/bin/vlock                                          root:shadow       0755
+/usr/bin/Xorg                                           root:root         0711
+# turned off write and wall by disabling sgid tty:
+/usr/bin/wall                                           root:tty          0755
+/usr/bin/write                                          root:tty          0755
+# thttpd: sgid + executeable only for group www. Useless...
+/usr/bin/makeweb                                        root:www          2750
+# yaps, pager software, accesses /dev/ttyS? . Disabled sgid uucp.
+/usr/bin/yaps                                           root:uucp         0755
+# ncpfs tool: trusted only
+/usr/bin/nwsfind                                        root:trusted      4750
+/usr/bin/ncplogin                                       root:trusted      4750
+/usr/bin/ncpmap                                         root:trusted      4750
+# lpdfilter:
+# checks itself that only lp and root can call it
+/usr/lib/lpdfilter/bin/runlpr                           root:root         4755
+# pcmcia:
+# Needs setuid to eject cards (#100120)
+/sbin/pccardctl                                         root:trusted      4750
+# gnokii nokia cellphone software
+# #66209
+/usr/sbin/mgnokiidev                                    root:uucp          755
+# pcp, performance co-pilot
+# setuid root is used to write /var/log/pcp/NOTICES
+# #66205
+/usr/lib/pcp/pmpost                                     root:trusted      4750
+# mailman mailing list software
+# #66315
+/usr/lib/mailman/cgi-bin/admin                          root:mailman      2755
+/usr/lib/mailman/cgi-bin/admindb                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/edithtml                       root:mailman      2755
+/usr/lib/mailman/cgi-bin/listinfo                       root:mailman      2755
+/usr/lib/mailman/cgi-bin/options                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/private                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/roster                         root:mailman      2755
+/usr/lib/mailman/cgi-bin/subscribe                      root:mailman      2755
+/usr/lib/mailman/cgi-bin/confirm                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/create                         root:mailman      2755
+/usr/lib/mailman/cgi-bin/editarch                       root:mailman      2755
+/usr/lib/mailman/cgi-bin/rmlist                         root:mailman      2755
+/usr/lib/mailman/mail/mailman                           root:mailman      2755
+
+# libgnomesu (#75823, #175616)
+/usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
+
+# control-center2 (#104993)
+/usr/sbin/change-passwd                                 root:root         4755
+
+#
+# cups (#66305,#406058)
+#
+/usr/bin/lppasswd                                       lp:lp             2755
+
+#
+# smb printing with kerberos authentication (#177114)
+#
+/usr/bin/get_printing_ticket                            root:lp           4750
+
+#
+# networking (need root for the privileged socket)
+#
+/bin/ping                                               root:root         4755
+/bin/ping6                                              root:root         4755
+/usr/sbin/traceroute6                                   root:root         4755
+# mtr is linked against ncurses. no suid bit, for root only:
+/usr/sbin/mtr                                           root:dialout      0755
+/usr/bin/rcp                                            root:root         4755
+/usr/bin/rlogin                                         root:root         4755
+/usr/bin/rsh                                            root:root         4755
+
+# heartbeat #66310
+# cl_status needs to be allowed to connect to the heartbeat API. If the setgid
+# bit is removed, one can manually add users to the haclient group instead.
+/usr/bin/cl_status                                      root:haclient     2555
+
+# exim
+/usr/sbin/exim                                          root:root         4755
+
+#
+# dialup networking programs
+#
+/usr/sbin/pppoe-wrapper                                 root:dialout      4750
+# i4l package (#100750):
+/sbin/isdnctrl                                          root:dialout      4750
+# #66111
+/usr/bin/vboxbeep                                       root:trusted      0755
+
+
+#
+# linux text console utilities
+# 
+# setuid needed on the text console to set the terminal content on ctrl-o
+# #66112
+/usr/lib/mc/cons.saver                                  root:root         0755
+
+
+#
+# terminal emulators
+# This and future SuSE products have support for the utempter, a small helper
+# program that does the utmp/wtmp update work with the necessary rights.
+# The use of utempter obsoletes the need for sgid bits on terminal emulator
+# binaries. We mention screen here, but all other terminal emulators have
+# moved to /etc/permissions, with modes set to 0755.
+
+# needs setuid to access /dev/console
+# framebuffer terminal emulator (japanese)
+/usr/bin/jfbterm                                        root:tty          0755
+
+#
+# kde
+# (all of them are disabled in permissions.secure except for 
+# the helper programs)
+#
+# arts wrapper, normally suid root:
+/opt/kde3/bin/artswrapper                               root:root         0755
+# needs setuid root when using shadow via NIS:
+# #66218
+/opt/kde3/bin/kcheckpass                                root:shadow       4755
+/usr/lib/kde4/libexec/kcheckpass                        root:shadow       4755
+/usr/lib64/kde4/libexec/kcheckpass                      root:shadow       4755
+# This has a meaning... hmm...
+/opt/kde3/bin/kdesud                                    root:nogroup      2755
+/usr/lib/kde4/libexec/kdesud                            root:nogroup      2755
+/usr/lib64/kde4/libexec/kdesud                          root:nogroup      2755
+# used for getting proxy settings from dhcp
+/opt/kde3/bin/kpac_dhcp_helper                          root:root         0755
+# used to distract the oom killer
+# #203535
+/opt/kde3/bin/start_kdeinit                             root:root         4755
+# edits /etc/smb.conf
+# #66312
+/usr/bin/fileshareset                                   root:root         0755
+
+#
+# amanda
+#
+# Well, if you are gid disk already, you don't need these amanda binaries
+# to get root.
+# Anyway, we don't keep the suid bits.
+/usr/sbin/amcheck                                       root:disk         0750
+/usr/lib/amanda/calcsize                                root:disk         0750
+/usr/lib/amanda/rundump                                 root:disk         0750
+/usr/lib/amanda/planner                                 root:disk         0750
+/usr/lib/amanda/runtar                                  root:disk         0750
+/usr/lib/amanda/dumper                                  root:disk         0750
+/usr/lib/amanda/killpgrp                                root:disk         0750
+
+
+#
+# gnats
+#
+/usr/lib/gnats/gen-index                                gnats:root        4555
+/usr/lib/gnats/pr-edit                                  gnats:root        4555
+/usr/lib/gnats/queue-pr                                 gnats:root        4555
+
+
+#
+# news (inn)
+#
+# the inn start script changes it's uid to news:news. Later innstart and
+# innfeed are called by this user. Those programs do not need to be called by
+# anyone else, therefore the strange permissions 4554 are required for
+# operation. (#67032)
+#
+/usr/lib/news/bin/rnews                                 news:uucp         4550
+/usr/lib/news/bin/startinnfeed                          root:news         4554
+/usr/lib/news/bin/inndstart                             root:news         4554
+/usr/lib/news/bin/inews                                 news:news         2555
+
+
+#
+# fax
+#
+# restrictive, only for "trusted" group users:
+# faxq helper:
+/usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4711
+/var/spool/fax/outgoing/                                fax:root          0755
+/var/spool/fax/outgoing/locks                           fax:root          0755
+# TODO: package should set this permissions
+/var/spool/fax/archive                                  fax:uucp           700
+/var/spool/fax/bin                                      fax:uucp           755
+/var/spool/fax/client                                   fax:uucp           755
+/var/spool/fax/config                                   fax:uucp           755
+/var/spool/fax/dev                                      fax:uucp           755
+/var/spool/fax/docq                                     fax:uucp           700
+/var/spool/fax/doneq                                    fax:uucp           700
+/var/spool/fax/etc                                      fax:uucp           755
+/var/spool/fax/info                                     fax:uucp           755
+/var/spool/fax/log                                      fax:uucp           755
+/var/spool/fax/pollq                                    fax:uucp           700
+/var/spool/fax/recvq                                    fax:uucp           755
+/var/spool/fax/sendq                                    fax:uucp           700
+/var/spool/fax/status                                   fax:uucp           755
+/var/spool/fax/tmp                                      fax:uucp           700
+
+#
+# uucp
+#
+/var/spool/uucppublic/                                  root:uucp         1770
+/usr/bin/uucp                                           uucp:uucp         6555
+/usr/bin/uuname                                         uucp:uucp         6555
+/usr/bin/uustat                                         uucp:uucp         6555
+/usr/bin/uux                                            uucp:uucp         6555
+/usr/lib/uucp/uucico                                    uucp:uucp         6555
+/usr/lib/uucp/uuxqt                                     uucp:uucp         6555
+
+
+#
+# games of all kinds, toys
+# all suid and sgid bits cleared.
+#
+
+# bsd-games
+/usr/games/atc                                          games:games       0755
+/usr/games/battlestar                                   games:games       0755
+/usr/games/canfield                                     games:games       0755
+/usr/games/cribbage                                     games:games       0755
+/usr/games/phantasia                                    games:games       0755
+/usr/games/robots                                       games:games       0755
+/usr/games/sail                                         games:games       0755
+/usr/games/snake                                        games:games       0755
+/usr/games/tetris-bsd                                   games:games       0755
+
+# Maelstrom
+/usr/games/Maelstrom                                    games:games       0755
+
+# pachi
+/usr/games/pachi                                        games:games       0755
+/usr/games/martian                                      games:games       0755
+
+# nethack
+/usr/lib/nethack/nethack.tty                            games:games       0755
+
+# chromium,
+/usr/games/chromium                                     games:games       0755
+
+# xscrabble
+/usr/games/xscrab                                       games:games       0755
+
+# trackballs
+/usr/games/trackballs                                   games:games       0755
+
+# ltris
+/usr/games/ltris                                        games:games       0755
+
+# xlogical
+/usr/games/xlogical                                     games:games       0755
+
+# lbreakout
+/usr/games/lbreakout2                                   games:games       0755
+
+# xgalaga
+/usr/bin/xgalaga                                        games:games       0755
+
+# rocksndiamonds
+/usr/games/rocksndiamonds                               games:games       0755
+
+# gnome-games
+/usr/bin/glines                                         games:games       0755
+/usr/bin/gnibbles                                       games:games       0755
+/usr/bin/gnobots2                                       games:games       0755
+/usr/bin/gnometris                                      games:games       0755
+/usr/bin/gnomine                                        games:games       0755
+/usr/bin/gnotravex                                      games:games       0755
+/usr/bin/gnotski                                        games:games       0755
+/usr/bin/gtali                                          games:games       0755
+/usr/bin/mahjongg                                       games:games       0755
+/usr/bin/same-gnome                                     games:games       0755
+
+# zypp (#385207)
+/usr/sbin/zypp-refresh-wrapper                          root:root         0755
+
+# PolicyKit (#295341)
+/usr/lib/PolicyKit/polkit-set-default-helper            polkituser:root   4755
+/usr/lib/PolicyKit/polkit-read-auth-helper              root:polkituser   2755
+/usr/lib/PolicyKit/polkit-revoke-helper                 root:polkituser   2755
+/usr/lib/PolicyKit/polkit-explicit-grant-helper         root:polkituser   2755
+/usr/lib/PolicyKit/polkit-grant-helper                  root:polkituser   2755
+/usr/lib/PolicyKit/polkit-grant-helper-pam              root:polkituser   4750
+
+# dbus-1 (#333361)
+/lib/dbus-1/dbus-daemon-launch-helper                   root:messagebus   4750
+/lib64/dbus-1/dbus-daemon-launch-helper                 root:messagebus   4750
+
+# policycoreutils (#440596)
+/usr/bin/newrole                                        root:root         0755
+
+# VirtualBox (#429725)
+/usr/lib/virtualbox/VirtualBox                          root:vboxusers    0755
+/usr/lib/virtualbox/VirtualBox3                         root:vboxusers    0755
+/usr/lib/virtualbox/VBoxBFE                             root:vboxusers    0755
+/usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
+/usr/lib/virtualbox/VBoxSDL                             root:vboxusers    0755
