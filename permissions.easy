@@ -270,13 +270,13 @@
 #
 # amanda
 #
-/usr/sbin/amcheck                                       root:disk         4750
-/usr/lib/amanda/calcsize                                root:disk         4750
-/usr/lib/amanda/rundump                                 root:disk         4750
-/usr/lib/amanda/planner                                 root:disk         4750
-/usr/lib/amanda/runtar                                  root:disk         4750
-/usr/lib/amanda/dumper                                  root:disk         4750
-/usr/lib/amanda/killpgrp                                root:disk         4750
+/usr/sbin/amcheck                                       root:amanda       4750
+/usr/lib/amanda/calcsize                                root:amanda       4750
+/usr/lib/amanda/rundump                                 root:amanda       4750
+/usr/lib/amanda/planner                                 root:amanda       4750
+/usr/lib/amanda/runtar                                  root:amanda       4750
+/usr/lib/amanda/dumper                                  root:amanda       4750
+/usr/lib/amanda/killpgrp                                root:amanda       4750
 
 
 #

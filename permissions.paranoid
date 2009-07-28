@@ -283,16 +283,13 @@
 #
 # amanda
 #
-# Well, if you are gid disk already, you don't need these amanda binaries
-# to get root.
-# Anyway, we don't keep the suid bits.
-/usr/sbin/amcheck                                       root:disk         0750
-/usr/lib/amanda/calcsize                                root:disk         0750
-/usr/lib/amanda/rundump                                 root:disk         0750
-/usr/lib/amanda/planner                                 root:disk         0750
-/usr/lib/amanda/runtar                                  root:disk         0750
-/usr/lib/amanda/dumper                                  root:disk         0750
-/usr/lib/amanda/killpgrp                                root:disk         0750
+/usr/sbin/amcheck                                       root:amanda       0750
+/usr/lib/amanda/calcsize                                root:amanda       0750
+/usr/lib/amanda/rundump                                 root:amanda       0750
+/usr/lib/amanda/planner                                 root:amanda       0750
+/usr/lib/amanda/runtar                                  root:amanda       0750
+/usr/lib/amanda/dumper                                  root:amanda       0750
+/usr/lib/amanda/killpgrp                                root:amanda       0750
 
 
 #
