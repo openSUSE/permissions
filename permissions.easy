@@ -302,28 +302,11 @@
 
 
 #
-# fax
+# sendfax
 #
-# faxq helper:
 /usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4711
 /var/spool/fax/outgoing/                                fax:root          1755
 /var/spool/fax/outgoing/locks                           fax:root          0777
-# TODO: package should set this permissions
-/var/spool/fax/archive                                  fax:uucp           700
-/var/spool/fax/bin                                      fax:uucp           755
-/var/spool/fax/client                                   fax:uucp           755
-/var/spool/fax/config                                   fax:uucp           755
-/var/spool/fax/dev                                      fax:uucp           755
-/var/spool/fax/docq                                     fax:uucp           700
-/var/spool/fax/doneq                                    fax:uucp           700
-/var/spool/fax/etc                                      fax:uucp           755
-/var/spool/fax/info                                     fax:uucp           755
-/var/spool/fax/log                                      fax:uucp           755
-/var/spool/fax/pollq                                    fax:uucp           700
-/var/spool/fax/recvq                                    fax:uucp           755
-/var/spool/fax/sendq                                    fax:uucp           700
-/var/spool/fax/status                                   fax:uucp           755
-/var/spool/fax/tmp                                      fax:uucp           700
 
 #
 # uucp
