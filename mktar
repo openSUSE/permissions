@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+NAME=permissions
+VERSION=
+LAST_COMMIT=(`git rev-list --timestamp HEAD^..HEAD`)
+DATE=`date +%Y.%m.%d.%H%M -d "1970-01-01 00:00 UTC $LAST_COMMIT seconds"`
+vers="${VERSION:+${VERSION}_}$DATE"
+pfx="$NAME-$vers"
+fn="$pfx".tar.bz2
+git archive --prefix="$pfx"/ HEAD | bzip2 > $fn
+echo "version $vers -> $fn"
