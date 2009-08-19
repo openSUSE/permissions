@@ -434,6 +434,10 @@
 /usr/lib/PolicyKit/polkit-grant-helper                  root:polkituser   2755
 /usr/lib/PolicyKit/polkit-grant-helper-pam              root:polkituser   4750
 
+# polkit new (bnc#523377)
+/usr/lib/polkit-1/polkit-agent-helper-1                 root:root         4755
+/usr/bin/pkexec                                         root:root         4755
+
 # dbus-1 (#333361)
 /lib/dbus-1/dbus-daemon-launch-helper                   root:messagebus   4750
 /lib64/dbus-1/dbus-daemon-launch-helper                 root:messagebus   4750
