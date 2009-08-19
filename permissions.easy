@@ -405,3 +405,6 @@
 /usr/lib/virtualbox/VBoxBFE                             root:vboxusers    4750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    4750
 /usr/lib/virtualbox/VBoxSDL                             root:vboxusers    4750
+
+# open-vm-tools (bnc#474285)
+/usr/bin/vmware-user-suid-wrapper			root:root         4755
