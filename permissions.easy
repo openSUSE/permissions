@@ -307,9 +307,9 @@
 #
 # sendfax
 #
-/usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4711
-/var/spool/fax/outgoing/                                fax:root          1755
-/var/spool/fax/outgoing/locks                           fax:root          0777
+/usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4755
+/var/spool/fax/outgoing/                                fax:root          0755
+/var/spool/fax/outgoing/locks                           fax:root          0755
 
 #
 # uucp
