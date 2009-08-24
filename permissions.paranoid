@@ -212,7 +212,6 @@
 #
 /bin/ping                                               root:root         0755
 /bin/ping6                                              root:root         0755
-/usr/sbin/traceroute6                                   root:root         0755
 # mtr is linked against ncurses.
 /usr/sbin/mtr                                           root:dialout      0755
 /usr/bin/rcp                                            root:root         0755

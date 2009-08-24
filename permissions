@@ -159,11 +159,6 @@
 # you really need it as suidperl is a hardlink to perl nowadays.
 /usr/bin/suidperl                                       root:root          755
 
-# cdrecord does not need to be setuid root as it uses resmgr for
-# accessing the devices. Access to that one can be configured in
-# /etc/resmgr.conf
-/usr/bin/cdrecord                                       root:root          755
-
 # new traceroute program by Olaf Kirch does not need setuid root any more.
 /usr/sbin/traceroute                                    root:root          755
 

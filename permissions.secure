@@ -234,7 +234,6 @@
 #
 /bin/ping                                               root:root         4755
 /bin/ping6                                              root:root         4755
-/usr/sbin/traceroute6                                   root:root         4755
 # mtr is linked against ncurses. no suid bit, for root only:
 /usr/sbin/mtr                                           root:dialout      0755
 /usr/bin/rcp                                            root:root         4755
