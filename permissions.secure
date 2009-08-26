@@ -157,6 +157,13 @@
 /usr/src/packages/RPMS/sparc64/                         root:root          755
 /usr/src/packages/RPMS/x86_64/                          root:root          755
 /usr/src/packages/RPMS/armv4l/                          root:root          755
+/usr/src/packages/RPMS/armv5tel/                        root:root          755
+/usr/src/packages/RPMS/armv5tevl/                       root:root          755
+/usr/src/packages/RPMS/armv5tejl/                       root:root          755
+/usr/src/packages/RPMS/armv5tejvl/                      root:root          755
+/usr/src/packages/RPMS/armv6l/                          root:root          755
+/usr/src/packages/RPMS/armv6vl/                         root:root          755
+/usr/src/packages/RPMS/armv7l/                          root:root          755
 /usr/src/packages/RPMS/hppa/                            root:root          755
 /usr/src/packages/RPMS/hppa2.0/                         root:root          755
 /usr/src/packages/RPMS/noarch/                          root:root          755
