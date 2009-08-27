@@ -110,6 +110,7 @@
 # rpm subsystem:
 /usr/src/packages/SOURCES/                              root:root          700
 /usr/src/packages/BUILD/                                root:root          700
+/usr/src/packages/BUILDROOT/                            root:root          700
 /usr/src/packages/RPMS/                                 root:root          700
 /usr/src/packages/RPMS/alpha/                           root:root          700
 /usr/src/packages/RPMS/alphaev56/                       root:root          700
