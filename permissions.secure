@@ -228,11 +228,6 @@
 /usr/sbin/change-passwd                                 root:root         4755
 
 #
-# cups (#66305,#406058)
-#
-/usr/bin/lppasswd                                       lp:lp             2755
-
-#
 # smb printing with kerberos authentication (#177114)
 #
 /usr/bin/get_printing_ticket                            root:lp           4750
