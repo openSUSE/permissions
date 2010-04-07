@@ -308,16 +308,14 @@
 #
 # news (inn)
 #
-# the inn start script changes it's uid to news:news. Later innstart and
-# innfeed are called by this user. Those programs do not need to be called by
-# anyone else, therefore the strange permissions 4554 are required for
-# operation. (#67032)
+# the inn start script changes it's uid to news:news. Later innbind
+# is called by this user. Those programs do not need to be called by
+# anyone else, therefore the strange permissions 4554 are required
+# for operation. (#67032, #594393)
 #
 /usr/lib/news/bin/rnews                                 news:uucp         0555
-/usr/lib/news/bin/startinnfeed                          root:news         0555
-/usr/lib/news/bin/inndstart                             root:news         0555
 /usr/lib/news/bin/inews                                 news:news         0555
-
+/usr/lib/news/bin/innbind                               root:news         0555
 
 #
 # sendfax
