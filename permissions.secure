@@ -178,8 +178,6 @@
 # scotty:
 # #66211
 /usr/bin/ntping                                         root:trusted      4750
-# vlock (bnc#629236)
-/usr/sbin/vlock-main                                    root:shadow       0755
 #
 /usr/bin/Xorg                                           root:root         0711
 # turned off write and wall by disabling sgid tty:
