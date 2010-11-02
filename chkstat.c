@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/capability.h>
 #define __USE_GNU
 #include <fcntl.h>
 
@@ -37,6 +38,7 @@ struct perm {
   char *owner;
   char *group;
   mode_t mode;
+  cap_t caps;
 };
 
 struct perm *permlist;
@@ -47,7 +49,7 @@ char *root;
 int rootl;
 
 void
-add_permlist(char *file, char *owner, char *group, mode_t mode)
+add_permlist(char *file, char *owner, char *group, mode_t mode, cap_t caps)
 {
   struct perm *ec, **epp;
 
@@ -80,6 +82,7 @@ add_permlist(char *file, char *owner, char *group, mode_t mode)
         free(ec->file);
         free(ec->owner);
         free(ec->group);
+        cap_free(ec->caps);
         free(ec);
       }
     else
@@ -94,6 +97,7 @@ add_permlist(char *file, char *owner, char *group, mode_t mode)
   ec->owner = owner;
   ec->group = group;
   ec->mode = mode;
+  ec->caps = caps;
   ec->next = 0;
   *epp = ec;
 }
@@ -264,7 +268,7 @@ safepath(char *path, uid_t uid, gid_t gid)
 int
 main(int argc, char **argv)
 {
-  char *opt, *p;
+  char *opt, *p, *str;
   int set = 0;
   int told = 0;
   int use_checklist = 0;
@@ -282,6 +286,7 @@ main(int argc, char **argv)
   gid_t gid;
   int fd, r;
   int errors = 0;
+  cap_t caps;
 
   while (argc > 1)
     {
@@ -408,7 +413,7 @@ main(int argc, char **argv)
 	    }
 	  if (inpart)
 	    pcnt++;
-	  if (pcnt != 3)
+	  if (pcnt != 3 && pcnt != 4)
 	    {
 	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
 	      continue;
@@ -429,7 +434,8 @@ main(int argc, char **argv)
 	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
 	      continue;
 	    }
-	  add_permlist(part[0], part[1], part[2], mode);
+	  caps = *p ? cap_from_text(p) : cap_init();
+	  add_permlist(part[0], part[1], part[2], mode, caps);
 	}
       fclose(fp);
     }
@@ -455,7 +461,11 @@ main(int argc, char **argv)
 	}
       uid = pwd->pw_uid;
       gid = grp->gr_gid;
-      if ((stb.st_mode & 07777) == e->mode && stb.st_uid == uid && stb.st_gid == gid)
+      if (cap_get_file(e->file))
+	caps = cap_get_file(e->file);
+      else
+	caps = cap_init();
+      if ((stb.st_mode & 07777) == e->mode && stb.st_uid == uid && stb.st_gid == gid && !cap_compare(e->caps, caps))
 	continue;
 
       if (!told)
@@ -466,10 +476,20 @@ main(int argc, char **argv)
 	    printf("\t%s\n", argv[i]);
 	}
 
-      if (!set)
-        printf("%s should be %s:%s %04o.", e->file, e->owner, e->group, e->mode);
+      if (!e->caps)
+	if (!set)
+	  printf("%s should be %s:%s %04o.", e->file, e->owner, e->group, e->mode);
+	else
+	  printf("setting %s to %s:%s %04o.", e->file, e->owner, e->group, e->mode);
       else
-        printf("setting %s to %s:%s %04o.", e->file, e->owner, e->group, e->mode);
+        {
+	  str = cap_to_text(e->caps, NULL);
+	  if (!set)
+	    printf("%s should be %s:%s %04o \"%s\".", e->file, e->owner, e->group, e->mode, str);
+	  else
+	    printf("setting %s to %s:%s %04o \"%s\".", e->file, e->owner, e->group, e->mode, str);
+	  cap_free(str);
+        }
       printf(" (wrong");
       if (stb.st_uid != uid || stb.st_gid != gid)
 	{
@@ -488,6 +508,12 @@ main(int argc, char **argv)
 	}
       if ((stb.st_mode & 07777) != e->mode)
 	printf(" permissions %04o", (int)(stb.st_mode & 07777));
+      if (e->caps != 0 && cap_compare(e->caps, caps))
+        {
+	  str = cap_to_text(caps, NULL);
+	  printf(" capabilities %s", str);
+	  cap_free(str);
+        }
       putchar(')');
       putchar('\n');
 
@@ -576,6 +602,18 @@ main(int argc, char **argv)
 	  if (r)
 	    {
 	      fprintf(stderr, "%s: chmod: %s\n", e->file, strerror(errno));
+	      errors++;
+	    }
+	}
+      if (cap_compare(e->caps, caps))
+	{
+	  if (fd >= 0)
+	    r = cap_set_fd(fd, e->caps);
+	  else
+	    r = cap_set_file(e->file, e->caps);
+	  if (r)
+	    {
+	      fprintf(stderr, "%s: cap_set_file: %s\n", e->file, strerror(errno));
 	      errors++;
 	    }
 	}
