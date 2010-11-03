@@ -267,6 +267,31 @@ safepath(char *path, uid_t uid, gid_t gid)
     }
 }
 
+/* that's really ugly. There should be sysctl or something */
+static int
+check_fscaps_cmdline()
+{
+  FILE* fp;
+  char line[4096];
+  if ((fp = fopen("/proc/cmdline", "r")) == 0)
+    {
+      return 0;
+    }
+  if (readline(fp, line, sizeof(line)))
+    {
+      char* p;
+      if ((p = strstr(line, "file_caps")))
+	{
+	  if (p - line < 3 || strncmp("no_", p, 3))
+	    {
+	      return 1;
+	    }
+	}
+    }
+  fclose(fp);
+  return 0;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -289,6 +314,7 @@ main(int argc, char **argv)
   int fd, r;
   int errors = 0;
   cap_t caps = NULL;
+  int have_fscaps = check_fscaps_cmdline();
 
   while (argc > 1)
     {
@@ -430,6 +456,8 @@ main(int argc, char **argv)
 		}
 	      if (!strncmp(p, "+capabilities ", 14))
 		{
+		  if (!have_fscaps)
+		    continue;
 		  p += 14;
 		  caps = cap_from_text(p);
 		  if (caps)
@@ -526,6 +554,10 @@ main(int argc, char **argv)
 	  printf("Checking permissions and ownerships - using the permissions files\n");
 	  for (i = 1; i < argc; i++)
 	    printf("\t%s\n", argv[i]);
+	  if (!have_fscaps)
+	    {
+	      printf("fscaps support disabled (file_caps missing in /proc/cmdline).\n");
+	    }
 	}
 
       if (!set)
