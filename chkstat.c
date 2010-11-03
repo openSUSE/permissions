@@ -31,6 +31,8 @@
 #define __USE_GNU
 #include <fcntl.h>
 
+#define BAD_LINE() \
+  fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
 
 struct perm {
   struct perm *next;
@@ -48,8 +50,8 @@ uid_t euid;
 char *root;
 int rootl;
 
-void
-add_permlist(char *file, char *owner, char *group, mode_t mode, cap_t caps)
+struct perm*
+add_permlist(char *file, char *owner, char *group, mode_t mode)
 {
   struct perm *ec, **epp;
 
@@ -82,7 +84,6 @@ add_permlist(char *file, char *owner, char *group, mode_t mode, cap_t caps)
         free(ec->file);
         free(ec->owner);
         free(ec->group);
-        cap_free(ec->caps);
         free(ec);
       }
     else
@@ -97,9 +98,10 @@ add_permlist(char *file, char *owner, char *group, mode_t mode, cap_t caps)
   ec->owner = owner;
   ec->group = group;
   ec->mode = mode;
-  ec->caps = caps;
+  ec->caps = NULL;
   ec->next = 0;
   *epp = ec;
+  return ec;
 }
 
 int
@@ -286,7 +288,7 @@ main(int argc, char **argv)
   gid_t gid;
   int fd, r;
   int errors = 0;
-  cap_t caps;
+  cap_t caps = NULL;
 
   while (argc > 1)
     {
@@ -384,8 +386,11 @@ main(int argc, char **argv)
 	  exit(1);
 	}
       lcnt = 0;
+      struct perm* last = NULL;
+      int extline;
       while (readline(fp, line, sizeof(line)))
 	{
+	  extline = 0;
 	  lcnt++;
 	  if (*line == 0 || *line == '#' || *line == '$')
 	    continue;
@@ -403,6 +408,11 @@ main(int argc, char **argv)
 		    }
 		  continue;
 		}
+	      if (pcnt == 0 && !inpart && *p == '+')
+		{
+		  extline = 1;
+		  break;
+		}
 	      if (!inpart)
 		{
 		  inpart = 1;
@@ -411,11 +421,32 @@ main(int argc, char **argv)
 		  part[pcnt] = p;
 		}
 	    }
+	  if (extline)
+	    {
+	      if (!last)
+		{
+		  BAD_LINE();
+		  continue;
+		}
+	      if (!strncmp(p, "+capabilities ", 14))
+		{
+		  p += 14;
+		  caps = cap_from_text(p);
+		  if (caps)
+		    {
+		      cap_free(last->caps);
+		      last->caps = caps;
+		    }
+		  continue;
+		}
+	      BAD_LINE();
+	      continue;
+	    }
 	  if (inpart)
 	    pcnt++;
-	  if (pcnt != 3 && pcnt != 4)
+	  if (pcnt != 3)
 	    {
-	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
+	      BAD_LINE();
 	      continue;
 	    }
 	  part[3] = part[2];
@@ -424,18 +455,17 @@ main(int argc, char **argv)
 	    part[2] = strchr(part[1], '.');
 	  if (!part[2])
 	    {
-	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
+	      BAD_LINE();
 	      continue;
 	    }
 	  *part[2]++ = 0;
           mode = strtoul(part[3], part + 3, 8);
 	  if (mode > 07777 || part[3][0])
 	    {
-	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
+	      BAD_LINE();
 	      continue;
 	    }
-	  caps = *p ? cap_from_text(p) : cap_init();
-	  add_permlist(part[0], part[1], part[2], mode, caps);
+	  last = add_permlist(part[0], part[1], part[2], mode);
 	}
       fclose(fp);
     }
@@ -461,11 +491,33 @@ main(int argc, char **argv)
 	}
       uid = pwd->pw_uid;
       gid = grp->gr_gid;
-      if (cap_get_file(e->file))
-	caps = cap_get_file(e->file);
-      else
-	caps = cap_init();
-      if ((stb.st_mode & 07777) == e->mode && stb.st_uid == uid && stb.st_gid == gid && !cap_compare(e->caps, caps))
+      caps = cap_get_file(e->file);
+      if (!caps)
+	{
+	  cap_free(caps);
+	  caps = NULL;
+	  if (errno == EOPNOTSUPP)
+	    {
+	      //fprintf(stderr, "%s: fscaps not supported\n", e->file);
+	      cap_free(e->caps);
+	      e->caps = NULL;
+	    }
+	}
+      if (e->caps)
+	{
+	  e->mode &= 0777;
+	}
+
+      int perm_ok = (stb.st_mode & 07777) == e->mode;
+      int owner_ok = stb.st_uid == uid && stb.st_gid == gid;
+      int caps_ok = 0;
+
+      if (!caps && !e->caps)
+	caps_ok = 1;
+      else if (caps && e->caps && !cap_compare(e->caps, caps))
+	caps_ok = 1;
+
+      if (perm_ok && owner_ok && caps_ok)
 	continue;
 
       if (!told)
@@ -476,22 +528,19 @@ main(int argc, char **argv)
 	    printf("\t%s\n", argv[i]);
 	}
 
-      if (!e->caps)
-	if (!set)
-	  printf("%s should be %s:%s %04o.", e->file, e->owner, e->group, e->mode);
-	else
-	  printf("setting %s to %s:%s %04o.", e->file, e->owner, e->group, e->mode);
+      if (!set)
+	printf("%s should be %s:%s %04o", e->file, e->owner, e->group, e->mode);
       else
+	printf("setting %s to %s:%s %04o", e->file, e->owner, e->group, e->mode);
+
+      if (!caps_ok && e->caps)
         {
 	  str = cap_to_text(e->caps, NULL);
-	  if (!set)
-	    printf("%s should be %s:%s %04o \"%s\".", e->file, e->owner, e->group, e->mode, str);
-	  else
-	    printf("setting %s to %s:%s %04o \"%s\".", e->file, e->owner, e->group, e->mode, str);
+	  printf(" \"%s\"", str);
 	  cap_free(str);
         }
-      printf(" (wrong");
-      if (stb.st_uid != uid || stb.st_gid != gid)
+      printf(". (wrong");
+      if (!owner_ok)
 	{
 	  pwd = getpwuid(stb.st_uid);
 	  grp = getgrgid(stb.st_gid);
@@ -506,13 +555,24 @@ main(int argc, char **argv)
 	  pwd = 0;
 	  grp = 0;
 	}
-      if ((stb.st_mode & 07777) != e->mode)
+
+      if (!perm_ok)
 	printf(" permissions %04o", (int)(stb.st_mode & 07777));
-      if (e->caps != 0 && cap_compare(e->caps, caps))
+
+      if (!caps_ok)
         {
-	  str = cap_to_text(caps, NULL);
-	  printf(" capabilities %s", str);
-	  cap_free(str);
+	  if (!perm_ok || !owner_ok)
+	    {
+	      fputc(',', stdout);
+	    }
+	  if (caps)
+	    {
+	      str = cap_to_text(caps, NULL);
+	      printf(" capabilities \"%s\"", str);
+	      cap_free(str);
+	    }
+	  else
+	    fputs(" missing capabilities", stdout);
         }
       putchar(')');
       putchar('\n');
@@ -565,13 +625,13 @@ main(int argc, char **argv)
 		}
 	    }
 	}
-      else if (strncmp(e->file, "/dev/", 4) != 0)
+      else if (strncmp(e->file, "/dev/", 5) != 0) // handle special files only in /dev
 	{
 	  fprintf(stderr, "%s: don't know what to do with that type of file\n", e->file);
 	  errors++;
 	  continue;
 	}
-      if (euid == 0 && (stb.st_uid != uid || stb.st_gid != gid))
+      if (euid == 0 && !owner_ok)
 	{
 	  if (fd >= 0)
 	    r = fchown(fd, uid, gid);
@@ -593,7 +653,7 @@ main(int argc, char **argv)
 	      continue;
 	    }
 	}
-      if ((stb.st_mode & 07777) != e->mode)
+      if (!perm_ok)
 	{
 	  if (fd >= 0)
 	    r = fchmod(fd, e->mode);
@@ -605,7 +665,7 @@ main(int argc, char **argv)
 	      errors++;
 	    }
 	}
-      if (cap_compare(e->caps, caps))
+      if (!caps_ok)
 	{
 	  if (fd >= 0)
 	    r = cap_set_fd(fd, e->caps);

@@ -87,7 +87,10 @@ for my $permfile (@permfiles)
     {
 	chomp;
 	s/#.*//;
+	s/^\s.*//;
 	next if(/^$/);
+
+	next if(/^\+/); # XXX ext line
 
 	my ($file, $owner, $mode) = split(/\s+/);
 

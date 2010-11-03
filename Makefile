@@ -1,6 +1,7 @@
 CFLAGS=-W -Wall -g -O2
 CC=gcc
 DESTDIR=
+LDLIBS=-lcap
 prefix=/usr
 sysconfdir=/etc
 bindir=$(prefix)/bin
