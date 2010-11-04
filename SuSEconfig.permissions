@@ -41,7 +41,10 @@ case "$CHECK_PERMISSIONS" in
     *) echo "invalid value '$CHECK_PERMISSIONS' for \$CHECK_PERMISSIONS" >&2 ;;
 esac
 
-
+if test -n "$FASTRUN" -a "$ONLY_MODULE" != "permissions" -a -n "$mode"; then
+    echo "no permissions will be changed if not called explicitly"
+    mode=""
+fi
 
 # collect files that contain permission specifications
 #
