@@ -530,6 +530,7 @@ main(int argc, char **argv)
   int told = 0;
   int use_checklist = 0;
   int systemmode = 0;
+  int suseconfig = 0;
   FILE *fp;
   char line[512];
   char *part[4];
@@ -558,6 +559,15 @@ main(int argc, char **argv)
 	{
 	  argc--;
 	  argv++;
+	  systemmode = 1;
+	  continue;
+	}
+      // hidden option for use by suseconfig only
+      if (!strcmp(opt, "-suseconfig"))
+	{
+	  argc--;
+	  argv++;
+	  suseconfig = 1;
 	  systemmode = 1;
 	  continue;
 	}
@@ -651,6 +661,15 @@ main(int argc, char **argv)
 	    {
 	      fprintf(stderr, "permissions handling disabled in %s\n", file);
 	      exit(0);
+	    }
+	  if (suseconfig && default_set)
+	    {
+	      char* module = getenv("ONLY_MODULE");
+	      if (!module || strcmp(module, "permissions"))
+		{
+		  puts("no permissions will be changed if not called explicitly");
+		  default_set = 0;
+		}
 	    }
 	  do_set = default_set;
 	}

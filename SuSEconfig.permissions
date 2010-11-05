@@ -24,66 +24,9 @@
 
 . /lib/YaST/SuSEconfig.functions || exit 1
 
-for i in /etc/sysconfig/security /etc/sysconfig/suseconfig ; do
-  . $i || exit 1
-done
-
 if test -n "$ENABLE_SUSECONFIG" -a "$ENABLE_SUSECONFIG" = "no" ; then
     echo "SuSEconfig is disabled in /etc/sysconfig/suseconfig"
     exit 0
 fi
 
-mode=""
-case "$CHECK_PERMISSIONS" in
-    set) mode="-set" ;;
-    warn) ;;
-    no|"") exit 0 ;;
-    *) echo "invalid value '$CHECK_PERMISSIONS' for \$CHECK_PERMISSIONS" >&2 ;;
-esac
-
-if test -n "$FASTRUN" -a "$ONLY_MODULE" != "permissions" -a -n "$mode"; then
-    echo "no permissions will be changed if not called explicitly"
-    mode=""
-fi
-
-# collect files that contain permission specifications
-#
-# 1. central fixed permissions file
-files="/etc/permissions"
-
-# 2. central easy, secure paranoid as those are defined by SUSE
-for level in $PERMISSION_SECURITY; do 
-    case "$level" in
-	easy|secure|paranoid)
-	    if [ -e /etc/permissions.$level ]; then
-		files="$files /etc/permissions.$level"
-	    fi
-	;;
-    esac
-done
-
-# 3. package specific permissions
-pkgfiles=(/etc/permissions.d/*)
-pkgfiles=(${pkgfiles[*]##*/})
-pkgfiles=(${pkgfiles[*]%%.*})
-pkgfiles=(`for i in ${pkgfiles[@]}; do echo $i; done | /usr/bin/sort -u`)
-
-for file in ${pkgfiles[@]}; do
-    file=/etc/permissions.d/$file
-    [ -e $file ] && files="$files $file"
-    for level in $PERMISSION_SECURITY; do 
-	[ -e $file.$level ] && files="$files $file.$level"
-    done
-done
-
-# 4. central permissions files with user defined level incl 'local'
-for level in $PERMISSION_SECURITY; do 
-    case "$level" in
-	easy|secure|paranoid) continue ;;
-    esac
-    if [ -e /etc/permissions.$level ]; then
-	files="$files /etc/permissions.$level"
-    fi
-done
-
-/usr/bin/chkstat $mode $files
+/usr/bin/chkstat --suseconfig $mode
