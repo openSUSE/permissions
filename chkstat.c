@@ -546,7 +546,7 @@ main(int argc, char **argv)
   int fd, r;
   int errors = 0;
   cap_t caps = NULL;
-  int have_fscaps = check_fscaps_cmdline();
+  int have_fscaps = -1;
 
   while (argc > 1)
     {
@@ -569,6 +569,20 @@ main(int argc, char **argv)
 	  argv++;
 	  suseconfig = 1;
 	  systemmode = 1;
+	  continue;
+	}
+      if (!strcmp(opt, "-fscaps"))
+	{
+	  argc--;
+	  argv++;
+	  have_fscaps = 1;
+	  continue;
+	}
+      if (!strcmp(opt, "-no-fscaps"))
+	{
+	  argc--;
+	  argv++;
+	  have_fscaps = 0;
 	  continue;
 	}
       if (!strcmp(opt, "-s") || !strcmp(opt, "-set"))
@@ -650,6 +664,9 @@ main(int argc, char **argv)
 	usage(!strcmp(opt, "-h") || !strcmp(opt, "-help") ? 0 : 1);
       break;
     }
+
+  if (have_fscaps == -1)
+      have_fscaps = check_fscaps_cmdline();
 
   if (systemmode)
     {
