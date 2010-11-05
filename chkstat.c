@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <dirent.h>
 #include <sys/capability.h>
 #define __USE_GNU
 #include <fcntl.h>
@@ -49,6 +50,12 @@ int nchecklist;
 uid_t euid;
 char *root;
 int rootl;
+int nlevel;
+char** level;
+int do_set = 0;
+int default_set = 0;
+char** permfiles = NULL;
+int npermfiles = 0;
 
 struct perm*
 add_permlist(char *file, char *owner, char *group, mode_t mode)
@@ -161,10 +168,234 @@ readline(FILE *fp, char *buf, int len)
   return 1;
 }
 
+int
+in_level(char *e)
+{
+  int i;
+  for (i = 0; i < nlevel; i++)
+    if (!strcmp(e, level[i]))
+      return 1;
+  return 0;
+}
+
+void
+ensure_array(void** array, int* size)
+{
+  if ((*size & 63) == 0)
+    {
+      if (*array == NULL)
+	*array = malloc(sizeof(char *) * (*size + 64));
+      else
+	*array = realloc(*array, sizeof(char *) * (*size + 64));
+      if (*array == NULL)
+	{
+	  perror("array alloc");
+	  exit(1);
+	}
+    }
+}
+
+void
+add_level(char *e)
+{
+  if (in_level(e))
+    return;
+  e = strdup(e);
+  if (e == 0)
+    {
+      perror("level entry alloc");
+      exit(1);
+    }
+  ensure_array((void**)&level, &nlevel);
+  level[nlevel++] = e;
+}
+
+static inline int isquote(char c)
+{
+    return (c == '"' || c == '\'');
+}
+
+int
+parse_sysconf(const char* file)
+{
+  FILE* fp;
+  char line[1024];
+  char* p;
+  if ((fp = fopen(file, "r")) == 0)
+    {
+      fprintf(stderr, "error opening: %s: %s\n", file, strerror(errno));
+      return 0;
+    }
+  while (readline(fp, line, sizeof(line)))
+    {
+      if (!*line)
+	continue;
+      for (p = line; *p == ' '; ++p);
+      if (!*p || *p == '#')
+	continue;
+      if (!strncmp(p, "PERMISSION_SECURITY=", 20))
+	{
+	  p+=20;
+	  if (isquote(*p))
+	    ++p;
+	  p = strtok(p, " ");
+	  if (p && !isquote(*p))
+	    {
+	      do
+		{
+		  if (isquote(p[strlen(p)-1]))
+		    {
+		      p[strlen(p)-1] = '\0';
+		    }
+		  if (*p && strcmp(p, "local"))
+		      add_level(p);
+		}
+	      while ((p = strtok(NULL, " ")));
+	    }
+	}
+      else if (!strncmp(p, "CHECK_PERMISSIONS=", 18))
+	{
+	  p+=18;
+	  if (isquote(*p))
+	    ++p;
+	  if (!strncmp(p, "set", 3))
+	    {
+	      p+=3;
+	      if (isquote(*p) || !*p)
+		default_set=1;
+	    }
+	  else if ((!strncmp(p, "no", 2) && (!p[3] || isquote(p[3]))) || !*p || isquote(*p))
+	    {
+	      p+=2;
+	      if (isquote(*p) || !*p)
+		{
+		  default_set = -1;
+		}
+	    }
+	  else
+	    {
+	      //fprintf(stderr, "invalid value for CHECK_PERMISSIONS (must be 'set', 'warn' or 'no')\n");
+	    }
+	}
+    }
+  fclose(fp);
+  return 0;
+}
+
+static int
+compare(const void* a, const void* b)
+{
+  return strcmp(*(char* const*)a, *(char* const*)b);
+}
+
+static void
+collect_permfiles()
+{
+  int i;
+  DIR* dir;
+
+  ensure_array((void**)&permfiles, &npermfiles);
+  // 1. central fixed permissions file
+  permfiles[npermfiles++] = strdup("/etc/permissions");
+
+  // 2. central easy, secure paranoid as those are defined by SUSE
+  for (i = 0; i < nlevel; ++i)
+    {
+      if (!strcmp(level[i], "easy")
+	      || !strcmp(level[i], "secure")
+	      || !strcmp(level[i], "paranoid"))
+	{
+	  char fn[4096];
+	  snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
+	  if (access(fn, R_OK) == 0)
+	    {
+	      ensure_array((void**)&permfiles, &npermfiles);
+	      permfiles[npermfiles++] = strdup(fn);
+	    }
+	}
+    }
+  // 3. package specific permissions
+  dir = opendir("/etc/permissions.d");
+  if (dir)
+    {
+      char** files = NULL;
+      int nfiles = 0;
+      struct dirent* d;
+      while ((d = readdir(dir)))
+	{
+	  char* p;
+	  if (!strcmp("..", d->d_name) || !strcmp(".", d->d_name))
+	    continue;
+	  ensure_array((void**)&files, &nfiles);
+	  if ((p = strchr(d->d_name, '.')))
+	    {
+	      *p = '\0';
+	    }
+	  files[nfiles++] = strdup(d->d_name);
+	}
+      closedir(dir);
+      if (nfiles)
+	{
+	  qsort(files, nfiles, sizeof(char*), compare);
+	  for (i = 0; i < nfiles; ++i)
+	    {
+	      char fn[4096];
+	      int l;
+	      // skip duplicates
+	      if (i && !strcmp(files[i-1], files[i]))
+		continue;
+
+	      snprintf(fn, sizeof(fn), "/etc/permissions.d/%s", files[i]);
+	      if (access(fn, R_OK) == 0)
+		{
+		  ensure_array((void**)&permfiles, &npermfiles);
+		  permfiles[npermfiles++] = strdup(fn);
+		}
+
+	      for (l = 0; l < nlevel; ++l)
+		{
+		  snprintf(fn, sizeof(fn), "/etc/permissions.d/%s.%s", files[i], level[l]);
+
+		  if (access(fn, R_OK) == 0)
+		    {
+		      ensure_array((void**)&permfiles, &npermfiles);
+		      permfiles[npermfiles++] = strdup(fn);
+		    }
+		}
+
+	    }
+	}
+    }
+  // 4. central permissions files with user defined level incl 'local'
+  for (i = 0; i < nlevel; ++i)
+    {
+      char fn[4096];
+
+      if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid"))
+	continue;
+
+      snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
+      if (access(fn, R_OK) == 0)
+	{
+	  ensure_array((void**)&permfiles, &npermfiles);
+	  permfiles[npermfiles++] = strdup(fn);
+	}
+    }
+}
+
+
 void
 usage(int x)
 {
-  fprintf(stderr, "Usage: chkstat [--set] [--noheader] [[--examine file] ...] [ [--files filelist] ...] permission-file ...\n");
+  printf("Usage:\n"
+"a) chkstat [OPTIONS] <permission-files>...\n"
+"b) chkstat --system [OPTIONS] <files>...\n"
+"\n"
+"Options:\n"
+"  --set			apply changes\n"
+"  --noheader		don't print intro message\n"
+"  --examine file	apply to specified file only\n"
+"  --files filelist	read list of files to apply from filelist\n");
   exit(x);
 }
 
@@ -179,7 +410,7 @@ safepath(char *path, uid_t uid, gid_t gid)
 
   lcnt = 0;
   l2 = strlen(path);
-  if (l2 >= sizeof(pathbuf))
+  if ((unsigned)l2 >= sizeof(pathbuf))
     return 0;
   strcpy(pathbuf, path);
   if (pathbuf[0] != '/') 
@@ -198,11 +429,11 @@ safepath(char *path, uid_t uid, gid_t gid)
 	  if (++lcnt >= 256)
 	    return 0;
 	  l = readlink(pathbuf, linkbuf, sizeof(linkbuf));
-	  if (l <= 0 || l >= sizeof(linkbuf))
+	  if (l <= 0 || (unsigned)l >= sizeof(linkbuf))
 	    return 0;
 	  while(l && linkbuf[l - 1] == '/')
 	    l--;
-	  if (l + 1 >= sizeof(linkbuf))
+	  if ((unsigned)l + 1 >= sizeof(linkbuf))
 	    return 0;
 	  linkbuf[l++] = '/';
 	  linkbuf[l] = 0;
@@ -234,7 +465,7 @@ safepath(char *path, uid_t uid, gid_t gid)
 	      l2 -= (p - p2);
 	      p = p2;
 	    }
-	  if (l + l2 >= sizeof(pathbuf))
+	  if ((unsigned)(l + l2) >= sizeof(pathbuf))
 	    return 0;
 	  memmove(p + l, p, pathbuf + l2 - p + 1);
 	  memmove(p, linkbuf, l);
@@ -296,9 +527,9 @@ int
 main(int argc, char **argv)
 {
   char *opt, *p, *str;
-  int set = 0;
   int told = 0;
   int use_checklist = 0;
+  int systemmode = 0;
   FILE *fp;
   char line[512];
   char *part[4];
@@ -323,9 +554,16 @@ main(int argc, char **argv)
 	break;
       if (*opt == '-' && opt[1] == '-')
 	opt++;
+      if (!strcmp(opt, "-system"))
+	{
+	  argc--;
+	  argv++;
+	  systemmode = 1;
+	  continue;
+	}
       if (!strcmp(opt, "-s") || !strcmp(opt, "-set"))
 	{
-	  set = 1;
+	  do_set=1;
 	  argc--;
 	  argv++;
 	  continue;
@@ -402,11 +640,44 @@ main(int argc, char **argv)
 	usage(!strcmp(opt, "-h") || !strcmp(opt, "-help") ? 0 : 1);
       break;
     }
-  if (argc <= 1)
-    usage(1);
-  for (i = 1; i < argc; i++)
+
+  if (systemmode)
     {
-      if ((fp = fopen(argv[i], "r")) == 0)
+      const char file[] = "/etc/sysconfig/security";
+      parse_sysconf(file);
+      if(!do_set)
+	{
+	  if (default_set < 0)
+	    {
+	      fprintf(stderr, "permissions handling disabled in %s\n", file);
+	      exit(0);
+	    }
+	  do_set = default_set;
+	}
+
+      if (!nlevel)
+	add_level("secure");
+      add_level("local"); // always add local
+
+      for (i = 1; i < argc; i++)
+	{
+	  add_checklist(argv[i]);
+	  use_checklist = 1;
+	  continue;
+	}
+      collect_permfiles();
+    }
+  else if (argc <= 1)
+    usage(1);
+  else
+    {
+      npermfiles = argc-1;
+      permfiles = &argv[1];
+    }
+
+  for (i = 0; i < npermfiles; i++)
+    {
+      if ((fp = fopen(permfiles[i], "r")) == 0)
 	{
 	  perror(argv[i]);
 	  exit(1);
@@ -552,15 +823,15 @@ main(int argc, char **argv)
 	{
 	  told = 1;
 	  printf("Checking permissions and ownerships - using the permissions files\n");
-	  for (i = 1; i < argc; i++)
-	    printf("\t%s\n", argv[i]);
+	  for (i = 0; i < npermfiles; i++)
+	    printf("\t%s\n", permfiles[i]);
 	  if (!have_fscaps)
 	    {
 	      printf("fscaps support disabled (file_caps missing in /proc/cmdline).\n");
 	    }
 	}
 
-      if (!set)
+      if (!do_set)
 	printf("%s should be %s:%s %04o", e->file, e->owner, e->group, e->mode);
       else
 	printf("setting %s to %s:%s %04o", e->file, e->owner, e->group, e->mode);
@@ -609,7 +880,7 @@ main(int argc, char **argv)
       putchar(')');
       putchar('\n');
 
-      if (!set)
+      if (!do_set)
 	continue;
 
       fd = -1;
@@ -719,3 +990,5 @@ main(int argc, char **argv)
     }
   exit(0);
 }
+
+// vim: sw=4 cino+={.5s,n-.5s,^-.5s
