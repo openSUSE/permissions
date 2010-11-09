@@ -52,7 +52,7 @@ char *root;
 int rootl;
 int nlevel;
 char** level;
-int do_set = 0;
+int do_set = -1;
 int default_set = 0;
 char** permfiles = NULL;
 int npermfiles = 0;
@@ -592,6 +592,13 @@ main(int argc, char **argv)
 	  argv++;
 	  continue;
 	}
+      if (!strcmp(opt, "-warn"))
+	{
+	  do_set=0;
+	  argc--;
+	  argv++;
+	  continue;
+	}
       if (!strcmp(opt, "-n") || !strcmp(opt, "-noheader"))
 	{
 	  told = 1;
@@ -672,7 +679,7 @@ main(int argc, char **argv)
     {
       const char file[] = "/etc/sysconfig/security";
       parse_sysconf(file);
-      if(!do_set)
+      if(do_set == -1)
 	{
 	  if (default_set < 0)
 	    {
@@ -710,6 +717,9 @@ main(int argc, char **argv)
       npermfiles = argc-1;
       permfiles = &argv[1];
     }
+
+  if  (do_set == -1)
+    do_set = 0;
 
   for (i = 0; i < npermfiles; i++)
     {
