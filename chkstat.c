@@ -56,6 +56,7 @@ int do_set = -1;
 int default_set = 0;
 char** permfiles = NULL;
 int npermfiles = 0;
+char* force_level;
 
 struct perm*
 add_permlist(char *file, char *owner, char *group, mode_t mode)
@@ -235,6 +236,9 @@ parse_sysconf(const char* file)
 	continue;
       if (!strncmp(p, "PERMISSION_SECURITY=", 20))
 	{
+	  if (force_level)
+	    continue;
+
 	  p+=20;
 	  if (isquote(*p))
 	    ++p;
@@ -621,6 +625,20 @@ main(int argc, char **argv)
 	  argv++;
 	  continue;
 	}
+      if (!strcmp(opt, "-level"))
+	{
+	  argc--;
+	  argv++;
+	  if (argc == 1)
+	    {
+	      fprintf(stderr, "level: argument required\n");
+	      exit(1);
+	    }
+	  force_level = argv[1];
+	  argc--;
+	  argv++;
+	  continue;
+	}
       if (!strcmp(opt, "-f") || !strcmp(opt, "-files"))
 	{
 	  argc--;
@@ -696,6 +714,15 @@ main(int argc, char **argv)
 		}
 	    }
 	  do_set = default_set;
+	}
+      if (force_level)
+	{
+	  char *p = strtok(force_level, " ");
+	  do
+	    {
+	      add_level(p);
+	    }
+	  while ((p = strtok(NULL, " ")));
 	}
 
       if (!nlevel)
