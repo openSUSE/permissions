@@ -3,7 +3,7 @@
 .\"
 .\" Author: Ruediger Oertel
 .\"
-.TH CHKSTAT 8 "2008-04-17" "SUSE Linux" "Tool to check and set file permissions"
+.TH CHKSTAT 8 "2010-11-09" "SUSE Linux" "Tool to check and set file permissions"
 .\"
 .UC 8
 .SH NAME
@@ -12,67 +12,81 @@ chkstat \- Tool to check and set file permissions
 .SH SYNOPSIS
 .\"
 .B chkstat
-.RB \|[\| \-\-set|\-set ]
-.RB \|[\| \-\-noheader ]
-.RB \|[\|\|[\| \-\-examine\  file\ ] ... ]
-.RB \|[\|\|[\| \-\-files\  filelist\ ] ... ]
-.RB \|[\|\|[\| \-\-root\  directory\ ] ... ]
-.B permission-file ...
+.RB [OPTIONS]
+.B <permission-files...>
+
+.B chkstat
+.RB \-\-system
+.RB [OPTIONS]
+.B <files...>
 .\"
 .SH DESCRIPTION
 The program
 .I /usr/bin/chkstat
 is a tool to check and set file permissions.
 .PP
-Multiple permissions files can be given on the commandline.
-If the permission files contain multiple entries for a single
-file, the last entry found will be used.
+chkstat can either operate in system mode or on individually
+specified permission files. In system mode /etc/permissions/security
+determines which level to use and whether to actually apply
+permission changes.
 .PP
 .\"
-.SS General Options
+.SS OPTIONS
 .TP
-.IR \-\-set ,\  \-set
-This option enables setting the file permissions,
-the default is to check and warn only.
+.IR \-\-system
+Run in system mode. Parses \fI/etc/sysconfig/security\fR to
+determine which security level to use (\fIPERMISSION_SECURITY\fR)
+and whether to set or merely warn about permission changes
+(\fICHECK_PERMISSIONS\fR). In system mode non-option arguments refer
+to files. Ie just as if the \-\-examine option was specified for them.
+.TP
+.IR \-\-set
+Actually apply the file permissions. The default is to check and
+warn only unless in system mode where \fICHECK_PERMISSIONS\fR
+specifies the default behavior.
+.TP
+.IR \-\-warn
+Opposite of --set, ie warn only but don't make actual changes
 .TP
 .IR \-\-noheader
 Omit printing the output header lines.
 .TP
+.IR \-\-fscaps,\ \-\-no\-fscaps
+Force or disable use of fscaps. Default is to automatically
+determine whether the running kernel supports fscaps.
+.TP
 .IR \-\-examine\ file
-Check permissions for this file and not all files listed in the permissions files.
+Check permissions for this file instead of all files listed in the permissions files.
 .TP
 .IR \-\-files\ filelist
 Check permissions for the files listed in
 .IR filelist
-and not for all files listed in the permissions files.
+and instead of all files listed in the permissions files.
 .TP
 .IR \-\-root\ directory
-Prefix the files given in the permissions files by this directory.
+Check files relative to the specified directory.
 .PP
-.SH EXAMPLE
+.SH EXAMPLES
 .PP
-The command
+.B chkstat --set /etc/permissions /etc/permissions.secure
 .PP
-.RS
-.B chkstat -set /etc/permissions
-.RE
+parses the files /etc/permissions and /etc/permissions and sets the
+access mode and the user- and group memberships for each file listed.
 .PP
-will parse the file /etc/permissions and set the access mode and the
-user- and group memberships each file listed. The format
-for the input file is
+.B chkstat --system /bin/ping
 .PP
-.B FILEPATH
-.B OWNER:GROUP
-.B MODE
-.PP
-and wildcards are not supported for the filepath. Lines starting
-with '#' and empty lines are treated as comments.
+Run in system mode and only correct permissions of /bin/ping
+.
+.SH "SEE ALSO"
+.sp
+permissions(5)
+.
 .SH COPYRIGHT
 1996-2003 SuSE Linux AG, Nuernberg, Germany.
 
-2008 SUSE LINUX Products GmbH
+2008-2010 SUSE LINUX Products GmbH
 .SH AUTHORS
-Reinhold Sojer, Ruediger Oertel, Michael Schroeder
+Reinhold Sojer, Ruediger Oertel, Michael Schroeder, Ludwig Nussel
 .PP
 Useful changes and additions by Tobias Burnus
 

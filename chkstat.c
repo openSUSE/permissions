@@ -397,9 +397,16 @@ usage(int x)
 "\n"
 "Options:\n"
 "  --set			apply changes\n"
+"  --warn		only tell which changes are needed\n"
 "  --noheader		don't print intro message\n"
-"  --examine file	apply to specified file only\n"
-"  --files filelist	read list of files to apply from filelist\n");
+"  --fscaps		force use of fscaps\n"
+"  --no-fscaps		disable use of fscaps\n"
+"  --system		system mode, act according to /etc/permissions/security\n"
+"  --level LEVEL		force use LEVEL (only with --system)\n"
+"  --examine FILE	apply to specified file only\n"
+"  --files FILELIST	read list of files to apply from FILELIST\n"
+"  --root DIR		check files relative to DIR\n"
+);
   exit(x);
 }
 
