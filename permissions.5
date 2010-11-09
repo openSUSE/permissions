@@ -1,0 +1,48 @@
+.TH "PERMISSIONS" "5" "07/11/2010" "" ""
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.SH "NAME"
+permission - default permission settings
+.SH "SYNOPSIS"
+The chkstat program sets permissions and ownerships according to the
+permission files\.
+.SH "DESCRIPTION"
+\- The files /etc/permissions\.* are line based and space delimited\.
+.br
+\- Lines starting with # are comments\.
+.br
+\- The first column specifies the file name\. Directory names have to
+end with a slash\.
+.br
+\- The second column specifies the owner and group\.
+.br
+\- The third column specifies the file mode\.
+.br
+\- The special value \fB+capabilities\fR in the first column extends
+the information of the previous line with with file capabilites.
+.br
+.SH "FILES"
+.sp
+/etc/permissions
+.br
+/etc/permissions\.easy
+.br
+/etc/permissions\.secure
+.br
+/etc/permissions\.paranoid
+.br
+/etc/permissions\.d/*
+.br
+/etc/permissions\.local
+.br
+.SH "SEE ALSO"
+chkstat(8)
+.sp
+.SH "AUTHOR"
+Written by Ludwig Nussel
+.sp
+.SH "REPORTING BUGS"
+Report bugs to https://bugzilla\.novell\.com/
+.sp
