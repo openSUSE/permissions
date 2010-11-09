@@ -986,6 +986,10 @@ main(int argc, char **argv)
 	}
       if (euid == 0 && !owner_ok)
 	{
+	 /* if we change owner or group of a setuid file the bit gets reset so
+	    also set perms again */
+	  if (e->mode & 06000)
+	      perm_ok = 0;
 	  if (fd >= 0)
 	    r = fchown(fd, uid, gid);
 	  else
