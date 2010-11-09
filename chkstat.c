@@ -826,12 +826,12 @@ main(int argc, char **argv)
 	continue;
       if ((!pwd || strcmp(pwd->pw_name, e->owner)) && (pwd = getpwnam(e->owner)) == 0)
 	{
-	  fprintf(stderr, "%s: unknown user %s\n", e->file, e->owner);
+	  fprintf(stderr, "%s: unknown user %s\n", e->file+rootl, e->owner);
 	  continue;
 	}
       if ((!grp || strcmp(grp->gr_name, e->group)) && (grp = getgrnam(e->group)) == 0)
 	{
-	  fprintf(stderr, "%s: unknown group %s\n", e->file, e->group);
+	  fprintf(stderr, "%s: unknown group %s\n", e->file+rootl, e->group);
 	  continue;
 	}
       uid = pwd->pw_uid;
@@ -843,7 +843,7 @@ main(int argc, char **argv)
 	  caps = NULL;
 	  if (errno == EOPNOTSUPP)
 	    {
-	      //fprintf(stderr, "%s: fscaps not supported\n", e->file);
+	      //fprintf(stderr, "%s: fscaps not supported\n", e->file+rootl);
 	      cap_free(e->caps);
 	      e->caps = NULL;
 	    }
@@ -875,12 +875,16 @@ main(int argc, char **argv)
 	    {
 	      printf("fscaps support disabled (file_caps missing in /proc/cmdline).\n");
 	    }
+	  if (rootl)
+	    {
+	      printf("Using root %s\n", root);
+	    }
 	}
 
       if (!do_set)
-	printf("%s should be %s:%s %04o", e->file, e->owner, e->group, e->mode);
+	printf("%s should be %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
       else
-	printf("setting %s to %s:%s %04o", e->file, e->owner, e->group, e->mode);
+	printf("setting %s to %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
 
       if (!caps_ok && e->caps)
         {
@@ -953,13 +957,13 @@ main(int argc, char **argv)
 	    continue;
 	  if (stb.st_mode != stb2.st_mode || stb.st_nlink != stb2.st_nlink || stb.st_dev != stb2.st_dev || stb.st_ino != stb2.st_ino)
 	    {
-	      fprintf(stderr, "%s: too fluctuating\n", e->file);
+	      fprintf(stderr, "%s: too fluctuating\n", e->file+rootl);
 	      errors++;
 	      continue;
 	    }
 	  if (stb.st_nlink > 1 && !safepath(e->file, 0, 0))
 	    {
-	      fprintf(stderr, "%s: on an insecure path\n", e->file);
+	      fprintf(stderr, "%s: on an insecure path\n", e->file+rootl);
 	      errors++;
 	      continue;
 	    }
@@ -968,7 +972,7 @@ main(int argc, char **argv)
 	      /* extra checks for s-bits */
 	      if (!safepath(e->file, (e->mode & 02000) == 0 ? uid : 0, (e->mode & 04000) == 0 ? gid : 0))
 		{
-		  fprintf(stderr, "%s: will not give away s-bits on an insecure path\n", e->file);
+		  fprintf(stderr, "%s: will not give away s-bits on an insecure path\n", e->file+rootl);
 		  errors++;
 		  continue;
 		}
@@ -976,7 +980,7 @@ main(int argc, char **argv)
 	}
       else if (strncmp(e->file, "/dev/", 5) != 0) // handle special files only in /dev
 	{
-	  fprintf(stderr, "%s: don't know what to do with that type of file\n", e->file);
+	  fprintf(stderr, "%s: don't know what to do with that type of file\n", e->file+rootl);
 	  errors++;
 	  continue;
 	}
@@ -988,7 +992,7 @@ main(int argc, char **argv)
 	    r = chown(e->file, uid, gid);
 	  if (r)
 	    {
-	      fprintf(stderr, "%s: chown: %s\n", e->file, strerror(errno));
+	      fprintf(stderr, "%s: chown: %s\n", e->file+rootl, strerror(errno));
 	      errors++;
 	    }
 	  if (fd >= 0)
@@ -997,7 +1001,7 @@ main(int argc, char **argv)
 	    r = lstat(e->file, &stb);
 	  if (r)
 	    {
-	      fprintf(stderr, "%s: too fluctuating\n", e->file);
+	      fprintf(stderr, "%s: too fluctuating\n", e->file+rootl);
 	      errors++;
 	      continue;
 	    }
@@ -1010,7 +1014,7 @@ main(int argc, char **argv)
 	    r = chmod(e->file, e->mode);
 	  if (r)
 	    {
-	      fprintf(stderr, "%s: chmod: %s\n", e->file, strerror(errno));
+	      fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
 	      errors++;
 	    }
 	}
@@ -1022,7 +1026,7 @@ main(int argc, char **argv)
 	    r = cap_set_file(e->file, e->caps);
 	  if (r)
 	    {
-	      fprintf(stderr, "%s: cap_set_file: %s\n", e->file, strerror(errno));
+	      fprintf(stderr, "%s: cap_set_file: %s\n", e->file+rootl, strerror(errno));
 	      errors++;
 	    }
 	}
