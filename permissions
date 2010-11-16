@@ -97,7 +97,7 @@
 /var/log/faillog                                        root:root          600
 # This file is not writeable by gid tty so that the information
 # therein can be trusted.
-/var/log/lastlog                                        root:tty           644
+/var/log/lastlog                                        root:utmp          644
 
 
 #
@@ -139,7 +139,7 @@
 /etc/sysconfig/network/providers/                       root:root          700
 
 # utempter
-/usr/sbin/utempter                                      root:tty          2755
+/usr/sbin/utempter                                      root:utmp         2755
 
 # ensure correct permissions on ssh files to avoid sshd refusing
 # logins (bnc#398250)
