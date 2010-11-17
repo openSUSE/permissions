@@ -68,9 +68,6 @@
 /etc/fstab                                              root:root          644
 /etc/ftpaccess                                          root:root          644
 /etc/ftpusers                                           root:root          644
-/etc/inetd.conf                                         root:root          644
-/etc/inittab                                            root:root          644
-/etc/mtab                                               root:root          644
 /etc/rmtab                                              root:root          644
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          600
