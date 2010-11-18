@@ -92,13 +92,13 @@
 /var/run/sudo/                                          root:root          700
 
 #
-# log files that do not grow remarkably
+# login tracking
 #
+/var/log/lastlog                                        root:root          644
 /var/log/faillog                                        root:root          600
-# This file is not writeable by gid tty so that the information
-# therein can be trusted.
-/var/log/lastlog                                        root:utmp          644
-
+/var/log/wtmp                                           root:utmp          664
+/var/log/btmp                                           root:root          600
+/var/run/utmp                                           root:utmp          664
 
 #
 # some device files
