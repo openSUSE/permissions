@@ -175,8 +175,7 @@
 # scotty:
 # #66211
 /usr/bin/ntping                                         root:trusted      4750
-#
-/usr/bin/Xorg                                           root:root         0711
+
 # turned off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          0755
 /usr/bin/write                                          root:tty          0755
