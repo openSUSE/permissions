@@ -28,9 +28,6 @@
 # be overridden.
 # This file needs to end with a newline.
 #
-# example:
-#/usr/bin/sperl5.10.8         root:root       4755
-#
 
 #
 # suexec is only secure if the document root doesn't contain files
