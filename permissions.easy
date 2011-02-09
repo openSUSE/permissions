@@ -417,3 +417,8 @@
 
 # lockdev (bnc#588325)
 /usr/sbin/lockdev                                       root:lock         2755
+
+# hawk (bnc#665045)
+/usr/sbin/hawk_chkpwd                                   root:haclient     2750
+/usr/sbin/hawk_invoke                                   root:haclient     2750
+
