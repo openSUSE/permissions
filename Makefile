@@ -12,6 +12,9 @@ mandir=$(datadir)/man
 man8dir=$(mandir)/man8
 man5dir=$(mandir)/man5
 
+FSCAPS_DEFAULT_ENABLED = 1
+CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
+
 all: chkstat
 
 install: all

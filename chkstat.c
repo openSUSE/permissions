@@ -515,23 +515,29 @@ check_fscaps_cmdline()
 {
   FILE* fp;
   char line[4096];
+  int have_fscaps = FSCAPS_DEFAULT_ENABLED;
   if ((fp = fopen("/proc/cmdline", "r")) == 0)
     {
-      return 0;
+      goto out;
     }
   if (readline(fp, line, sizeof(line)))
     {
       char* p;
       if ((p = strstr(line, "file_caps")))
 	{
-	  if (p - line < 3 || strncmp("no_", p, 3))
+	  if (p - line == 3 && !strncmp("no_", p, 3))
 	    {
-	      return 1;
+	      have_fscaps = 0;
+	    }
+	  else
+	    {
+	      have_fscaps = 1;
 	    }
 	}
     }
   fclose(fp);
-  return 0;
+out:
+  return have_fscaps;
 }
 
 int
