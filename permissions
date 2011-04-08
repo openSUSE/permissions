@@ -1,6 +1,7 @@
 # /etc/permissions
 #
-# Copyright (c) 2001 SuSE GmbH Nuernberg, Germany.  All rights reserved.
+# Copyright (c) 2001 SuSE GmbH Nuernberg, Germany.
+# Copyright (c) 2011 SUSE Linux Products GmbH Nuernberg, Germany.
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
 #
@@ -20,35 +21,18 @@
 # <file> <owner>:<group> <permission> 
 #
 # How it works:
-# Change the entries as you like, then call
-# 'chkstat -set /etc/permissions' or /etc/permissions.{easy,secure,paranoid}
-# respectively, or call 'SuSEconfig' as yast do after they think
-# that files have been modified in the system.
+# To change an entry copy the line to permissions.local, modify it
+# to suit your needs and call "chkstat --system"
 #
-# SuSEconfig will use the files /etc/permissions and the ones ending
-# in what the variable PERMISSION_SECURITY from
-# /etc/sysconfig/security contains. By default, these are the files
-# /etc/permissions, /etc/permissions.easy and /etc/permissions.local
-# for local changes by the admin. In addition, the directory
+# chkstat uses the variable PERMISSION_SECURITY from
+# /etc/sysconfig/security to determine which security level to
+# apply.
+# In addition to the central files listed above the directory
 # /etc/permissions.d/ can contain permission files that belong to
 # the packages they modify file modes for. These permission files
 # are to switch between conflicting file modes of the same file
 # paths in different packages (popular example: sendmail and
 # postfix, path /usr/sbin/sendmail).
-#
-# SuSEconfig's usage of the chkstat program can be turned off completely
-# by setting CHECK_PERMISSIONS to "warn" in /etc/sysconfig/security.
-#
-# /etc/permissions is kept to the bare minimum. File modes that differ
-# from the settings in this file should be considered broken.
-#
-# Please see the headers of the files
-#   /etc/permissions.easy
-#   /etc/permissions.secure
-#   /etc/permissions.paranoid
-# as well as
-#   /etc/permissions.local
-# for more information about their particular meaning and their setup.
 
 #
 # root directories:
