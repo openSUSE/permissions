@@ -83,7 +83,7 @@
 /usr/sbin/pam_auth                                      root:shadow       4755
 
 # still to be converted to utempter
-/usr/lib/libvte9/gnome-pty-helper                       root:utmp         2755
+/usr/lib/gnome-pty-helper                               root:utmp         2755
 
 #
 # mixed section:

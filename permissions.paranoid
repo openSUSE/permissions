@@ -98,7 +98,7 @@
 /usr/sbin/pam_auth                                      root:shadow       0755
 
 # still to be converted to utempter
-/usr/lib/libvte9/gnome-pty-helper                       root:utmp         0755
+/usr/lib/gnome-pty-helper                               root:utmp         0755
 
 #
 # mixed section: most of it is disabled in this permissions.secure:
