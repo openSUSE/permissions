@@ -509,31 +509,20 @@ safepath(char *path, uid_t uid, gid_t gid)
     }
 }
 
-/* that's really ugly. There should be sysctl or something */
+/* check /sys/kernel/fscaps, 2.6.39 */
 static int
-check_fscaps_cmdline()
+check_fscaps_enabled()
 {
   FILE* fp;
-  char line[4096];
+  char line[128];
   int have_fscaps = FSCAPS_DEFAULT_ENABLED;
-  if ((fp = fopen("/proc/cmdline", "r")) == 0)
+  if ((fp = fopen("/sys/kernel/fscaps", "r")) == 0)
     {
       goto out;
     }
   if (readline(fp, line, sizeof(line)))
     {
-      char* p;
-      if ((p = strstr(line, "file_caps")))
-	{
-	  if (p - line == 3 && !strncmp("no_", p, 3))
-	    {
-	      have_fscaps = 0;
-	    }
-	  else
-	    {
-	      have_fscaps = 1;
-	    }
-	}
+      have_fscaps = atoi(line);
     }
   fclose(fp);
 out:
@@ -704,7 +693,7 @@ main(int argc, char **argv)
     }
 
   if (have_fscaps == -1)
-      have_fscaps = check_fscaps_cmdline();
+      have_fscaps = check_fscaps_enabled();
 
   if (systemmode)
     {
@@ -913,7 +902,7 @@ main(int argc, char **argv)
 	    printf("\t%s\n", permfiles[i]);
 	  if (!have_fscaps)
 	    {
-	      printf("fscaps support disabled (file_caps missing in /proc/cmdline).\n");
+	      printf("kernel has fscaps support disabled.\n");
 	    }
 	  if (rootl)
 	    {
