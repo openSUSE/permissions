@@ -86,8 +86,6 @@
 /usr/bin/chage                                          root:shadow       4755
 /usr/bin/chsh                                           root:shadow       4755
 /usr/bin/expiry                                         root:shadow       4755
-# the default configuration of the sudo package in SuSE distribution is to
-# intimidate users.
 /usr/bin/sudo                                           root:root         4755
 /usr/sbin/su-wrapper                                    root:root         0755
 # opie password system
