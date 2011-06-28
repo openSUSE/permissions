@@ -68,7 +68,6 @@
 # opie password system
 # #66303
 /usr/bin/opiepasswd                                     root:root         0755
-/usr/bin/opiesu                                         root:root         0755
 # "user" entries in /etc/fstab make mount work for non-root users:
 /usr/bin/ncpmount                                       root:trusted      0755
 /usr/bin/ncpumount                                      root:trusted      0755
