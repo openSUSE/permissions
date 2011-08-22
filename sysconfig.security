@@ -1,25 +1,10 @@
 ## Path:        System/Security/Permissions
 ## Description: Configuration of permissions on the system
-## Type:        list(set,warn,no)
-## Default:     set
-## Config:      permissions
-#
-# SuSEconfig can call chkstat to check permissions and ownerships for
-# files and directories (using /etc/permissions).
-# Setting to "set" will correct it, "warn" produces warnings, if
-# something strange is found. Disable this feature with "no".
-#
-CHECK_PERMISSIONS="set"
-
 ## Type:        string
 ## Default:     "easy local"
 #
-# SuSE Linux contains two different configurations for
-# chkstat. The differences can be found in /etc/permissions.secure
-# and /etc/permissions.easy. If you create your own configuration
-# (e.g. permissions.foo), you can enter the extension here as well.
-#
-# (easy/secure local foo whateveryouwant).
+# Permission settings to use. By default 'easy', 'secure' and
+# 'paranoid' exist. You may define your own though.
 #
 PERMISSION_SECURITY="easy local"
 
