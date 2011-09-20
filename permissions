@@ -167,11 +167,6 @@
 /lib/udev/devices/zero                                  root:root         0666
 
 #
-# directory for system crash dumps (#438041)
-#
-/var/crash/                                             root:root         1777
-
-#
 # named chroot (#438045)
 #
 /var/lib/named/dev/null                                 root:root         0666
