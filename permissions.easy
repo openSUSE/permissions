@@ -316,68 +316,6 @@
 /usr/lib/uucp/uucico                                    uucp:uucp         6555
 /usr/lib/uucp/uuxqt                                     uucp:uucp         6555
 
-
-#
-# games of all kinds, toys
-#
-
-# bsd-games
-/usr/games/atc                                          games:games       2755
-/usr/games/battlestar                                   games:games       2755
-/usr/games/canfield                                     games:games       2755
-/usr/games/cribbage                                     games:games       2755
-/usr/games/phantasia                                    games:games       2755
-/usr/games/robots                                       games:games       2755
-/usr/games/sail                                         games:games       2755
-/usr/games/snake                                        games:games       2755
-/usr/games/tetris-bsd                                   games:games       2755
-
-# Maelstrom
-/usr/games/Maelstrom                                    games:games       2755
-
-# pachi
-/usr/games/pachi                                        games:games       2755
-/usr/games/martian                                      games:games       2755
-
-# nethack
-/usr/lib/nethack/nethack.tty                            games:games       2755
-
-# chromium,
-/usr/games/chromium                                     games:games       2755
-
-# xscrabble
-/usr/games/xscrab                                       games:games       2755
-
-# trackballs
-/usr/games/trackballs                                   games:games       2755
-
-# ltris
-/usr/games/ltris                                        games:games       2755
-
-# xlogical
-/usr/games/xlogical                                     games:games       2755
-
-# lbreakout
-/usr/games/lbreakout2                                   games:games       2755
-
-# xgalaga
-/usr/bin/xgalaga                                        games:games       2755
-
-# rocksndiamonds
-/usr/games/rocksndiamonds                               games:games       2755
-
-# gnome-games
-/usr/bin/glines                                         games:games       2755
-/usr/bin/gnibbles                                       games:games       2755
-/usr/bin/gnobots2                                       games:games       2755
-/usr/bin/gnometris                                      games:games       2755
-/usr/bin/gnomine                                        games:games       2755
-/usr/bin/gnotravex                                      games:games       2755
-/usr/bin/gnotski                                        games:games       2755
-/usr/bin/gtali                                          games:games       2755
-/usr/bin/mahjongg                                       games:games       2755
-/usr/bin/same-gnome                                     games:games       2755
-
 # zypp (#385207)
 /usr/sbin/zypp-refresh-wrapper                          root:root         4755
 
