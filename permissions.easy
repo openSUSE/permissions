@@ -85,48 +85,6 @@
 #
 # mixed section:
 #
-#########################################################################
-# rpm subsystem:
-/usr/src/packages/SOURCES/                              root:root         1777
-/usr/src/packages/BUILD/                                root:root         1777
-/usr/src/packages/BUILDROOT/                            root:root         1777
-/usr/src/packages/RPMS/                                 root:root         1777
-/usr/src/packages/RPMS/alpha/                           root:root         1777
-/usr/src/packages/RPMS/alphaev56/                       root:root         1777
-/usr/src/packages/RPMS/alphaev67/                       root:root         1777
-/usr/src/packages/RPMS/alphaev6/                        root:root         1777
-/usr/src/packages/RPMS/arm4l/                           root:root         1777
-/usr/src/packages/RPMS/athlon/                          root:root         1777
-/usr/src/packages/RPMS/i386/                            root:root         1777
-/usr/src/packages/RPMS/i486/                            root:root         1777
-/usr/src/packages/RPMS/i586/                            root:root         1777
-/usr/src/packages/RPMS/i686/                            root:root         1777
-/usr/src/packages/RPMS/ia64/                            root:root         1777
-/usr/src/packages/RPMS/mips/                            root:root         1777
-/usr/src/packages/RPMS/ppc/                             root:root         1777
-/usr/src/packages/RPMS/ppc64/                           root:root         1777
-/usr/src/packages/RPMS/powerpc/                         root:root         1777
-/usr/src/packages/RPMS/powerpc64/                       root:root         1777
-/usr/src/packages/RPMS/s390/                            root:root         1777
-/usr/src/packages/RPMS/s390x/                           root:root         1777
-/usr/src/packages/RPMS/sparc/                           root:root         1777
-/usr/src/packages/RPMS/sparcv9/                         root:root         1777
-/usr/src/packages/RPMS/sparc64/                         root:root         1777
-/usr/src/packages/RPMS/x86_64/                          root:root         1777
-/usr/src/packages/RPMS/armv4l/                          root:root         1777
-/usr/src/packages/RPMS/armv5tel/                        root:root         1777
-/usr/src/packages/RPMS/armv5tevl/                       root:root         1777
-/usr/src/packages/RPMS/armv5tejl/                       root:root         1777
-/usr/src/packages/RPMS/armv5tejvl/                      root:root         1777
-/usr/src/packages/RPMS/armv6l/                          root:root         1777
-/usr/src/packages/RPMS/armv6vl/                         root:root         1777
-/usr/src/packages/RPMS/armv7l/                          root:root         1777
-/usr/src/packages/RPMS/hppa/                            root:root         1777
-/usr/src/packages/RPMS/hppa2.0/                         root:root         1777
-/usr/src/packages/RPMS/noarch/                          root:root         1777
-/usr/src/packages/SPECS/                                root:root         1777
-/usr/src/packages/SRPMS/                                root:root         1777
-#########################################################################
 # video
 /usr/bin/v4l-conf                                       root:video        4755
 # Itanium ia32 emulator
