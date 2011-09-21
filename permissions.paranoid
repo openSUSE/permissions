@@ -330,4 +330,4 @@
 /usr/sbin/hawk_invoke                                   root:haclient     0755
 
 # chromium (bnc#718016)
-/lib/chrome_sandbox                                     root:root         0755
+/usr/lib/chrome_sandbox                                     root:root         0755
