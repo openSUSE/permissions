@@ -53,7 +53,7 @@ int rootl;
 int nlevel;
 char** level;
 int do_set = -1;
-int default_set = 0;
+int default_set = 1;
 char** permfiles = NULL;
 int npermfiles = 0;
 char* force_level;
