@@ -19,7 +19,7 @@ my @defpermfiles = ('permissions', 'permissions.easy', 'permissions.secure', 'pe
 my %perms;
 
 my($nodups, $checkmissing, $defonly, $showsuid, $showsgid, $showww, $showgw,
-    $show, @levels, $showsame, $dump, @permfiles, $help, $checkdirs);
+    $show, @levels, $showsame, $dump, @permfiles, $help, $checkdirs, $root);
 
 Getopt::Long::Configure("no_ignore_case");
 GetOptions (
@@ -35,6 +35,7 @@ GetOptions (
     "level=s"     => \@levels,
     "dump"        => \$dump,
     "checkdirs=s"  => \$checkdirs,
+    "root=s"      => \$root,
     "help"        => \$help,
     );
 
@@ -57,6 +58,7 @@ OPTIONS:
   --dump     dump files as perl hash
   --level    restrict checks to this coma separated list of levels
   --checkdirs DIR  check for group writeable directories below DIR
+  --root DIR check for entries that don't exist in DIR
 EOF
 exit 0;
 }
@@ -191,6 +193,11 @@ foreach $file (sort keys %perms)
 	{
 	    print STDERR "$file:\n$msg\n";
 	}
+    }
+
+    if ($root && ! -e $root.$file)
+    {
+	print STDERR "MISSING: $file\n";
     }
 }
 
