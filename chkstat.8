@@ -52,8 +52,9 @@ Opposite of --set, ie warn only but don't make actual changes
 Omit printing the output header lines.
 .TP
 .IR \-\-fscaps,\ \-\-no\-fscaps
-Force or disable use of fscaps. Default is to automatically
-determine whether the running kernel supports fscaps.
+Enable or disable use of fscaps. In system mode the setting of
+PERMISSIONS_FSCAPS determines whether fscaps are on or off when this
+option is not set.
 .TP
 .IR \-\-examine\ file
 Check permissions for this file instead of all files listed in the permissions files.

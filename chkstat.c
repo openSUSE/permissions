@@ -54,6 +54,7 @@ int nlevel;
 char** level;
 int do_set = -1;
 int default_set = 1;
+int have_fscaps = -1;
 char** permfiles = NULL;
 int npermfiles = 0;
 char* force_level;
@@ -279,6 +280,24 @@ parse_sysconf(const char* file)
 	  else
 	    {
 	      //fprintf(stderr, "invalid value for CHECK_PERMISSIONS (must be 'set', 'warn' or 'no')\n");
+	    }
+	}
+      else if (have_fscaps == -1 && !strncmp(p, "PERMISSIONS_FSCAPS=", 19))
+	{
+	  p+=19;
+	  if (isquote(*p))
+	    ++p;
+	  if (!strncmp(p, "yes", 3))
+	    {
+	      p+=3;
+	      if (isquote(*p) || !*p)
+		have_fscaps=1;
+	    }
+	  else if (!strncmp(p, "no", 2))
+	    {
+	      p+=2;
+	      if (isquote(*p) || !*p)
+		have_fscaps=0;
 	    }
 	}
     }
@@ -515,18 +534,18 @@ check_fscaps_enabled()
 {
   FILE* fp;
   char line[128];
-  int have_fscaps = FSCAPS_DEFAULT_ENABLED;
+  int val = FSCAPS_DEFAULT_ENABLED;
   if ((fp = fopen("/sys/kernel/fscaps", "r")) == 0)
     {
       goto out;
     }
   if (readline(fp, line, sizeof(line)))
     {
-      have_fscaps = atoi(line);
+      val = atoi(line);
     }
   fclose(fp);
 out:
-  return have_fscaps;
+  return val;
 }
 
 int
@@ -552,7 +571,6 @@ main(int argc, char **argv)
   int fd, r;
   int errors = 0;
   cap_t caps = NULL;
-  int have_fscaps = -1;
 
   while (argc > 1)
     {
@@ -692,9 +710,6 @@ main(int argc, char **argv)
       break;
     }
 
-  if (have_fscaps == -1)
-      have_fscaps = check_fscaps_enabled();
-
   if (systemmode)
     {
       const char file[] = "/etc/sysconfig/security";
@@ -745,6 +760,11 @@ main(int argc, char **argv)
     {
       npermfiles = argc-1;
       permfiles = &argv[1];
+    }
+
+  if (have_fscaps == 1 && !check_fscaps_enabled())
+    {
+      fprintf(stderr, "Warning: running kernel does not support fscaps\n");
     }
 
   if  (do_set == -1)
@@ -802,7 +822,7 @@ main(int argc, char **argv)
 		}
 	      if (!strncmp(p, "+capabilities ", 14))
 		{
-		  if (!have_fscaps)
+		  if (have_fscaps != 1)
 		    continue;
 		  p += 14;
 		  caps = cap_from_text(p);
@@ -900,10 +920,6 @@ main(int argc, char **argv)
 	  printf("Checking permissions and ownerships - using the permissions files\n");
 	  for (i = 0; i < npermfiles; i++)
 	    printf("\t%s\n", permfiles[i]);
-	  if (!have_fscaps)
-	    {
-	      printf("kernel has fscaps support disabled.\n");
-	    }
 	  if (rootl)
 	    {
 	      printf("Using root %s\n", root);
