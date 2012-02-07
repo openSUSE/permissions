@@ -32,4 +32,7 @@ install: all
 clean:
 	/bin/rm chkstat
 
-.PHONY: all clean
+package:
+	@obs/mkpackage
+
+.PHONY: all clean package

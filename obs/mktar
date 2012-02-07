@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+NAME=permissions
+VERSION=unused
+datefmt="%Y.%m.%d.%H%M"
+LAST_COMMIT=(`git rev-list --timestamp HEAD^..HEAD`)
+DATE=`date +$datefmt -d "1970-01-01 00:00 UTC $LAST_COMMIT seconds"`
+#revs=`git rev-list master|wc -l`
+#scmver="$revs"
+vers="$DATE"
+pfx="$NAME${vers:+-$vers}"
+fn="$pfx".tar.bz2
+if ! git config --get tar.umask >/dev/null 2>&1 ; then
+	git config --add tar.umask 022
+fi
+git archive --prefix="$pfx"/ HEAD | bzip2 > $fn
+echo "VERSION=$vers"
+echo "FILENAME=$fn"

@@ -1,0 +1,11 @@
+#!/bin/sh
+# create log suitable for c&p into rpm changes file
+if [ -z "$1" ]; then
+	set -- remotes/origin/master..HEAD
+elif [ "${1%.changes}" != "$1"  ]; then
+	# parse time stamp of .changes file
+	d=`awk 'NR==2{FS=" - ";$0=$0;print $1;exit}' < $1`
+	set -- --since="$d" HEAD
+fi
+# no idea why it always prints those commit lines
+git rev-list --pretty=format:"- %s" "$@" |grep -v ^commit
