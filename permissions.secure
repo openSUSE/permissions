@@ -96,7 +96,6 @@
 /usr/bin/ncpumount                                      root:trusted      4750
 # #331020
 /sbin/mount.nfs                                         root:root         0755
-# mount/umount have had their problems already:
 /bin/mount                                              root:root         4755
 /bin/umount                                             root:root         4755
 /bin/eject                                              root:audio        4750
@@ -354,3 +353,25 @@
 
 # chromium (bnc#718016)
 /usr/lib/chrome_sandbox                                     root:root         0755
+
+#
+# XXX: / -> /usr merge and sbin -> bin merge
+# XXX: duplicated entries need to be cleaned up before 12.2
+/usr/bin/su                                             root:root         4755
+/usr/sbin/mount.nfs                                     root:root         0755
+/usr/bin/mount.nfs                                      root:root         0755
+/usr/bin/mount                                          root:root         4755
+/usr/bin/umount                                         root:root         4755
+/usr/bin/eject                                          root:audio        4750
+/usr/sbin/unix_chkpwd                                   root:shadow       4755
+/usr/bin/unix_chkpwd                                    root:shadow       4755
+/usr/sbin/unix2_chkpwd                                  root:shadow       4755
+/usr/bin/unix2_chkpwd                                   root:shadow       4755
+/usr/sbin/isdnctrl                                      root:dialout      4750
+/usr/bin/isdnctrl                                       root:dialout      4750
+/usr/sbin/pccardctl                                     root:trusted      4750
+/usr/bin/pccardctl                                      root:trusted      4750
+/usr/bin/ping                                           root:root         4755
+ +capabilities cap_net_raw=ep
+/usr/bin/ping6                                          root:root         4755
+ +capabilities cap_net_raw=ep
