@@ -760,6 +760,7 @@ main(int argc, char **argv)
 	      exit(1);
 	    }
 	  add_checklist(argv[1]);
+	  add_permlist(argv[1], "unknown", "unknown", 0);
 	  use_checklist = 1;
 	  argc--;
 	  argv++;
@@ -798,6 +799,7 @@ main(int argc, char **argv)
 	      if (!*line)
 		continue;
 	      add_checklist(line);
+	      add_permlist(argv[1], "unknown", "unknown", 0);
 	    }
 	  fclose(fp);
 	  use_checklist = 1;
@@ -869,6 +871,7 @@ main(int argc, char **argv)
       for (i = 1; i < argc; i++)
 	{
 	  add_checklist(argv[i]);
+	  add_permlist(argv[1], "unknown", "unknown", 0);
 	  use_checklist = 1;
 	  continue;
 	}
@@ -993,6 +996,24 @@ main(int argc, char **argv)
 	continue;
       if (S_ISLNK(stb.st_mode))
 	continue;
+      if (!e->mode && !strcmp(e->owner, "unknown"))
+	{
+	  char uids[16], gids[16];
+	  pwd = _getpwuid(stb.st_uid);
+	  grp = _getgrgid(stb.st_gid);
+	  if (!pwd)
+	    sprintf(uids, "%d", stb.st_uid);
+	  if (!grp)
+	    sprintf(gids, "%d", stb.st_gid);
+	  fprintf(stderr, "%s: cannot verify %s:%s %04o - not listed in /etc/permissions\n",
+		  e->file+rootl,
+		  pwd?pwd->pw_name:uids,
+		  grp?grp->gr_name:gids,
+		  (int)(stb.st_mode&07777));
+	  pwd = 0;
+	  grp = 0;
+	  continue;
+	}
       if ((!pwd || strcmp(pwd->pw_name, e->owner)) && (pwd = _getpwnam(e->owner)) == 0)
 	{
 	  fprintf(stderr, "%s: unknown user %s\n", e->file+rootl, e->owner);
