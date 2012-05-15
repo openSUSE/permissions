@@ -760,7 +760,6 @@ main(int argc, char **argv)
 	      exit(1);
 	    }
 	  add_checklist(argv[1]);
-	  add_permlist(argv[1], "unknown", "unknown", 0);
 	  use_checklist = 1;
 	  argc--;
 	  argv++;
@@ -799,7 +798,6 @@ main(int argc, char **argv)
 	      if (!*line)
 		continue;
 	      add_checklist(line);
-	      add_permlist(argv[1], "unknown", "unknown", 0);
 	    }
 	  fclose(fp);
 	  use_checklist = 1;
@@ -871,7 +869,6 @@ main(int argc, char **argv)
       for (i = 1; i < argc; i++)
 	{
 	  add_checklist(argv[i]);
-	  add_permlist(argv[1], "unknown", "unknown", 0);
 	  use_checklist = 1;
 	  continue;
 	}
@@ -892,6 +889,10 @@ main(int argc, char **argv)
 
   if  (do_set == -1)
     do_set = 0;
+
+  // add fake list entries for all files to check
+  for (i = 0; i < nchecklist; i++)
+    add_permlist(checklist[i], "unknown", "unknown", 0);
 
   for (i = 0; i < npermfiles; i++)
     {
@@ -990,7 +991,7 @@ main(int argc, char **argv)
   euid = geteuid();
   for (e = permlist; e; e = e->next)
     {
-      if (use_checklist && !in_checklist(e->file))
+      if (use_checklist && !in_checklist(e->file+rootl))
 	continue;
       if (lstat(e->file, &stb))
 	continue;
