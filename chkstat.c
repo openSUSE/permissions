@@ -62,8 +62,7 @@ char* force_level;
 static struct passwd*
 _getpwuid(uid_t uid)
 {
-  const char etcPass[] = "/etc/passwd";
-  char passwdFile[PATH_MAX + sizeof(etcPass)];
+  char fn[PATH_MAX];
   struct passwd *pwd = 0;
   FILE *fp = 0;
 
@@ -71,9 +70,12 @@ _getpwuid(uid_t uid)
     return getpwuid(uid);
 
   // read the passwd from the root instead
-  sprintf(passwdFile, "%s%s", root, etcPass);
+  strcpy(fn, root);
+  strcpy(fn+rootl, "/etc/passwd");
 
-  fp = fopen(passwdFile, "r");
+  printf("trying %s\n", fn);
+
+  fp = fopen(fn, "r");
   if (!fp)
     goto out;
 
@@ -92,8 +94,7 @@ out:
 static struct passwd*
 _getpwnam(const char *name)
 {
-  const char etcPass[] = "/etc/passwd";
-  char passwdFile[PATH_MAX + sizeof(etcPass)];
+  char fn[PATH_MAX];
   struct passwd *pwd = 0;
   FILE *fp = 0;
 
@@ -101,9 +102,10 @@ _getpwnam(const char *name)
     return getpwnam(name);
 
   // read the passwd from the root instead
-  sprintf(passwdFile, "%s%s", root, etcPass);
+  strcpy(fn, root);
+  strcpy(fn+rootl, "/etc/passwd");
 
-  fp = fopen(passwdFile, "r");
+  fp = fopen(fn, "r");
   if (!fp)
     goto out;
 
@@ -122,8 +124,7 @@ out:
 static struct group*
 _getgrgid(gid_t gid)
 {
-  const char etcGroup[] = "/etc/group";
-  char groupFile[PATH_MAX + sizeof(etcGroup)];
+  char fn[PATH_MAX];
   struct group *grp = 0;
   FILE *fp = 0;
 
@@ -131,9 +132,10 @@ _getgrgid(gid_t gid)
     return getgrgid(gid);
 
   // read the group from the root instead
-  sprintf(groupFile, "%s%s", root, etcGroup);
+  strcpy(fn, root);
+  strcpy(fn+rootl, "/etc/passwd");
 
-  fp = fopen(groupFile, "r");
+  fp = fopen(fn, "r");
   if (!fp)
     goto out;
 
@@ -152,8 +154,7 @@ out:
 static struct group*
 _getgrnam(const char *name)
 {
-  const char etcGroup[] = "/etc/group";
-  char groupFile[PATH_MAX + sizeof(etcGroup)];
+  char fn[PATH_MAX];
   struct group *grp = 0;
   FILE *fp = 0;
 
@@ -161,9 +162,10 @@ _getgrnam(const char *name)
     return getgrnam(name);
 
   // read the group from the root instead
-  sprintf(groupFile, "%s%s", root, etcGroup);
+  strcpy(fn, root);
+  strcpy(fn+rootl, "/etc/passwd");
 
-  fp = fopen(groupFile, "r");
+  fp = fopen(fn, "r");
   if (!fp)
     goto out;
 
