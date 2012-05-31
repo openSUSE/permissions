@@ -880,8 +880,8 @@ main(int argc, char **argv)
       if (!e->mode && !strcmp(e->owner, "unknown"))
 	{
 	  char uids[16], gids[16];
-	  pwd = _getpwuid(stb.st_uid);
-	  grp = _getgrgid(stb.st_gid);
+	  pwd = getpwuid(stb.st_uid);
+	  grp = getgrgid(stb.st_gid);
 	  if (!pwd)
 	    sprintf(uids, "%d", stb.st_uid);
 	  if (!grp)
