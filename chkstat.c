@@ -59,128 +59,6 @@ char** permfiles = NULL;
 int npermfiles = 0;
 char* force_level;
 
-static struct passwd*
-_getpwuid(uid_t uid)
-{
-  char fn[PATH_MAX];
-  struct passwd *pwd = 0;
-  FILE *fp = 0;
-
-  if (!rootl)
-    return getpwuid(uid);
-
-  // read the passwd from the root instead
-  strcpy(fn, root);
-  strcpy(fn+rootl, "/etc/passwd");
-
-  printf("trying %s\n", fn);
-
-  fp = fopen(fn, "r");
-  if (!fp)
-    goto out;
-
-  while ((pwd = fgetpwent(fp)))
-    {
-      if (pwd->pw_uid == uid)
-        goto out;
-    }
-
-out:
-  if (fp)
-    fclose(fp);
-  return pwd;
-}
-
-static struct passwd*
-_getpwnam(const char *name)
-{
-  char fn[PATH_MAX];
-  struct passwd *pwd = 0;
-  FILE *fp = 0;
-
-  if (!rootl)
-    return getpwnam(name);
-
-  // read the passwd from the root instead
-  strcpy(fn, root);
-  strcpy(fn+rootl, "/etc/passwd");
-
-  fp = fopen(fn, "r");
-  if (!fp)
-    goto out;
-
-  while ((pwd = fgetpwent(fp)))
-    {
-      if (strcmp(pwd->pw_name, name) == 0)
-        goto out;
-    }
-
-out:
-  if (fp)
-    fclose(fp);
-  return pwd;
-}
-
-static struct group*
-_getgrgid(gid_t gid)
-{
-  char fn[PATH_MAX];
-  struct group *grp = 0;
-  FILE *fp = 0;
-
-  if (!rootl)
-    return getgrgid(gid);
-
-  // read the group from the root instead
-  strcpy(fn, root);
-  strcpy(fn+rootl, "/etc/passwd");
-
-  fp = fopen(fn, "r");
-  if (!fp)
-    goto out;
-
-  while ((grp = fgetgrent(fp)))
-    {
-      if (grp->gr_gid == gid)
-        goto out;
-    }
-
-out:
-  if (fp)
-    fclose(fp);
-  return grp;
-}
-
-static struct group*
-_getgrnam(const char *name)
-{
-  char fn[PATH_MAX];
-  struct group *grp = 0;
-  FILE *fp = 0;
-
-  if (!rootl)
-    return getgrnam(name);
-
-  // read the group from the root instead
-  strcpy(fn, root);
-  strcpy(fn+rootl, "/etc/passwd");
-
-  fp = fopen(fn, "r");
-  if (!fp)
-    goto out;
-
-  while ((grp = fgetgrent(fp)))
-    {
-      if (strcmp(grp->gr_name, name) == 0)
-        goto out;
-    }
-
-out:
-  if (fp)
-    fclose(fp);
-  return grp;
-}
-
 struct perm*
 add_permlist(char *file, char *owner, char *group, mode_t mode)
 {
@@ -1017,12 +895,12 @@ main(int argc, char **argv)
 	  grp = 0;
 	  continue;
 	}
-      if ((!pwd || strcmp(pwd->pw_name, e->owner)) && (pwd = _getpwnam(e->owner)) == 0)
+      if ((!pwd || strcmp(pwd->pw_name, e->owner)) && (pwd = getpwnam(e->owner)) == 0)
 	{
 	  fprintf(stderr, "%s: unknown user %s\n", e->file+rootl, e->owner);
 	  continue;
 	}
-      if ((!grp || strcmp(grp->gr_name, e->group)) && (grp = _getgrnam(e->group)) == 0)
+      if ((!grp || strcmp(grp->gr_name, e->group)) && (grp = getgrnam(e->group)) == 0)
 	{
 	  fprintf(stderr, "%s: unknown group %s\n", e->file+rootl, e->group);
 	  continue;
@@ -1084,8 +962,8 @@ main(int argc, char **argv)
       printf(". (wrong");
       if (!owner_ok)
 	{
-	  pwd = _getpwuid(stb.st_uid);
-	  grp = _getgrgid(stb.st_gid);
+	  pwd = getpwuid(stb.st_uid);
+	  grp = getgrgid(stb.st_gid);
 	  if (pwd)
 	    printf(" owner/group %s", pwd->pw_name);
 	  else
