@@ -17,8 +17,6 @@
 # Directories
 #
 
-# lock file for emacs
-/var/lib/xemacs/lock/                                   root:root         1777
 # for screen's session sockets:
 /var/run/uscreens/                                      root:root         1777
 

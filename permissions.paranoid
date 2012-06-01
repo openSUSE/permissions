@@ -31,8 +31,6 @@
 #
 # Directories
 #
-# no lock files for emacs:
-/var/lib/xemacs/lock/                                   root:trusted      1775
 # for screen's session sockets:
 /var/run/uscreens/                                      root:trusted      1775
 
