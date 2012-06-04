@@ -58,7 +58,6 @@
 #
 
 /var/tmp/                                               root:root         1777
-/var/tmp/vi.recover/                                    root:root         1777
 /var/log/                                               root:root          755
 /var/spool/                                             root:root          755
 /var/spool/mqueue/                                      root:root          700
