@@ -21,7 +21,6 @@ install: all
 	@for i in $(bindir) $(suseconfigdir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir); \
 		do install -d -m 755 $(DESTDIR)$$i; done
 	@install -m 755 chkstat $(DESTDIR)$(bindir)
-	@install -m 755 SuSEconfig.permissions $(DESTDIR)$(suseconfigdir)
 	@install -m 644 chkstat.8 $(DESTDIR)$(man8dir)
 	@install -m 644 permissions.5 $(DESTDIR)$(man5dir)
 	@install -m 644 sysconfig.security $(DESTDIR)$(fillupdir)
