@@ -333,6 +333,8 @@
 # XXX: / -> /usr merge and sbin -> bin merge
 # XXX: duplicated entries need to be cleaned up before 12.2
 /usr/bin/su                                             root:root         0755
+# temporary hack to make the move from coreutils to util-linux work
+/usr/bin/su.core                                        root:root         0755
 /usr/sbin/mount.nfs                                     root:root         0755
 /usr/bin/mount.nfs                                      root:root         0755
 /usr/bin/mount                                          root:root         0755
