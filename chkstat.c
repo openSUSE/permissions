@@ -298,7 +298,8 @@ parse_sysconf(const char* file)
 	      p+=2;
 	      if (isquote(*p) || !*p)
 		have_fscaps=0;
-	    }
+	    } else
+	        have_fscaps=1; /* default */
 	}
     }
   fclose(fp);
