@@ -8,3 +8,11 @@
 #
 PERMISSION_SECURITY="easy local"
 
+## Description: Use filesystem capabilities for more finegrained permission handling
+## Type:        yesno
+## Default:     "yes"
+#
+# Flag whether to use filesystem capabilities for finegrained
+# access control (compared to setuid) or not.
+#
+PERMISSION_FSCAPS=""
