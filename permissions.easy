@@ -58,7 +58,7 @@
 /sbin/mount.nfs                                         root:root         4755
 /bin/mount                                              root:root         4755
 /bin/umount                                             root:root         4755
-/bin/eject                                              root:audio        4755
+/usr/bin/eject                                          root:audio        4755
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
@@ -144,9 +144,9 @@
 #
 # networking (need root for the privileged socket)
 #
-/bin/ping                                               root:root         4755
+/usr/bin/ping                                           root:root         4755
  +capabilities cap_net_raw=ep
-/bin/ping6                                              root:root         4755
+/usr/bin/ping6                                          root:root         4755
  +capabilities cap_net_raw=ep
 # mtr is linked against ncurses. For dialout only.
 /usr/sbin/mtr                                           root:dialout      4750
@@ -327,7 +327,6 @@
 /usr/bin/mount.nfs                                      root:root         4755
 /usr/bin/mount                                          root:root         4755
 /usr/bin/umount                                         root:root         4755
-/usr/bin/eject                                          root:audio        4755
 /usr/sbin/unix_chkpwd                                   root:shadow       4755
 /usr/bin/unix_chkpwd                                    root:shadow       4755
 /usr/sbin/unix2_chkpwd                                  root:shadow       4755
@@ -336,7 +335,3 @@
 /usr/bin/isdnctrl                                       root:dialout      4750
 /usr/sbin/pccardctl                                     root:trusted      4755
 /usr/bin/pccardctl                                      root:trusted      4755
-/usr/bin/ping                                           root:root         4755
- +capabilities cap_net_raw=ep
-/usr/bin/ping6                                          root:root         4755
- +capabilities cap_net_raw=ep

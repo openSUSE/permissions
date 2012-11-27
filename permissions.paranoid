@@ -73,7 +73,7 @@
 /sbin/mount.nfs                                         root:root         0755
 /bin/mount                                              root:root         0755
 /bin/umount                                             root:root         0755
-/bin/eject                                              root:audio        0755
+/usr/bin/eject                                          root:audio        0750
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      0755
@@ -160,8 +160,8 @@
 #
 # networking (need root for the privileged socket)
 #
-/bin/ping                                               root:root         0755
-/bin/ping6                                              root:root         0755
+/usr/bin/ping                                           root:root         0755
+/usr/bin/ping6                                          root:root         0755
 # mtr is linked against ncurses.
 /usr/sbin/mtr                                           root:dialout      0755
 /usr/bin/rcp                                            root:root         0755
@@ -339,7 +339,6 @@
 /usr/bin/mount.nfs                                      root:root         0755
 /usr/bin/mount                                          root:root         0755
 /usr/bin/umount                                         root:root         0755
-/usr/bin/eject                                          root:audio        0750
 /usr/sbin/unix_chkpwd                                   root:shadow       0755
 /usr/bin/unix_chkpwd                                    root:shadow       0755
 /usr/sbin/unix2_chkpwd                                  root:shadow       0755
@@ -348,5 +347,3 @@
 /usr/bin/isdnctrl                                       root:dialout      0755
 /usr/sbin/pccardctl                                     root:trusted      0755
 /usr/bin/pccardctl                                      root:trusted      0755
-/usr/bin/ping                                           root:root         0755
-/usr/bin/ping6                                          root:root         0755
