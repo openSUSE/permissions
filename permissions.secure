@@ -355,6 +355,9 @@
 # ecryptfs-utils (bnc#740110)
 /sbin/mount.ecryptfs_private                            root:root         0755
 
+# wireshark (not yet)
+/usr/bin/dumpcap					root:root	  0755
+
 #
 # XXX: / -> /usr merge and sbin -> bin merge
 # XXX: duplicated entries need to be cleaned up before 12.2
