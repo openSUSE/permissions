@@ -387,6 +387,7 @@
 
 # cdrecord of cdrtools from Joerg Schilling (bnc#550021)
 # not allowed setuid root or any capabilities unless audit bug is resolved
-/usr/bin/cdrecord                                       root:root       755
-/usr/bin/readcd                                         root:root       755
-/usr/bin/cdda2wav                                       root:root       755
+# leave it out until it is in the distro
+#/usr/bin/cdrecord                                       root:root       755
+#/usr/bin/readcd                                         root:root       755
+#/usr/bin/cdda2wav                                       root:root       755
