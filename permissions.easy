@@ -347,8 +347,10 @@
 /usr/bin/pccardctl                                      root:trusted      4755
 
 # cdrecord of cdrtools from Joerg Schilling (bnc#550021)
-# not allowed setuid root or any capabilities unless audit bug is resolved
-# leave it disabled until it is in the distro to allow their overrides
-#/usr/bin/cdrecord					root:root	755
-#/usr/bin/readcd						root:root	755
-#/usr/bin/cdda2wav					root:root	755
+# Please note that additional capabilities are provided only for reliable
+# CD/DVD burning and do not cover all use-cases of cdrecord.
+/usr/bin/cdrecord					root:root	755
+  +capabilities cap_sys_resource,cap_sys_nice,cap_ipc_lock,cap_sys_rawio=ep
+# no special privileges are needed for cd reading.
+/usr/bin/readcd						root:root	755
+/usr/bin/cdda2wav					root:root	755
