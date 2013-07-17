@@ -391,3 +391,6 @@
 /usr/bin/cdrecord                                       root:root       755
 /usr/bin/readcd                                         root:root       755
 /usr/bin/cdda2wav                                       root:root       755
+
+# qemu-bridge-helper has no special privileges currently (bnc#765948)
+/usr/lib/qemu-bridge-helper				root:root	755
