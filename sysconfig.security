@@ -15,4 +15,4 @@ PERMISSION_SECURITY="easy local"
 # Flag whether to use filesystem capabilities for finegrained
 # access control (compared to setuid) or not.
 #
-PERMISSION_FSCAPS=""
+PERMISSIONS_FSCAPS=""
