@@ -358,7 +358,7 @@
 /usr/sbin/hawk_invoke                                   root:haclient     4750
 
 # chromium (bnc#718016)
-/usr/lib/chrome_sandbox                                     root:root         0755
+/usr/lib/chrome_sandbox                                 root:root         4755
 
 # ecryptfs-utils (bnc#740110)
 /sbin/mount.ecryptfs_private                            root:root         0755
