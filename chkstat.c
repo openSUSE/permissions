@@ -282,9 +282,10 @@ parse_sysconf(const char* file)
 	      //fprintf(stderr, "invalid value for CHECK_PERMISSIONS (must be 'set', 'warn' or 'no')\n");
 	    }
 	}
-      else if (have_fscaps == -1 && !strncmp(p, "PERMISSION_FSCAPS=", 19))
+#define FSCAPSENABLE "PERMISSION_FSCAPS="
+      else if (have_fscaps == -1 && !strncmp(p, FSCAPSENABLE, strlen(FSCAPSENABLE)))
 	{
-	  p+=19;
+	  p+=strlen(FSCAPSENABLE);
 	  if (isquote(*p))
 	    ++p;
 	  if (!strncmp(p, "yes", 3))
