@@ -58,7 +58,6 @@
 /sbin/mount.nfs                                         root:root         4755
 /bin/mount                                              root:root         4755
 /bin/umount                                             root:root         4755
-/usr/bin/eject                                          root:audio        4755
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
