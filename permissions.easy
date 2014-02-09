@@ -147,8 +147,9 @@
  +capabilities cap_net_raw=ep
 /usr/bin/ping6                                          root:root         4755
  +capabilities cap_net_raw=ep
-# mtr is linked against ncurses. For dialout only.
-/usr/sbin/mtr                                           root:dialout      4750
+#no need for SUID, net_raw capability is enough
+/usr/sbin/mtr                                           root:root         0755
+ +capabilities cap_net_raw=ep
 /usr/bin/rcp                                            root:root         4755
 /usr/bin/rlogin                                         root:root         4755
 /usr/bin/rsh                                            root:root         4755
