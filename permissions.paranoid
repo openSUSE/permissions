@@ -33,6 +33,7 @@
 #
 # for screen's session sockets:
 /var/run/uscreens/                                      root:trusted      1775
+/run/uscreens/                                      	root:trusted      1775
 
 
 #

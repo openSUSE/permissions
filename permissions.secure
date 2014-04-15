@@ -57,6 +57,7 @@
 #
 # for screen's session sockets:
 /var/run/uscreens/                                      root:root         1777
+/run/uscreens/                                      	root:root         1777
 
 #
 # /etc
