@@ -24,7 +24,7 @@
 #
 # /etc
 #
-/etc/crontab                                            root:root          644
+/etc/crontab                                            root:root          600
 /etc/exports                                            root:root          644
 /etc/fstab                                              root:root          644
 # we don't package it
