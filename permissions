@@ -179,8 +179,6 @@
 # wodim is not allowed setuid root as cd burning does not strictly require
 # it (bnc#882035)
 /usr/bin/wodim                                          root:root         0755
-# vlock is not allowed setuid root as code is unproven quality (bnc#882035)
-/usr/sbin/vlock-main                                    root:root         0755
 
 # we no longer make rpm build dirs 1777
 /usr/src/packages/SOURCES/                              root:root         0755
