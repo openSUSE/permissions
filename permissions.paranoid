@@ -219,6 +219,9 @@
 /opt/kde3/bin/kdesud                                    root:nogroup      0755
 /usr/lib/kde4/libexec/kdesud                            root:nogroup      0755
 /usr/lib64/kde4/libexec/kdesud                          root:nogroup      0755
+/usr/lib/libexec/kf5/kdesud                             root:nogroup      0755
+/usr/lib64/libexec/kf5/kdesud                           root:nogroup      0755
+
 # used for getting proxy settings from dhcp
 /opt/kde3/bin/kpac_dhcp_helper                          root:root         0755
 # used to distract the oom killer
