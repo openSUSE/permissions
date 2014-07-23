@@ -291,7 +291,7 @@
 #
 /usr/lib/news/bin/rnews                                 news:uucp         4550
 /usr/lib/news/bin/inews                                 news:news         2555
-/usr/lib/news/bin/innbind                               root:news         4554
+/usr/lib/news/bin/innbind                               root:news         4550
 
 #
 # sendfax
