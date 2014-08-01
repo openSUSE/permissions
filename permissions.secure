@@ -399,5 +399,5 @@
 /usr/lib/qemu-bridge-helper				root:root	755
 
 # systemd-journal (bnc#888151)
-/var/log/journal                                        root:systemd-journal	2755
+/var/log/journal/                                       root:systemd-journal	2755
 
