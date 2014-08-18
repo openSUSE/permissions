@@ -1,8 +1,9 @@
 #
 # /etc/permissions.local
 #
-# This file is used by SuSEconfig and chkstat to check or set the modes
-# and ownerships of files and directories in the installation.
+# This file is used by chkstat (and indirectly by various RPM package scripts)
+# to check or set the modes and ownerships of files and directories in
+# the installation.
 #
 # In particular, this file will not be touched during an upgrade of the
 # installation. It is designed to be a placeholder for local

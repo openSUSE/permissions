@@ -5,8 +5,8 @@
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
 #
-# This file is used by SuSEconfig and chkstat to check or set the modes
-# and ownerships of files and directories in the installation.
+# This file is used by chkstat (and indirectly by various RPM scripts)
+# to check or set the modes and ownerships of files and directories in the installation.
 #
 # There is a set of files with similar meaning in a SuSE installation:
 # /etc/permissions  (This file)
