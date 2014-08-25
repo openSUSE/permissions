@@ -351,6 +351,13 @@ collect_permfiles()
 	  char* p;
 	  if (!strcmp("..", d->d_name) || !strcmp(".", d->d_name))
 	    continue;
+
+	  /* filter out backup files */
+	  if ((strlen(d->d_name)>2) && (d->d_name[strlen(d->d_name)-2] == '~'))
+	    continue;
+	  if (strstr(d->d_name,".rpmnew") || strstr(d->d_name,".rpmsave"))
+	    continue;
+
 	  ensure_array((void**)&files, &nfiles);
 	  if ((p = strchr(d->d_name, '.')))
 	    {
