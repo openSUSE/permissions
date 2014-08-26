@@ -353,7 +353,7 @@ collect_permfiles()
 	    continue;
 
 	  /* filter out backup files */
-	  if ((strlen(d->d_name)>2) && (d->d_name[strlen(d->d_name)-2] == '~'))
+	  if ((strlen(d->d_name)>2) && (d->d_name[strlen(d->d_name)-1] == '~'))
 	    continue;
 	  if (strstr(d->d_name,".rpmnew") || strstr(d->d_name,".rpmsave"))
 	    continue;
