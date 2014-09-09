@@ -1,6 +1,10 @@
 #
 # /etc/permissions.local
 #
+# After editing this file run
+#	chkstat --system --set
+# to apply the changes.
+#
 # This file is used by chkstat (and indirectly by various RPM package scripts)
 # to check or set the modes and ownerships of files and directories in
 # the installation.
