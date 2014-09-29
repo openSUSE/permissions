@@ -91,6 +91,13 @@
 # from the squid package
 /usr/sbin/pam_auth                                      root:shadow       0755
 
+# squid changes from bnc#891268
+/var/cache/squid                                        squid:root        0750
+/var/log/squid                                          squid:root        0750
+/usr/sbin/pinger                                        root:squid        0750
+/usr/sbin/basic_pam_auth                                root:shadow       0750
+
+
 # still to be converted to utempter
 /usr/lib/gnome-pty-helper                               root:utmp         0755
 
