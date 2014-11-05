@@ -160,9 +160,9 @@
 /usr/sbin/change-passwd                                 root:root         0755
 
 #
-# smb printing with kerberos authentication (#177114)
+# smb printing with kerberos authentication (bnc#177114) (bnc#685093)
 #
-/usr/bin/get_printing_ticket                            root:lp           0755
+/usr/bin/get_printing_ticket                            root:lp           0700
 
 #
 # networking (need root for the privileged socket)
