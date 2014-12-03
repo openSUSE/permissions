@@ -373,3 +373,8 @@
 # systemd-journal (bnc#888151)
 /var/log/journal/                                       root:systemd-journal	2755
 
+#iouyap (bnc#904060)
+/usr/lib/iouyap						root:iouyap	0750
+  +capabilities cap_net_raw,cap_net_admin=ep
+
+
