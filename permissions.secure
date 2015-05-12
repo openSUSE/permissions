@@ -183,11 +183,6 @@
 /usr/sbin/change-passwd                                 root:root         4755
 
 #
-# smb printing with kerberos authentication (bnc#177114)(bnc#685093)
-#
-/usr/bin/get_printing_ticket                            root:lp           0700
-
-#
 # networking (need root for the privileged socket)
 #
 /usr/bin/ping                                           root:root         0755
