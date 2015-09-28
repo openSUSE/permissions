@@ -373,5 +373,5 @@
   +capabilities cap_net_raw,cap_net_admin=ep
 
 # radosgw (bsc#943471)
-/usr/bin/radosgw					root:root	0755
+/usr/bin/radosgw					root:www	0750
  +capabilities cap_net_bind_service=ep
