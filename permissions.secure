@@ -407,3 +407,6 @@
 #iouyap (bnc#904060)
 /usr/lib/iouyap						root:iouyap	0750
 
+# radosgw (bsc#943471)
+/usr/bin/radosgw					root:root	0755
+ +capabilities cap_net_bind_service=ep
