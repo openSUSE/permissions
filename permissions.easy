@@ -375,3 +375,12 @@
 # radosgw (bsc#943471)
 /usr/bin/radosgw					root:www	0750
  +capabilities cap_net_bind_service=ep
+#
+# suexec is only secure if the document root doesn't contain files
+# writeable by wwwrun. Make sure you have a safe server setup
+# before setting the setuid bit! See also
+# https://bugzilla.novell.com/show_bug.cgi?id=263789
+# http://httpd.apache.org/docs/trunk/suexec.html
+# You need to override this in permissions.local.
+#
+/usr/sbin/suexec2            				root:root       0755
