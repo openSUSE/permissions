@@ -35,6 +35,7 @@
 # http://httpd.apache.org/docs/trunk/suexec.html
 #
 #/usr/sbin/suexec2            root:root       4755
+#/usr/sbin/suexec             root:root       4755
 
 # setuid bit on Xorg is only needed if no display manager, ie startx
 # is used. Beware of CVE-2010-2240.
