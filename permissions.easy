@@ -375,6 +375,12 @@
 # radosgw (bsc#943471)
 /usr/bin/radosgw					root:www	0750
  +capabilities cap_net_bind_service=ep
+
+# gstreamer ptp (bsc#960173)
+/usr/lib/gstreamer-1.0/gst-ptp-helper			root:root	0755
+ +capabilities cap_net_bind_service=ep
+
+
 #
 # suexec is only secure if the document root doesn't contain files
 # writeable by wwwrun. Make sure you have a safe server setup
