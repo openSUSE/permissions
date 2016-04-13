@@ -44,7 +44,7 @@
 /usr/bin/newgrp                                         root:root         4755
 /usr/bin/passwd                                         root:shadow       4755
 /usr/bin/chfn                                           root:shadow       4755
-/usr/bin/chage                                          root:shadow       4755
+/usr/bin/chage                                          root:shadow       2755
 /usr/bin/chsh                                           root:shadow       4755
 /usr/bin/expiry                                         root:shadow       4755
 /usr/bin/sudo                                           root:root         4755
