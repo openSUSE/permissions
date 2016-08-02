@@ -395,5 +395,5 @@
 /usr/sbin/suexec            				root:root       0755
 
 # newgidmap / newuidmap (bsc#979282)
-/usr/bin/newgidmap					root:root	0755
-/usr/bin/newuidmap					root:root	0755
+/usr/bin/newgidmap					root:shadow	0755
+/usr/bin/newuidmap					root:shadow	0755
