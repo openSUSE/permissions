@@ -362,8 +362,10 @@
 /usr/bin/readcd						root:root	755
 /usr/bin/cdda2wav					root:root	755
 
-# qemu-bridge-helper has no special privileges currently (bnc#765948)
-/usr/lib/qemu-bridge-helper				root:root	755
+# qemu-bridge-helper (bnc#765948, bsc#988279)
+/usr/lib/qemu-bridge-helper				root:kvm	04750
+/usr/lib64/qemu-bridge-helper				root:kvm	04750
+
 
 # systemd-journal (bnc#888151)
 /var/log/journal/                                       root:systemd-journal	2755
@@ -391,3 +393,5 @@
 #
 /usr/sbin/suexec2            				root:root       0755
 /usr/sbin/suexec            				root:root       0755
+
+
