@@ -427,3 +427,7 @@
 # suexec2 is a symlink for now, leave as-is
 #
 /usr/sbin/suexec             				root:root       0755
+
+# newgidmap / newuidmap (bsc#979282)
+/usr/bin/newgidmap					root:root	0755
+/usr/bin/newuidmap					root:root	0755
