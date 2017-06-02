@@ -116,7 +116,7 @@
 
 /etc/opiekeys                                           root:root          600
 
-/etc/ppp/                                               root:dialout       750
+/etc/ppp/                                               root:root          750
 /etc/ppp/chap-secrets                                   root:root          600
 /etc/ppp/pap-secrets                                    root:root          600
 
