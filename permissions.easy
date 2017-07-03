@@ -314,6 +314,8 @@
 /usr/lib/virtualbox/VBoxNetAdpCtl                       root:vboxusers    4750
 # bnc#669055
 /usr/lib/virtualbox/VBoxNetDHCP                         root:vboxusers    4750
+# bsc#1033425
+/usr/lib/virtualbox/VBoxNetNAT                          root:vboxusers    4750
 
 # open-vm-tools (bnc#474285)
 /usr/bin/vmware-user-suid-wrapper			root:root         4755
