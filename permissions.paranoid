@@ -310,6 +310,9 @@
 # dbus-1 (#333361)
 /lib/dbus-1/dbus-daemon-launch-helper                   root:messagebus   0750
 /lib64/dbus-1/dbus-daemon-launch-helper                 root:messagebus   0750
+# dbus-1 in /usr #1056764)
+/usr/lib/dbus-1/dbus-daemon-launch-helper               root:messagebus   0750
+/usr/lib64/dbus-1/dbus-daemon-launch-helper             root:messagebus   0750
 
 # policycoreutils (#440596)
 /usr/bin/newrole                                        root:root         0755
