@@ -336,6 +336,14 @@
 # wireshark (not yet)
 /usr/bin/dumpcap					root:root	  0755
 
+# singularity (bsc#1028304)
+/usr/lib/singularity/bin/expand-suid			root:singularity  4750
+/usr/lib/singularity/bin/mount-suid			root:singularity  4750	
+/usr/lib/singularity/bin/create-suid			root:singularity  4750	
+/usr/lib/singularity/bin/action-suid			root:singularity  4750	
+/usr/lib/singularity/bin/export-suid			root:singularity  4750	
+/usr/lib/singularity/bin/import-suid			root:singularity  4750
+
 #
 # XXX: / -> /usr merge and sbin -> bin merge
 # XXX: duplicated entries need to be cleaned up before 12.2
@@ -383,7 +391,6 @@
 # gstreamer ptp (bsc#960173)
 /usr/lib/gstreamer-1.0/gst-ptp-helper			root:root	0755
  +capabilities cap_net_bind_service=ep
-
 
 #
 # suexec is only secure if the document root doesn't contain files
