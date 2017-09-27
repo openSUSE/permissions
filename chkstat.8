@@ -26,7 +26,7 @@ The program
 is a tool to check and set file permissions.
 .PP
 chkstat can either operate in system mode or on individually
-specified permission files. In system mode /etc/permissions/security
+specified permission files. In system mode, \fI/etc/sysconfig/security\fR
 determines which level to use and whether to actually apply
 permission changes.
 .PP
@@ -53,7 +53,7 @@ Omit printing the output header lines.
 .TP
 .IR \-\-fscaps,\ \-\-no\-fscaps
 Enable or disable use of fscaps. In system mode the setting of
-PERMISSIONS_FSCAPS determines whether fscaps are on or off when this
+\fIPERMISSIONS_FSCAPS\fR determines whether fscaps are on or off when this
 option is not set.
 .TP
 .IR \-\-examine\ file
