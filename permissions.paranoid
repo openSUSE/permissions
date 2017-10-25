@@ -47,6 +47,12 @@
 /etc/rmtab                                              root:root          600
 /var/lib/nfs/rmtab                                      root:root          600
 /etc/syslog.conf                                        root:root          600
+/etc/ssh/sshd_config                                    root:root          600
+/etc/cron.d                                             root:root          700
+/etc/cron.daily                                         root:root          700
+/etc/cron.hourly                                        root:root          700
+/etc/cron.monthly                                       root:root          700
+/etc/cron.weekly                                        root:root          700
 
 #
 # suid system programs that need the suid bit to work:
