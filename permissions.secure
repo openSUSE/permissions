@@ -70,6 +70,7 @@
 /etc/rmtab                                              root:root          644
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          600
+/etc/ssh/sshd_config                                    root:root          600
 
 #
 # suid system programs that need the suid bit to work:
