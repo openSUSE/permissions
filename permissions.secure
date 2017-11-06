@@ -386,6 +386,7 @@
 /usr/lib/singularity/bin/action-suid			root:singularity  4750
 /usr/lib/singularity/bin/export-suid			root:singularity  4750
 /usr/lib/singularity/bin/import-suid			root:singularity  4750
+/usr/lib/singularity/bin/start-suid			root:singularity  4750
 
 #
 # XXX: / -> /usr merge and sbin -> bin merge
