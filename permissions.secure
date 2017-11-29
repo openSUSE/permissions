@@ -458,3 +458,7 @@
 # incinga2 (bsc#1069410)
 /run/incinga2/cmd					icinga:icingagmd 2750
 
+# fping (bsc#1047921)
+/usr/sbin/fping						root:root	0755
+ +capabilities cap_net_raw=ep
+
