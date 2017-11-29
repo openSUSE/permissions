@@ -431,3 +431,6 @@
 # gvfs (bsc#1065864)
 /usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
  
+# incinga2 (bsc#1069410)
+/run/incinga2/cmd					icinga:icingagmd 0750
+
