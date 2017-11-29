@@ -428,3 +428,6 @@
 # kwayland (bsc#1062182)
 /usr/bin/kwin_wayland					root:root	0755
 
+# gvfs (bsc#1065864)
+/usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
+ 

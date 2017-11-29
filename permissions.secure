@@ -452,3 +452,6 @@
 /usr/bin/kwin_wayland					root:root	0755
  +capabilities cap_sys_nice=ep
 
+# gvfs (bsc#1065864)
+/usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
+
