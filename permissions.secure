@@ -462,3 +462,8 @@
 /usr/sbin/fping						root:root	0755
  +capabilities cap_net_raw=ep
 
+# usbauth (bsc#1066877)
+/usr/bin/usbauth-npriv                                  root:usbauth    04750
+/usr/lib/usbauth-notifier                               root:usbauth-notifier  0750
+/usr/lib/usbauth-notifier/usbauth-notifier              root:usbauth    02755
+
