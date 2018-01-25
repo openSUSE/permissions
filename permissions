@@ -81,7 +81,7 @@
 /var/log/lastlog                                        root:root          644
 /var/log/faillog                                        root:root          600
 /var/log/wtmp                                           root:utmp          664
-/var/log/btmp                                           root:root          600
+/var/log/btmp                                           root:utmp          600
 /var/run/utmp                                           root:utmp          664
 /run/utmp                                           	root:utmp          664
 
