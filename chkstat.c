@@ -33,7 +33,7 @@
 #include <fcntl.h>
 
 #define BAD_LINE() \
-  fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
+  fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt);
 
 struct perm {
   struct perm *next;
@@ -787,7 +787,7 @@ main(int argc, char **argv)
     {
       if ((fp = fopen(permfiles[i], "r")) == 0)
 	{
-	  perror(argv[i]);
+	  perror(permfiles[i]);
 	  exit(1);
 	}
       lcnt = 0;
