@@ -120,6 +120,13 @@
 /etc/ppp/chap-secrets                                   root:root          600
 /etc/ppp/pap-secrets                                    root:root          600
 
+# the permission files themseleves
+/etc/permissions					root:root          644
+/etc/permissions.easy					root:root          644
+/etc/permissions.local					root:root          644
+/etc/permissions.paranoid				root:root          644
+/etc/permissions.secure					root:root          644
+
 # sysconfig files:
 /etc/sysconfig/network/providers/                       root:root          700
 
