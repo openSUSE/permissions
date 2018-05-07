@@ -336,8 +336,9 @@
 # ecryptfs-utils (bnc#740110)
 /sbin/mount.ecryptfs_private				root:root         4755
 
-# wireshark (not yet)
-/usr/bin/dumpcap					root:root	  0755
+# wireshark (bsc#957624)
+/usr/bin/dumpcap					root:wireshark	  0755
+ +capabilities cap_net_raw,cap_net_admin=ep
 
 # singularity (bsc#1028304)
 /usr/lib/singularity/bin/expand-suid			root:singularity  4750
