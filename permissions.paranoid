@@ -353,7 +353,7 @@
 # ecryptfs-utils (bnc#740110)
 /sbin/mount.ecryptfs_private                            root:root         0755
 
-# wireshark (not yet)
+# wireshark (bsc#957624)
 /usr/bin/dumpcap					root:root	  0755
 
 # singularity (bsc#1028304)
