@@ -429,7 +429,7 @@ usage(int x)
 "  --noheader		don't print intro message\n"
 "  --fscaps		force use of fscaps\n"
 "  --no-fscaps		disable use of fscaps\n"
-"  --system		system mode, act according to /etc/permissions/security\n"
+"  --system		system mode, act according to /etc/sysconfig/security\n"
 "  --level LEVEL		force use LEVEL (only with --system)\n"
 "  --examine FILE	apply to specified file only\n"
 "  --files FILELIST	read list of files to apply from FILELIST\n"
