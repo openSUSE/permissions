@@ -431,3 +431,5 @@
 /usr/lib/usbauth-notifier                               root:usbauth-notifier  0750
 /usr/lib/usbauth-notifier/usbauth-notifier              root:usbauth    02755
 
+# spice-gtk (bsc#1101420)
+/usr/bin/spice-client-glib-usb-acl-helper               root:kvm        04750
