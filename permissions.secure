@@ -439,3 +439,7 @@
 # newgidmap / newuidmap (bsc#979282)
 /usr/bin/newgidmap					root:shadow	0755
 /usr/bin/newuidmap					root:shadow	0755
+
+# smc-tools (bsc#1102956)
+/usr/lib/libsmc-preload.so                              root:root       04755
+/usr/lib64/libsmc-preload.so                            root:root       04755
