@@ -438,3 +438,6 @@
 # smc-tools (bsc#1102956)
 /usr/lib/libsmc-preload.so                              root:root       04755
 /usr/lib64/libsmc-preload.so                            root:root       04755
+
+# lxc (bsc#988348)
+/usr/lib/lxc/lxc-user-nic                               root:kvm        04750
