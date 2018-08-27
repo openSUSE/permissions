@@ -477,3 +477,6 @@
 
 # lxc (bsc#988348)
 /usr/lib/lxc/lxc-user-nic                               root:kvm        04750
+
+# firejail (bsc#1059013)
+/usr/bin/firejail                                       root:firejail   04750
