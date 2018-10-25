@@ -440,3 +440,6 @@
 # newgidmap / newuidmap (bsc#979282)
 /usr/bin/newgidmap					root:shadow	0755
 /usr/bin/newuidmap					root:shadow	0755
+
+# authbind (bsc#1111251)
+/usr/lib/authbind/helper                                root:root       04755
