@@ -480,3 +480,6 @@
 
 # firejail (bsc#1059013)
 /usr/bin/firejail                                       root:firejail   04750
+
+# authbind (bsc#1111251)
+/usr/lib/authbind/helper                                root:root       04755
