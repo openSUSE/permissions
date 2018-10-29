@@ -447,3 +447,6 @@
 
 # authbind (bsc#1111251)
 /usr/lib/authbind/helper                                root:root       04755
+
+# fuse3 (bsc#1111230)
+/usr/bin/fusermount3                                    root:trusted    04755
