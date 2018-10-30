@@ -457,3 +457,6 @@
 
 # fuse3 (bsc#1111230)
 /usr/bin/fusermount3                                    root:trusted    0755
+
+# 389-ds (bsc#1111564)
+/usr/sbin/ns-slapd					root:dirsrv	0750
