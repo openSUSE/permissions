@@ -112,7 +112,8 @@ class PermissionsPlugin(zypp_plugin.Plugin):
             log("Processing", str(step))
 
             _type = step.get("type", None)
-            # we're only looking for new packages being installed
+            # we're only looking for new packages being installed (this also
+	    # covers updates).
             if not _type or _type != "+":
                 continue
 

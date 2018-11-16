@@ -9,6 +9,11 @@
 # to check or set the modes and ownerships of files and directories in
 # the installation.
 #
+# If you want chkstat to be run automically after zypper operations, then you
+# can install the permissions-zypp-plugin. This is helpful when you are
+# entering permissions in this file that get overwritten by package updates.
+# The plugin keeps the custom permissions in place.
+#
 # In particular, this file will not be touched during an upgrade of the
 # installation. It is designed to be a placeholder for local
 # additions by the administrator of the system to reflect filemodes
