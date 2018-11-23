@@ -236,13 +236,14 @@
 #
 # amanda
 #
-/usr/sbin/amcheck                                       root:amanda       4750
 /usr/lib/amanda/calcsize                                root:amanda       4750
 /usr/lib/amanda/rundump                                 root:amanda       4750
-/usr/lib/amanda/planner                                 root:amanda       4750
 /usr/lib/amanda/runtar                                  root:amanda       4750
-/usr/lib/amanda/dumper                                  root:amanda       4750
 /usr/lib/amanda/killpgrp                                root:amanda       4750
+/usr/lib/amanda/ambind                                  root:amanda       4750
+/usr/lib/amanda/application/ambsdtar                    root:amanda       4750
+/usr/lib/amanda/application/amgtar                      root:amanda       4750
+/usr/lib/amanda/application/amstar                      root:amanda       4750
 
 # postgresql (bsc#1123886)
 # This is for older products (<=15.1), in Factory we use better settings. Don't
