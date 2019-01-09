@@ -186,7 +186,7 @@
 
 #
 # terminal emulators
-# This and future SuSE products have support for the utempter, a small helper
+# This and future SUSE products have support for the utempter, a small helper
 # program that does the utmp/wtmp update work with the necessary rights.
 # The use of utempter obsoletes the need for sgid bits on terminal emulator
 # binaries. We mention screen here, but all other terminal emulators have
