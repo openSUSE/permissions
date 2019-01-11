@@ -8,7 +8,7 @@
 # This file is used by chkstat (and indirectly by various RPM scripts)
 # to check or set the modes and ownerships of files and directories in the installation.
 #
-# There is a set of files with similar meaning in a SuSE installation:
+# There is a set of files with similar meaning in a SUSE installation:
 # /etc/permissions  (This file)
 # /etc/permissions.easy
 # /etc/permissions.secure
