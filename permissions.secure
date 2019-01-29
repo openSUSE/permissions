@@ -71,6 +71,13 @@
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          600
 /etc/ssh/sshd_config                                    root:root          600
+# we might want to tighten that up in the future in this profile (remove the
+# ability for others to read/enter)
+/etc/cron.d                                             root:root          755
+/etc/cron.daily                                         root:root          755
+/etc/cron.hourly                                        root:root          755
+/etc/cron.monthly                                       root:root          755
+/etc/cron.weekly                                        root:root          755
 
 #
 # suid system programs that need the suid bit to work:
