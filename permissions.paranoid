@@ -435,6 +435,9 @@
 # incinga2 (bsc#1069410)
 /run/incinga2/cmd					icinga:icingagmd 0750
 
+# fping (bsc#1047921)
+/usr/sbin/fping                                         root:root       0755
+
 # usbauth (bsc#1066877)
 /usr/bin/usbauth-npriv                                  root:usbauth    0750
 /usr/lib/usbauth-notifier                               root:usbauth-notifier  0750
