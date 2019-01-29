@@ -32,6 +32,12 @@
 /etc/ftpusers                                           root:root          644
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          644
+/etc/ssh/sshd_config                                    root:root          640
+/etc/cron.d                                             root:root          755
+/etc/cron.daily                                         root:root          755
+/etc/cron.hourly                                        root:root          755
+/etc/cron.monthly                                       root:root          755
+/etc/cron.weekly                                        root:root          755
 
 #
 # suid system programs that need the suid bit to work:
