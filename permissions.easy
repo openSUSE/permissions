@@ -107,8 +107,6 @@
 /usr/bin/write                                          root:tty          2755
 # thttpd:
 /usr/bin/makeweb                                        root:www          2755
-# yaps, pager software, accesses /dev/ttyS?
-/usr/bin/yaps                                           root:uucp         2755
 # ncpfs tool
 /usr/bin/nwsfind                                        root:trusted      4750
 /usr/bin/ncplogin                                       root:trusted      4750

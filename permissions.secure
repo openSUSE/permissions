@@ -148,8 +148,6 @@
 /usr/bin/write                                          root:tty          0755
 # thttpd: sgid + executeable only for group www. Useless...
 /usr/bin/makeweb                                        root:www          2750
-# yaps, pager software, accesses /dev/ttyS? . Disabled sgid uucp.
-/usr/bin/yaps                                           root:uucp         0755
 # ncpfs tool: trusted only
 /usr/bin/nwsfind                                        root:trusted      4750
 /usr/bin/ncplogin                                       root:trusted      4750

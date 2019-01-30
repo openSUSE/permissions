@@ -123,8 +123,6 @@
 /usr/bin/write                                          root:tty          0755
 # thttpd
 /usr/bin/makeweb                                        root:www          0750
-# yaps, pager software, accesses /dev/ttyS? . Disabled sgid uucp.
-/usr/bin/yaps                                           root:uucp         0755
 # ncpfs tool: trusted only
 /usr/bin/nwsfind                                        root:trusted      0750
 /usr/bin/ncplogin                                       root:trusted      0750
