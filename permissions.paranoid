@@ -324,8 +324,8 @@
 
 # VirtualBox (#429725)
 /usr/lib/virtualbox/VirtualBox                          root:vboxusers    0755
-/usr/lib/virtualbox/VirtualBox3                         root:vboxusers    0755
-/usr/lib/virtualbox/VBoxBFE                             root:vboxusers    0755
+# bsc#1120650
+/usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
 /usr/lib/virtualbox/VBoxSDL                             root:vboxusers    0755
 # (bnc#533550)
