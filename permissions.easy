@@ -114,9 +114,6 @@
 # libgnomesu (#75823, #175616)
 /usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
 
-# control-center2 (#104993)
-/usr/sbin/change-passwd                                 root:root         4755
-
 #
 # networking (need root for the privileged socket)
 #
