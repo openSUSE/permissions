@@ -124,8 +124,6 @@
 #
 # video
 /usr/bin/v4l-conf                                       root:video        4750
-# Itanium ia32 emulator
-/usr/lib/ia32el/suid_ia32x_loader                       root:root         0755
 # scotty:
 # #66211
 /usr/bin/ntping                                         root:trusted      4750

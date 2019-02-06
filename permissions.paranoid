@@ -98,8 +98,6 @@
 #
 # video
 /usr/bin/v4l-conf                                       root:video        0755
-# Itanium ia32 emulator
-/usr/lib/ia32el/suid_ia32x_loader                       root:root         0755
 #########################################################################
 # scotty:
 # #66211
