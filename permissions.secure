@@ -218,9 +218,6 @@
 # bnc#523833
 /usr/lib/kde4/libexec/start_kdeinit                     root:root         4755
 /usr/lib64/kde4/libexec/start_kdeinit                   root:root         4755
-# edits /etc/smb.conf
-# #66312
-/usr/bin/fileshareset                                   root:root         0755
 
 #
 # amanda
