@@ -206,25 +206,15 @@
 # (all of them are disabled in permissions.secure except for 
 # the helper programs)
 #
-# arts wrapper, normally suid root:
-/opt/kde3/bin/artswrapper                               root:root         0755
 # needs setuid root when using shadow via NIS:
 # #66218
-/opt/kde3/bin/kcheckpass                                root:shadow       4755
 /usr/lib/kde4/libexec/kcheckpass                        root:shadow       4755
 /usr/lib64/kde4/libexec/kcheckpass                      root:shadow       4755
-# This has a meaning... hmm...
-/opt/kde3/bin/kdesud                                    root:nogroup      2755
 /usr/lib/kde4/libexec/kdesud                            root:nogroup      2755
 /usr/lib64/kde4/libexec/kdesud                          root:nogroup      2755
 /usr/lib/libexec/kf5/kdesud                             root:nogroup      2755
 /usr/lib64/libexec/kf5/kdesud                           root:nogroup      2755
 
-# used for getting proxy settings from dhcp
-/opt/kde3/bin/kpac_dhcp_helper                          root:root         0755
-# used to distract the oom killer
-# #203535
-/opt/kde3/bin/start_kdeinit                             root:root         4755
 # bnc#523833
 /usr/lib/kde4/libexec/start_kdeinit                     root:root         4755
 /usr/lib64/kde4/libexec/start_kdeinit                   root:root         4755
