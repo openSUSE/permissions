@@ -136,10 +136,6 @@
 # gnokii nokia cellphone software
 # #66209
 /usr/sbin/mgnokiidev                                    root:uucp          755
-# pcp, performance co-pilot
-# setuid root is used to write /var/log/pcp/NOTICES
-# #66205
-/usr/lib/pcp/pmpost                                     root:trusted      4750
 # mailman mailing list software
 # #66315
 /usr/lib/mailman/cgi-bin/admin                          root:mailman      2755
