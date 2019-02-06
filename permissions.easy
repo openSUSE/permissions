@@ -55,9 +55,6 @@
 # opie password system
 # #66303
 /usr/bin/opiepasswd                                     root:root         4755
-# "user" entries in /etc/fstab make mount work for non-root users:
-/usr/bin/ncpmount                                       root:trusted      4750
-/usr/bin/ncpumount                                      root:trusted      4750
 # #331020
 /sbin/mount.nfs                                         root:root         4755
 /bin/mount                                              root:root         4755
@@ -106,10 +103,6 @@
 /usr/bin/write                                          root:tty          2755
 # thttpd:
 /usr/bin/makeweb                                        root:www          2755
-# ncpfs tool
-/usr/bin/nwsfind                                        root:trusted      4750
-/usr/bin/ncplogin                                       root:trusted      4750
-/usr/bin/ncpmap                                         root:trusted      4750
 # lpdfilter:
 # checks itself that only lp and root can call it
 /usr/lib/lpdfilter/bin/runlpr                           root:root         4755
