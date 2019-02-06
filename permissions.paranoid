@@ -104,9 +104,6 @@
 /usr/bin/write                                          root:tty          0755
 # thttpd
 /usr/bin/makeweb                                        root:www          0750
-# lpdfilter:
-# checks itself that only lp and root can call it
-/usr/lib/lpdfilter/bin/runlpr                           root:root         0755
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      0755
