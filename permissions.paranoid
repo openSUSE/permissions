@@ -140,11 +140,6 @@
 /usr/bin/rlogin                                         root:root         0755
 /usr/bin/rsh                                            root:root         0755
 
-# heartbeat #66310
-# cl_status needs to be allowed to connect to the heartbeat API. If the setgid
-# bit is removed, one can manually add users to the haclient group instead.
-/usr/bin/cl_status                                      root:haclient     0555
-
 # exim
 /usr/sbin/exim                                          root:root         0755
 
