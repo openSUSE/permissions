@@ -62,8 +62,6 @@
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
-# #66203
-/usr/lib/majordomo/wrapper                              root:daemon       4755
 # glibc backwards compatibility
 /usr/lib/pt_chown                                       root:root         4755
 /usr/lib64/pt_chown                                     root:root         4755
