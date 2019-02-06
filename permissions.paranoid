@@ -82,8 +82,6 @@
 # #216816
 /sbin/unix_chkpwd                                       root:shadow       0755
 /sbin/unix2_chkpwd                                      root:shadow       0755
-# qpopper
-/usr/sbin/popauth                                       pop:trusted       0755
 # from the squid package
 /usr/sbin/pam_auth                                      root:shadow       0755
 
