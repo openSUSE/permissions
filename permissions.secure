@@ -124,9 +124,6 @@
 #
 # video
 /usr/bin/v4l-conf                                       root:video        4750
-# scotty:
-# #66211
-/usr/bin/ntping                                         root:trusted      4750
 
 # turned off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          0755

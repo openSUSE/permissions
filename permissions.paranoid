@@ -94,14 +94,10 @@
 /usr/lib/gnome-pty-helper                               root:utmp         0755
 
 #
-# mixed section: most of it is disabled in this permissions.secure:
+# mixed section: most of it is disabled in this permissions.paranoid:
 #
 # video
 /usr/bin/v4l-conf                                       root:video        0755
-#########################################################################
-# scotty:
-# #66211
-/usr/bin/ntping                                         root:trusted      0755
 
 # turned off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          0755
