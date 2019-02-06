@@ -62,9 +62,6 @@
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
-# glibc backwards compatibility
-/usr/lib/pt_chown                                       root:root         4755
-/usr/lib64/pt_chown                                     root:root         4755
 # needs setuid root when using shadow via NIS:
 # #216816
 /sbin/unix_chkpwd                                       root:shadow       4755
