@@ -43,7 +43,6 @@
 /etc/exports                                            root:root          600
 /etc/fstab                                              root:root          600
 /etc/ftpusers                                           root:root          600
-/etc/rmtab                                              root:root          600
 /var/lib/nfs/rmtab                                      root:root          600
 /etc/syslog.conf                                        root:root          600
 /etc/ssh/sshd_config                                    root:root          600
