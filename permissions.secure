@@ -107,8 +107,6 @@
 # #216816
 /sbin/unix_chkpwd                                       root:shadow       4755
 /sbin/unix2_chkpwd                                      root:shadow       4755
-# from the squid package
-/usr/sbin/pam_auth                                      root:shadow       4755
 
 # squid changes from bnc#891268
 /var/cache/squid/                                       squid:root        0750
