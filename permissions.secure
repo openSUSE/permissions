@@ -348,8 +348,6 @@
 /usr/bin/su                                             root:root         4755
 /usr/bin/mount                                          root:root         4755
 /usr/bin/umount                                         root:root         4755
-/usr/sbin/isdnctrl                                      root:dialout      4750
-/usr/bin/isdnctrl                                       root:dialout      4750
 /usr/sbin/pccardctl                                     root:trusted      4750
 /usr/bin/pccardctl                                      root:trusted      4750
 
