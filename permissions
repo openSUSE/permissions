@@ -137,10 +137,6 @@
 #
 # legacy
 #
-# don't set the setuid bit on suidperl! Set it on sperl instead if
-# you really need it as suidperl is a hardlink to perl nowadays.
-/usr/bin/suidperl                                       root:root          755
-
 # new traceroute program by Olaf Kirch does not need setuid root any more.
 /usr/sbin/traceroute                                    root:root          755
 
