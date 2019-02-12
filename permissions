@@ -121,7 +121,6 @@
 /etc/sysconfig/network/providers/                       root:root          700
 
 # utempter
-/usr/sbin/utempter                                      root:utmp         2755
 /usr/lib/utempter/utempter                              root:utmp         2755
 
 # ensure correct permissions on ssh files to avoid sshd refusing
