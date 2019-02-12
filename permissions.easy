@@ -314,8 +314,6 @@
 
 # qemu-bridge-helper (bnc#765948, bsc#988279)
 /usr/lib/qemu-bridge-helper				root:kvm	04750
-/usr/lib64/qemu-bridge-helper				root:kvm	04750
-
 
 # systemd-journal (bnc#888151)
 /var/log/journal/                                       root:systemd-journal	2755
