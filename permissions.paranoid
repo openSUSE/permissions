@@ -315,10 +315,6 @@
 /usr/bin/su                                             root:root         0755
 /usr/bin/mount                                          root:root         0755
 /usr/bin/umount                                         root:root         0755
-/usr/sbin/unix_chkpwd                                   root:shadow       0755
-/usr/bin/unix_chkpwd                                    root:shadow       0755
-/usr/sbin/unix2_chkpwd                                  root:shadow       0755
-/usr/bin/unix2_chkpwd                                   root:shadow       0755
 /usr/sbin/isdnctrl                                      root:dialout      0755
 /usr/bin/isdnctrl                                       root:dialout      0755
 /usr/sbin/pccardctl                                     root:trusted      0755
