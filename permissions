@@ -101,7 +101,6 @@
 /etc/passwd                                             root:root          644
 /etc/shadow                                             root:shadow        640
 /etc/init.d/                                            root:root          755
-/etc/HOSTNAME                                           root:root          644
 /etc/hosts                                              root:root          644
 # Changing the hosts_access(5) files causes trouble with services
 # that do not run as root!
