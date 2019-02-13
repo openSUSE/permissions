@@ -245,6 +245,11 @@
 /usr/lib/amanda/dumper                                  root:amanda       4750
 /usr/lib/amanda/killpgrp                                root:amanda       4750
 
+# postgresql (bsc#1123886)
+# This is for older products (<=15.1), in Factory we use better settings. Don't
+# port this master
+/run/postgresql                                         root:root         1777
+/var/run/postgresql                                     root:root         1777
 
 #
 # gnats
