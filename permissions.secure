@@ -27,7 +27,7 @@
 # file is of no use since the data used can be obtained from the /proc file
 # system or interface configuration as well. Also, system programs such as
 # /sbin/ifconfig or /sbin/route are not changed because nosey users can
-# bring their own. "Security by obscurity" will add any significant 
+# bring their own. "Security by obscurity" will not add any significant 
 # security-related advantage to the system. Keep in mind that curiosity
 # is a major motivation for your users to try to see behind the curtain.
 #
@@ -81,7 +81,7 @@
 # suid system programs that need the suid bit to work:
 #
 /bin/su                                                 root:root         4755
-# disable at and cron for users that do not belnong to the group "trusted"
+# disable at and cron for users that do not belong to the group "trusted"
 /usr/bin/at                                             root:trusted      4750
 /usr/bin/crontab                                        root:trusted      4750
 /usr/bin/gpasswd                                        root:shadow       4755
