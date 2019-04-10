@@ -9,9 +9,10 @@
 #
 # /etc/permissions.paranoid is NOT designed to be used in a single-user as
 # well as a multi-user installation, be it networked or not.
+# 
 # Derived from /etc/permissions.secure, it has _all_ sgid and suid bits
-# cleared - therefore, the system might be useable for non-privileged users
-# except for simple tasks like changing passwords and such. In addition, 
+# cleared - therefore, the system is probably not useable for non-privileged
+# users except for simple tasks like changing passwords and such. In addition,
 # some of the configuration files are not readable for world any more.
 #
 # Feel free to use this file as a basis of a system configuration that meets
