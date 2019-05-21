@@ -8,7 +8,7 @@
 # This file is used by chkstat (and indirectly by various RPM scripts)
 # to check or set the modes and ownerships of files and directories in the installation.
 #
-# There is a set of files with similar meaning in a SuSE installation:
+# There is a set of files with similar meaning in a SUSE installation:
 # /etc/permissions  (This file)
 # /etc/permissions.easy
 # /etc/permissions.secure
@@ -62,14 +62,11 @@
 /var/spool/                                             root:root          755
 /var/spool/mqueue/                                      root:root          700
 /var/spool/news/                                        news:news          775
-/var/spool/uucp/                                        uucp:uucp          755
 /var/spool/voice/                                       root:root          755
 /var/spool/mail/                                        root:root         1777
 /var/adm/                                               root:root          755
 /var/adm/backup/                                        root:root          700
 /var/cache/                                             root:root          755
-/var/cache/man/                                         man:root           755
-/var/yp/                                                root:root          755
 /var/run/nscd/socket					root:root	   666
 /run/nscd/socket					root:root	   666
 /var/run/sudo/                                          root:root          700
@@ -103,7 +100,6 @@
 /etc/passwd                                             root:root          644
 /etc/shadow                                             root:shadow        640
 /etc/init.d/                                            root:root          755
-/etc/HOSTNAME                                           root:root          644
 /etc/hosts                                              root:root          644
 # Changing the hosts_access(5) files causes trouble with services
 # that do not run as root!
@@ -124,7 +120,6 @@
 /etc/sysconfig/network/providers/                       root:root          700
 
 # utempter
-/usr/sbin/utempter                                      root:utmp         2755
 /usr/lib/utempter/utempter                              root:utmp         2755
 
 # ensure correct permissions on ssh files to avoid sshd refusing
@@ -141,15 +136,8 @@
 #
 # legacy
 #
-# don't set the setuid bit on suidperl! Set it on sperl instead if
-# you really need it as suidperl is a hardlink to perl nowadays.
-/usr/bin/suidperl                                       root:root          755
-
 # new traceroute program by Olaf Kirch does not need setuid root any more.
 /usr/sbin/traceroute                                    root:root          755
-
-# netatalk printer daemon: sgid not needed any more with cups.
-/usr/sbin/papd                                          root:lp           0755
 
 # games:games 775 safe as long as we don't change files below it (#103186)
 # still people do it (#429882) so root:root 755 is the consequence.
@@ -176,9 +164,6 @@
 
 # opiesu is not allowed setuid root as code quality is bad (bnc#882035)
 /usr/bin/opiesu						root:root         0755
-# wodim is not allowed setuid root as cd burning does not strictly require
-# it (bnc#882035)
-/usr/bin/wodim                                          root:root         0755
 
 # we no longer make rpm build dirs 1777
 /usr/src/packages/SOURCES/                              root:root         0755

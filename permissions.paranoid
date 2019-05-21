@@ -9,9 +9,10 @@
 #
 # /etc/permissions.paranoid is NOT designed to be used in a single-user as
 # well as a multi-user installation, be it networked or not.
+#
 # Derived from /etc/permissions.secure, it has _all_ sgid and suid bits
-# cleared - therefore, the system might be useable for non-privileged users
-# except for simple tasks like changing passwords and such. In addition, 
+# cleared - therefore, the system is probably not useable for non-privileged
+# users except for simple tasks like changing passwords and such. In addition,
 # some of the configuration files are not readable for world any more.
 #
 # Feel free to use this file as a basis of a system configuration that meets
@@ -42,9 +43,7 @@
 /etc/crontab                                            root:root          600
 /etc/exports                                            root:root          600
 /etc/fstab                                              root:root          600
-/etc/ftpaccess                                          root:root          600
 /etc/ftpusers                                           root:root          600
-/etc/rmtab                                              root:root          600
 /var/lib/nfs/rmtab                                      root:root          600
 /etc/syslog.conf                                        root:root          600
 /etc/ssh/sshd_config                                    root:root          600
@@ -73,29 +72,15 @@
 # opie password system
 # #66303
 /usr/bin/opiepasswd                                     root:root         0755
-# "user" entries in /etc/fstab make mount work for non-root users:
-/usr/bin/ncpmount                                       root:trusted      0755
-/usr/bin/ncpumount                                      root:trusted      0755
 # #331020
 /sbin/mount.nfs                                         root:root         0755
-/bin/mount                                              root:root         0755
-/bin/umount                                             root:root         0755
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      0755
-# #66203
-/usr/lib/majordomo/wrapper                              root:daemon       0755
-# glibc backwards compatibility
-/usr/lib/pt_chown                                       root:root         0755
-/usr/lib64/pt_chown                                     root:root         0755
 # needs setuid root when using shadow via NIS:
 # #216816
 /sbin/unix_chkpwd                                       root:shadow       0755
 /sbin/unix2_chkpwd                                      root:shadow       0755
-# qpopper
-/usr/sbin/popauth                                       pop:trusted       0755
-# from the squid package
-/usr/sbin/pam_auth                                      root:shadow       0755
 
 # /quid changes from bnc#891268
 /var/cache/squid/                                       squid:root        0750
@@ -108,41 +93,22 @@
 /usr/lib/gnome-pty-helper                               root:utmp         0755
 
 #
-# mixed section: most of it is disabled in this permissions.secure:
+# mixed section: most of it is disabled in this permissions.paranoid:
 #
 # video
 /usr/bin/v4l-conf                                       root:video        0755
-# Itanium ia32 emulator
-/usr/lib/ia32el/suid_ia32x_loader                       root:root         0755
-#########################################################################
-# scotty:
-# #66211
-/usr/bin/ntping                                         root:trusted      0755
 
 # turned off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          0755
 /usr/bin/write                                          root:tty          0755
 # thttpd
 /usr/bin/makeweb                                        root:www          0750
-# yaps, pager software, accesses /dev/ttyS? . Disabled sgid uucp.
-/usr/bin/yaps                                           root:uucp         0755
-# ncpfs tool: trusted only
-/usr/bin/nwsfind                                        root:trusted      0750
-/usr/bin/ncplogin                                       root:trusted      0750
-/usr/bin/ncpmap                                         root:trusted      0750
-# lpdfilter:
-# checks itself that only lp and root can call it
-/usr/lib/lpdfilter/bin/runlpr                           root:root         0755
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      0755
 # gnokii nokia cellphone software
 # #66209
 /usr/sbin/mgnokiidev                                    root:uucp          755
-# pcp, performance co-pilot
-# setuid root is used to write /var/log/pcp/NOTICES
-# #66205
-/usr/lib/pcp/pmpost                                     root:trusted      0755
 # mailman mailing list software
 # #66315
 /usr/lib/mailman/cgi-bin/admin                          root:mailman      0755
@@ -162,9 +128,6 @@
 # libgnomesu (#75823, #175616)
 /usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         0755
 
-# control-center2 (#104993)
-/usr/sbin/change-passwd                                 root:root         0755
-
 #
 # networking (need root for the privileged socket)
 #
@@ -175,11 +138,6 @@
 /usr/bin/rcp                                            root:root         0755
 /usr/bin/rlogin                                         root:root         0755
 /usr/bin/rsh                                            root:root         0755
-
-# heartbeat #66310
-# cl_status needs to be allowed to connect to the heartbeat API. If the setgid
-# bit is removed, one can manually add users to the haclient group instead.
-/usr/bin/cl_status                                      root:haclient     0555
 
 # exim
 /usr/sbin/exim                                          root:root         0755
@@ -204,7 +162,7 @@
 
 #
 # terminal emulators
-# This and future SuSE products have support for the utempter, a small helper
+# This and future SUSE products have support for the utempter, a small helper
 # program that does the utmp/wtmp update work with the necessary rights.
 # The use of utempter obsoletes the need for sgid bits on terminal emulator
 # binaries. We mention screen here, but all other terminal emulators have
@@ -216,32 +174,18 @@
 #
 # kde
 #
-# arts wrapper, normally suid root:
-/opt/kde3/bin/artswrapper                               root:root         0755
 # needs setuid root when using shadow via NIS:
 # #66218
-/opt/kde3/bin/kcheckpass                                root:shadow       0755
 /usr/lib/kde4/libexec/kcheckpass                        root:shadow       0755
 /usr/lib64/kde4/libexec/kcheckpass                      root:shadow       0755
-# This has a meaning... hmm...
-/opt/kde3/bin/kdesud                                    root:nogroup      0755
 /usr/lib/kde4/libexec/kdesud                            root:nogroup      0755
 /usr/lib64/kde4/libexec/kdesud                          root:nogroup      0755
 /usr/lib/libexec/kf5/kdesud                             root:nogroup      0755
 /usr/lib64/libexec/kf5/kdesud                           root:nogroup      0755
 
-# used for getting proxy settings from dhcp
-/opt/kde3/bin/kpac_dhcp_helper                          root:root         0755
-# used to distract the oom killer
-# #203535
-/opt/kde3/bin/start_kdeinit                             root:root         0755
 # bnc#523833
 /usr/lib/kde4/libexec/start_kdeinit                     root:root         0755
 /usr/lib64/kde4/libexec/start_kdeinit                   root:root         0755
-# edits /etc/smb.conf
-# #66312
-/usr/bin/fileshareset                                   root:root         0755
-
 
 #
 # amanda
@@ -326,8 +270,8 @@
 
 # VirtualBox (#429725)
 /usr/lib/virtualbox/VirtualBox                          root:vboxusers    0755
-/usr/lib/virtualbox/VirtualBox3                         root:vboxusers    0755
-/usr/lib/virtualbox/VBoxBFE                             root:vboxusers    0755
+# bsc#1120650
+/usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
 /usr/lib/virtualbox/VBoxSDL                             root:vboxusers    0755
 # (bnc#533550)
@@ -366,25 +310,12 @@
 /usr/lib/singularity/bin/action-suid			root:singularity  0750
 /usr/lib/singularity/bin/mount-suid			root:singularity  0750
 /usr/lib/singularity/bin/start-suid			root:singularity  0750
+# singularity version 3 (bsc#1128598)
+/usr/lib/singularity/bin/starter-suid                   root:singularity  0750
 
-#
-# XXX: / -> /usr merge and sbin -> bin merge
-# XXX: duplicated entries need to be cleaned up before 12.2
 /usr/bin/su                                             root:root         0755
-# temporary hack to make the move from coreutils to util-linux work
-/usr/bin/su.core                                        root:root         0755
-/usr/sbin/mount.nfs                                     root:root         0755
-/usr/bin/mount.nfs                                      root:root         0755
 /usr/bin/mount                                          root:root         0755
 /usr/bin/umount                                         root:root         0755
-/usr/sbin/unix_chkpwd                                   root:shadow       0755
-/usr/bin/unix_chkpwd                                    root:shadow       0755
-/usr/sbin/unix2_chkpwd                                  root:shadow       0755
-/usr/bin/unix2_chkpwd                                   root:shadow       0755
-/usr/sbin/isdnctrl                                      root:dialout      0755
-/usr/bin/isdnctrl                                       root:dialout      0755
-/usr/sbin/pccardctl                                     root:trusted      0755
-/usr/bin/pccardctl                                      root:trusted      0755
 
 # cdrecord of cdrtools from Joerg Schilling (bnc#550021)
 # in paranoid mode, no provisions are made for reliable cd burning, as admins
@@ -395,8 +326,6 @@
 
 # qemu-bridge-helper has no special privileges currently (bnc#765948)
 /usr/lib/qemu-bridge-helper				root:root	755
-/usr/lib64/qemu-bridge-helper				root:root	755
-
 
 # systemd-journal (bnc#888151)
 /var/log/journal/                                       root:systemd-journal	2755
@@ -433,8 +362,11 @@
 # gvfs (bsc#1065864)
 /usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
  
-# incinga2 (bsc#1069410)
-/run/incinga2/cmd					icinga:icingagmd 0750
+# icinga2 (bsc#1069410)
+/run/icinga2/cmd					icinga:icingagmd 0750
+
+# fping (bsc#1047921)
+/usr/sbin/fping                                         root:root       0755
 
 # usbauth (bsc#1066877)
 /usr/bin/usbauth-npriv                                  root:usbauth    0750

@@ -27,12 +27,15 @@
 /etc/crontab                                            root:root          600
 /etc/exports                                            root:root          644
 /etc/fstab                                              root:root          644
-# we don't package it
-/etc/ftpaccess                                          root:root          644
 /etc/ftpusers                                           root:root          644
-/etc/rmtab                                              root:root          644
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          644
+/etc/ssh/sshd_config                                    root:root          640
+/etc/cron.d                                             root:root          755
+/etc/cron.daily                                         root:root          755
+/etc/cron.hourly                                        root:root          755
+/etc/cron.monthly                                       root:root          755
+/etc/cron.weekly                                        root:root          755
 
 #
 # suid system programs that need the suid bit to work:
@@ -52,29 +55,15 @@
 # opie password system
 # #66303
 /usr/bin/opiepasswd                                     root:root         4755
-# "user" entries in /etc/fstab make mount work for non-root users:
-/usr/bin/ncpmount                                       root:trusted      4750
-/usr/bin/ncpumount                                      root:trusted      4750
 # #331020
 /sbin/mount.nfs                                         root:root         4755
-/bin/mount                                              root:root         4755
-/bin/umount                                             root:root         4755
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
-# #66203
-/usr/lib/majordomo/wrapper                              root:daemon       4755
-# glibc backwards compatibility
-/usr/lib/pt_chown                                       root:root         4755
-/usr/lib64/pt_chown                                     root:root         4755
 # needs setuid root when using shadow via NIS:
 # #216816
 /sbin/unix_chkpwd                                       root:shadow       4755
 /sbin/unix2_chkpwd                                      root:shadow       4755
-# qpopper
-/usr/sbin/popauth                                       pop:trusted       4755
-# from the squid package
-/usr/sbin/pam_auth                                      root:shadow       4755
 
 # squid changes from bnc#891268
 /var/cache/squid/                                       squid:root        0750
@@ -92,36 +81,18 @@
 #
 # video
 /usr/bin/v4l-conf                                       root:video        4755
-# Itanium ia32 emulator
-/usr/lib/ia32el/suid_ia32x_loader                       root:root         4755
-# scotty:
-# #66211
-/usr/bin/ntping                                         root:trusted      4750
 
 # turn off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          2755
 /usr/bin/write                                          root:tty          2755
 # thttpd:
 /usr/bin/makeweb                                        root:www          2755
-# yaps, pager software, accesses /dev/ttyS?
-/usr/bin/yaps                                           root:uucp         2755
-# ncpfs tool
-/usr/bin/nwsfind                                        root:trusted      4750
-/usr/bin/ncplogin                                       root:trusted      4750
-/usr/bin/ncpmap                                         root:trusted      4750
-# lpdfilter:
-# checks itself that only lp and root can call it
-/usr/lib/lpdfilter/bin/runlpr                           root:root         4755
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      4755
 # gnokii nokia cellphone software
 # #66209
 /usr/sbin/mgnokiidev                                    root:uucp         4755
-# pcp, performance co-pilot
-# setuid root is used to write /var/log/pcp/NOTICES
-# #66205
-/usr/lib/pcp/pmpost                                     root:root         4755
 # mailman mailing list software
 # #66315
 /usr/lib/mailman/cgi-bin/admin                          root:mailman      2755
@@ -141,9 +112,6 @@
 # libgnomesu (#75823, #175616)
 /usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
 
-# control-center2 (#104993)
-/usr/sbin/change-passwd                                 root:root         4755
-
 #
 # networking (need root for the privileged socket)
 #
@@ -157,11 +125,6 @@
 /usr/bin/rcp                                            root:root         4755
 /usr/bin/rlogin                                         root:root         4755
 /usr/bin/rsh                                            root:root         4755
-
-# heartbeat #66310
-# cl_status needs to be allowed to connect to the heartbeat API. If the setgid
-# bit is removed, one can manually add users to the haclient group instead.
-/usr/bin/cl_status                                      root:haclient     2555
 
 # exim
 /usr/sbin/exim                                          root:root         4755
@@ -186,7 +149,7 @@
 
 #
 # terminal emulators
-# This and future SuSE products have support for the utempter, a small helper
+# This and future SUSE products have support for the utempter, a small helper
 # program that does the utmp/wtmp update work with the necessary rights.
 # The use of utempter obsoletes the need for sgid bits on terminal emulator
 # binaries. We mention screen here, but all other terminal emulators have
@@ -201,32 +164,18 @@
 # (all of them are disabled in permissions.secure except for 
 # the helper programs)
 #
-# arts wrapper, normally suid root:
-/opt/kde3/bin/artswrapper                               root:root         4755
 # needs setuid root when using shadow via NIS:
 # #66218
-/opt/kde3/bin/kcheckpass                                root:shadow       4755
 /usr/lib/kde4/libexec/kcheckpass                        root:shadow       4755
 /usr/lib64/kde4/libexec/kcheckpass                      root:shadow       4755
-# This has a meaning... hmm...
-/opt/kde3/bin/kdesud                                    root:nogroup      2755
 /usr/lib/kde4/libexec/kdesud                            root:nogroup      2755
 /usr/lib64/kde4/libexec/kdesud                          root:nogroup      2755
 /usr/lib/libexec/kf5/kdesud                             root:nogroup      2755
 /usr/lib64/libexec/kf5/kdesud                           root:nogroup      2755
 
-# used for getting proxy settings from dhcp
-/opt/kde3/bin/kpac_dhcp_helper                          root:root         4755
-# used to distract the oom killer
-# #203535
-/opt/kde3/bin/start_kdeinit                             root:root         4755
 # bnc#523833
 /usr/lib/kde4/libexec/start_kdeinit                     root:root         4755
 /usr/lib64/kde4/libexec/start_kdeinit                   root:root         4755
-# edits /etc/smb.conf
-# #66312
-/usr/bin/fileshareset                                   root:root         4755
-
 
 #
 # amanda
@@ -310,8 +259,8 @@
 
 # VirtualBox (#429725)
 /usr/lib/virtualbox/VirtualBox                          root:vboxusers    4750
-/usr/lib/virtualbox/VirtualBox3                         root:vboxusers    4750
-/usr/lib/virtualbox/VBoxBFE                             root:vboxusers    4750
+# bsc#1120650
+/usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    4750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    4750
 /usr/lib/virtualbox/VBoxSDL                             root:vboxusers    4750
 # (bnc#533550)
@@ -350,25 +299,12 @@
 /usr/lib/singularity/bin/action-suid			root:singularity  4750
 /usr/lib/singularity/bin/mount-suid			root:singularity  4750
 /usr/lib/singularity/bin/start-suid			root:singularity  4750
+# singularity version 3 (bsc#1128598)
+/usr/lib/singularity/bin/starter-suid                   root:singularity  4750
 
-#
-# XXX: / -> /usr merge and sbin -> bin merge
-# XXX: duplicated entries need to be cleaned up before 12.2
 /usr/bin/su                                             root:root         4755
-# temporary hack to make the move from coreutils to util-linux work
-/usr/bin/su.core                                        root:root         4755
-/usr/sbin/mount.nfs                                     root:root         4755
-/usr/bin/mount.nfs                                      root:root         4755
 /usr/bin/mount                                          root:root         4755
 /usr/bin/umount                                         root:root         4755
-/usr/sbin/unix_chkpwd                                   root:shadow       4755
-/usr/bin/unix_chkpwd                                    root:shadow       4755
-/usr/sbin/unix2_chkpwd                                  root:shadow       4755
-/usr/bin/unix2_chkpwd                                   root:shadow       4755
-/usr/sbin/isdnctrl                                      root:dialout      4750
-/usr/bin/isdnctrl                                       root:dialout      4750
-/usr/sbin/pccardctl                                     root:trusted      4755
-/usr/bin/pccardctl                                      root:trusted      4755
 
 # cdrecord of cdrtools from Joerg Schilling (bnc#550021)
 # Please note that additional capabilities are provided only for reliable
@@ -381,8 +317,6 @@
 
 # qemu-bridge-helper (bnc#765948, bsc#988279)
 /usr/lib/qemu-bridge-helper				root:kvm	04750
-/usr/lib64/qemu-bridge-helper				root:kvm	04750
-
 
 # systemd-journal (bnc#888151)
 /var/log/journal/                                       root:systemd-journal	2755
@@ -422,8 +356,8 @@
 /usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
  +capabilities cap_net_bind_service=ep
 
-# incinga2 (bsc#1069410)
-/run/incinga2/cmd					icinga:icingagmd 2750
+# icinga2 (bsc#1069410)
+/run/icinga2/cmd					icinga:icingagmd 2750
 
 # fping (bsc#1047921)
 /usr/sbin/fping						root:root	0755
