@@ -356,6 +356,8 @@
 /usr/lib/singularity/bin/action-suid			root:singularity  0750
 /usr/lib/singularity/bin/export-suid			root:singularity  0750
 /usr/lib/singularity/bin/import-suid			root:singularity  0750
+# singularity version 3 (bsc#1128598)
+/usr/lib/singularity/bin/starter-suid                   root:singularity  0750
 
 #
 # XXX: / -> /usr merge and sbin -> bin merge
