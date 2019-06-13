@@ -401,6 +401,8 @@
 /usr/lib/singularity/bin/action-suid			root:singularity  4750
 /usr/lib/singularity/bin/mount-suid			root:singularity  4750
 /usr/lib/singularity/bin/start-suid			root:singularity  4750
+# singularity version 3 (bsc#1128598)
+/usr/lib/singularity/bin/starter-suid                   root:singularity  4750
 
 #
 # XXX: / -> /usr merge and sbin -> bin merge
