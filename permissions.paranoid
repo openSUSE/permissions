@@ -131,6 +131,7 @@
 #
 # networking (need root for the privileged socket)
 #
+/usr/bin/clockdiff                                      root:root         0755
 /usr/bin/ping                                           root:root         0755
 # mtr is linked against ncurses.
 /usr/sbin/mtr                                           root:dialout      0750
