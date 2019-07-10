@@ -156,6 +156,8 @@
 #
 # networking (need root for the privileged socket)
 #
+/usr/bin/clockdiff                                      root:root         0755
+ +capabilities cap_net_raw=p
 /usr/bin/ping                                           root:root         0755
  +capabilities cap_net_raw=ep
 /usr/bin/ping6                                          root:root         0755
