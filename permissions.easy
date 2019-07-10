@@ -116,9 +116,7 @@
 # networking (need root for the privileged socket)
 #
 /usr/bin/ping                                           root:root         0755
- +capabilities cap_net_raw=ep
-/usr/bin/ping6                                          root:root         0755
- +capabilities cap_net_raw=ep
+ +capabilities cap_net_raw=p
 # mtr is linked against ncurses. For dialout only.
 /usr/sbin/mtr                                           root:dialout      0750
  +capabilities cap_net_raw=ep
