@@ -132,7 +132,6 @@
 # networking (need root for the privileged socket)
 #
 /usr/bin/ping                                           root:root         0755
-/usr/bin/ping6                                          root:root         0755
 # mtr is linked against ncurses.
 /usr/sbin/mtr                                           root:dialout      0750
 /usr/bin/rcp                                            root:root         0755
