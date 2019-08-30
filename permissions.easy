@@ -287,7 +287,7 @@
 /sbin/mount.ecryptfs_private				root:root         4755
 
 # wireshark (bsc#957624)
-/usr/bin/dumpcap					root:wireshark	  0755
+/usr/bin/dumpcap					root:wireshark	  0750
  +capabilities cap_net_raw,cap_net_admin=ep
 
 # singularity (bsc#1028304)
