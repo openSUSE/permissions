@@ -17,24 +17,21 @@ zypp_commit_plugins=$(zypp_plugins)/commit
 FSCAPS_DEFAULT_ENABLED = 1
 CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
 
-all: chkstat
+all: src/chkstat
 
 install: all
 	@for i in $(bindir) $(suseconfigdir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \
 		do install -d -m 755 $(DESTDIR)$$i; done
-	@install -m 755 chkstat $(DESTDIR)$(bindir)
-	@install -m 644 chkstat.8 $(DESTDIR)$(man8dir)
-	@install -m 644 permissions.5 $(DESTDIR)$(man5dir)
-	@install -m 644 sysconfig.security $(DESTDIR)$(fillupdir)
+	@install -m 755 src/chkstat $(DESTDIR)$(bindir)
+	@install -m 644 man/chkstat.8 $(DESTDIR)$(man8dir)
+	@install -m 644 man/permissions.5 $(DESTDIR)$(man5dir)
+	@install -m 644 etc/sysconfig.security $(DESTDIR)$(fillupdir)
 	@install -m 755 zypper-plugin/permissions.py $(DESTDIR)$(zypp_commit_plugins)
-	@for i in permissions{,.local,.easy,.secure,.paranoid}; \
+	@for i in etc/permissions* profiles/permissions.*; \
 		do install -m 644 $$i $(DESTDIR)$(sysconfdir); done
 
 
 clean:
-	/bin/rm chkstat
+	/bin/rm src/chkstat
 
-package:
-	@obs/mkpackage
-
-.PHONY: all clean package
+.PHONY: all clean
