@@ -5,7 +5,6 @@ LDLIBS=-lcap
 prefix=/usr
 sysconfdir=/etc
 bindir=$(prefix)/bin
-suseconfigdir=/sbin/conf.d
 fillupdir=/var/adm/fillup-templates
 datadir=$(prefix)/share
 mandir=$(datadir)/man
@@ -20,7 +19,7 @@ CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
 all: src/chkstat
 
 install: all
-	@for i in $(bindir) $(suseconfigdir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \
+	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \
 		do install -d -m 755 $(DESTDIR)$$i; done
 	@install -m 755 src/chkstat $(DESTDIR)$(bindir)
 	@install -m 644 man/chkstat.8 $(DESTDIR)$(man8dir)
