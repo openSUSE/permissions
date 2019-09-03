@@ -18,6 +18,7 @@
  ****************************************************************
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <pwd.h>
 #include <grp.h>
@@ -29,8 +30,8 @@
 #include <errno.h>
 #include <dirent.h>
 #include <sys/capability.h>
-#define __USE_GNU
 #include <fcntl.h>
+#include <stdbool.h>
 
 #define BAD_LINE() \
   fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt);
@@ -439,102 +440,119 @@ usage(int x)
 }
 
 int
-safepath(char *path, uid_t uid, gid_t gid)
+safe_open(char *path, bool *traversed_uid)
 {
   struct stat stb;
   char pathbuf[1024];
   char linkbuf[1024];
-  char *p, *p2;
+  char *p;
   int l, l2, lcnt;
+  int pathfd = -1;
+  int nesting_level = 0;
+  *traversed_uid = false;
 
   lcnt = 0;
   l2 = strlen(path);
   if ((unsigned)l2 >= sizeof(pathbuf))
-    return 0;
+    goto fail;
   strcpy(pathbuf, path);
   if (pathbuf[0] != '/') 
-    return 0;
+    goto fail;
   p = pathbuf + rootl;
-  for (;;)
+  do
     {
-      p = strchr(p, '/');
-      if (!p)
-        return 1;
-      *p = 0;
-      if (lstat(*pathbuf ? pathbuf : "/", &stb))
-        return 0;
+      *p = '/';
+      char *cursor = p + 1;
+
+      if (pathfd == -1) {
+        pathfd = open(rootl ? root : "/", O_PATH);
+        if (pathfd == -1) {
+          fprintf(stderr, "failed to open root directory\n");
+          goto fail;
+        }
+      }
+
+      p = strchr(cursor, '/');
+      if (p)
+        *p = 0;
+
+      if (strcmp(cursor, "..") == 0) {
+        if (nesting_level == 0 && rootl)
+          continue;
+        nesting_level -= 1;
+      } else if(p) {
+        nesting_level += 1;
+      }
+
+      int open_flags;
+      if (p)
+        open_flags = O_PATH | O_NOFOLLOW;
+      else
+        // do not use O_PATH for the final file/dir since cap_get_fd() uses fgetxattr() which requires a proper file descriptor
+        open_flags = O_NOFOLLOW | O_NOCTTY | O_RDONLY | (euid ? 0 : O_NOATIME);
+      int newpathfd = openat(pathfd, *cursor ? cursor : ".", open_flags);
+      if (newpathfd == -1)
+        goto fail;
+
+      close(pathfd);
+      pathfd = newpathfd;
+
+      if (fstat(pathfd, &stb))
+        goto fail;
+
+      /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
+      /* for euid != 0 it is also ok if the owner is euid */
+      if (stb.st_uid && stb.st_uid != euid && p)
+        *traversed_uid = true;
+
       if (S_ISLNK(stb.st_mode))
         {
           if (++lcnt >= 256)
-            return 0;
-          l = readlink(pathbuf, linkbuf, sizeof(linkbuf));
+            goto fail;
+          l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
           if (l <= 0 || (unsigned)l >= sizeof(linkbuf))
-            return 0;
+            goto fail;
           while(l && linkbuf[l - 1] == '/')
             l--;
           if ((unsigned)l + 1 >= sizeof(linkbuf))
-            return 0;
-          linkbuf[l++] = '/';
+            goto fail;
+          if (p)
+            linkbuf[l++] = '/';
           linkbuf[l] = 0;
-          *p++ = '/';
+          size_t len;
+          char tmp[sizeof(pathbuf)];
           if (linkbuf[0] == '/')
             {
-              if (rootl)
-                {
-                  p[-1] = 0;
-                  fprintf(stderr, "can't handle symlink %s at the moment\n", pathbuf);
-                  return 0;
-                }
-              l2 -= (p - pathbuf);
-              memmove(pathbuf + rootl, p, l2 + 1);
-              l2 += rootl;
-              p = pathbuf + rootl;
+              // absolute link
+              nesting_level = 0;
+              close(pathfd);
+              pathfd = -1;
             }
+          if (p)
+            len = snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
           else
-            {
-              if (p - 1 == pathbuf)
-                return 0;                /* huh, "/" is a symlink */
-              for (p2 = p - 2; p2 >= pathbuf; p2--)
-                if (*p2 == '/')
-                  break;
-              if (p2 < pathbuf + rootl)        /* cannot happen */
-                return 0;
-              p2++;                        /* am now after '/' */
-              memmove(p2, p, pathbuf + l2 - p + 1);
-              l2 -= (p - p2);
-              p = p2;
-            }
-          if ((unsigned)(l + l2) >= sizeof(pathbuf))
-            return 0;
-          memmove(p + l, p, pathbuf + l2 - p + 1);
-          memmove(p, linkbuf, l);
-          l2 += l;
-          if (pathbuf[0] != '/')        /* cannot happen */
-            return 0;
-          if (p == pathbuf)
-            p++;
-          continue;
+            len = snprintf(tmp, sizeof(tmp), "%s", linkbuf);
+          if (len >= sizeof(pathbuf))
+            goto fail;
+          strcpy(pathbuf, tmp);
+          p = pathbuf;
         }
-      if (!S_ISDIR(stb.st_mode))
-        return 0;
+      else if (!S_ISDIR(stb.st_mode) && !S_ISREG(stb.st_mode))
+        goto fail;
 
-      /* write is always forbidden for other */
-      if ((stb.st_mode & 02) != 0)
-        return 0;
+      // TODO: what's that about? this PREVENTS setting the correct permissions on /tmp and children
+      /* write on directories is always forbidden for other */
+      if ((stb.st_mode & S_IWOTH) != 0 && S_ISDIR(stb.st_mode))
+        goto fail;
+    } while (p);
 
-      /* owner must be ok as she may change the mode */
-      /* for euid != 0 it is also ok if the owner is euid */
-      if (stb.st_uid && stb.st_uid != uid && stb.st_uid != euid)
-        return 0;
 
-      /* group gid may do fancy things */
-      /* for euid != 0 we don't check this */
-      if ((stb.st_mode & 020) != 0 && !euid)
-        if (!gid || stb.st_gid != gid)
-          return 0;
+  return pathfd;
 
-      *p++ = '/';
-    }
+fail:
+  if (pathfd >= 0)
+    close(pathfd);
+  return -1;
 }
 
 /* check /sys/kernel/fscaps, 2.6.39 */
@@ -572,12 +590,12 @@ main(int argc, char **argv)
   int inpart;
   mode_t mode;
   struct perm *e;
-  struct stat stb, stb2;
+  struct stat stb;
   struct passwd *pwd = 0;
   struct group *grp = 0;
   uid_t uid;
   gid_t gid;
-  int fd, r;
+  int fd = -1;
   int errors = 0;
   cap_t caps = NULL;
 
@@ -882,45 +900,53 @@ main(int argc, char **argv)
     {
       if (use_checklist && !in_checklist(e->file+rootl))
         continue;
-      if (lstat(e->file, &stb))
+
+      pwd = strcmp(e->owner, "unknown") ? getpwnam(e->owner) : NULL;
+      grp = strcmp(e->group, "unknown") ? getgrnam(e->group) : NULL;
+      uid = pwd ? pwd->pw_uid : 0;
+      gid = grp ? grp->gr_gid : 0;
+
+      bool traversed_uid;
+      if (fd >= 0) {
+        close(fd);
+        fd = -1;
+      }
+
+      fd = safe_open(e->file, &traversed_uid);
+      if (fd < 0)
+        continue;
+      if (fstat(fd, &stb))
         continue;
       if (S_ISLNK(stb.st_mode))
         continue;
+
       if (!e->mode && !strcmp(e->owner, "unknown"))
         {
-          char uids[16], gids[16];
+          fprintf(stderr, "%s: cannot verify ", e->file+rootl);
           pwd = getpwuid(stb.st_uid);
+          if (pwd)
+            fprintf(stderr, "%s", pwd->pw_name);
+          else
+            fprintf(stderr, "%d", stb.st_uid);
           grp = getgrgid(stb.st_gid);
-          if (!pwd)
-            sprintf(uids, "%d", stb.st_uid);
-          if (!grp)
-            sprintf(gids, "%d", stb.st_gid);
-          fprintf(stderr, "%s: cannot verify %s:%s %04o - not listed in /etc/permissions\n",
-                  e->file+rootl,
-                  pwd?pwd->pw_name:uids,
-                  grp?grp->gr_name:gids,
-                  (int)(stb.st_mode&07777));
-          pwd = 0;
-          grp = 0;
+          if (grp)
+            fprintf(stderr, "%s", grp->gr_name);
+          else
+            fprintf(stderr, "%d", stb.st_gid);
+          fprintf(stderr, "%04o - not listed in /etc/permissions\n",
+                          (int)(stb.st_mode&07777));
           continue;
         }
-      if ((!pwd || strcmp(pwd->pw_name, e->owner)) && (pwd = getpwnam(e->owner)) == 0)
-        {
-          fprintf(stderr, "%s: unknown user %s\n", e->file+rootl, e->owner);
+      if (!pwd) {
+          fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", e->file+rootl, e->owner);
+          continue;
+        } else if (!grp) {
+          fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", e->file+rootl, e->group);
           continue;
         }
-      if ((!grp || strcmp(grp->gr_name, e->group)) && (grp = getgrnam(e->group)) == 0)
-        {
-          fprintf(stderr, "%s: unknown group %s\n", e->file+rootl, e->group);
-          continue;
-        }
-      uid = pwd->pw_uid;
-      gid = grp->gr_gid;
-      caps = cap_get_file(e->file);
+      caps = cap_get_fd(fd);
       if (!caps)
         {
-          cap_free(caps);
-          caps = NULL;
           if (errno == EOPNOTSUPP)
             {
               //fprintf(stderr, "%s: fscaps not supported\n", e->file+rootl);
@@ -1009,110 +1035,49 @@ main(int argc, char **argv)
       if (!do_set)
         continue;
 
-      fd = -1;
-      if (S_ISDIR(stb.st_mode))
+      // don't give high privileges to files controlled by non-root users
+      if (traversed_uid && (e->caps || (e->mode & S_ISUID) || ((e->mode & S_ISGID) && S_ISREG(stb.st_mode))))
         {
-          fd = open(e->file, O_RDONLY|O_DIRECTORY|O_NONBLOCK|O_NOFOLLOW);
-          if (fd == -1)
-            {
-              perror(e->file);
-              errors++;
-              continue;
-            }
+          fprintf(stderr, "%s: on an insecure path\n", e->file+rootl);
+          errors++;
+          continue;
         }
-      else if (S_ISREG(stb.st_mode))
-        {
-          fd = open(e->file, O_RDONLY|O_NONBLOCK|O_NOFOLLOW);
-          if (fd == -1)
-            {
-              perror(e->file);
-              errors++;
-              continue;
-            }
-          if (fstat(fd, &stb2))
-            continue;
-          if (stb.st_mode != stb2.st_mode || stb.st_nlink != stb2.st_nlink || stb.st_dev != stb2.st_dev || stb.st_ino != stb2.st_ino)
-            {
-              fprintf(stderr, "%s: too fluctuating\n", e->file+rootl);
-              errors++;
-              continue;
-            }
-          if (stb.st_nlink > 1 && !safepath(e->file, 0, 0))
-            {
-              fprintf(stderr, "%s: on an insecure path\n", e->file+rootl);
-              errors++;
-              continue;
-            }
-          else if (e->mode & 06000)
-            {
-              /* extra checks for s-bits */
-              if (!safepath(e->file, (e->mode & 02000) == 0 ? uid : 0, (e->mode & 04000) == 0 ? gid : 0))
-                {
-                  fprintf(stderr, "%s: will not give away s-bits on an insecure path\n", e->file+rootl);
-                  errors++;
-                  continue;
-                }
-            }
-        }
-      else if (strncmp(e->file, "/dev/", 5) != 0) // handle special files only in /dev
+
+      // TODO: do we want to handle sockets/device nodes? (needs adjustments in other places)
+      if (!S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
         {
           fprintf(stderr, "%s: don't know what to do with that type of file\n", e->file+rootl);
           errors++;
           continue;
         }
+
       if (euid == 0 && !owner_ok)
         {
          /* if we change owner or group of a setuid file the bit gets reset so
             also set perms again */
-          if (e->mode & 06000)
+          if (e->mode & (S_ISUID | S_ISGID))
               perm_ok = 0;
-          if (fd >= 0)
-            r = fchown(fd, uid, gid);
-          else
-            r = chown(e->file, uid, gid);
-          if (r)
+          if (fchown(fd, uid, gid))
             {
               fprintf(stderr, "%s: chown: %s\n", e->file+rootl, strerror(errno));
               errors++;
             }
-          if (fd >= 0)
-            r = fstat(fd, &stb);
-          else
-            r = lstat(e->file, &stb);
-          if (r)
-            {
-              fprintf(stderr, "%s: too fluctuating\n", e->file+rootl);
-              errors++;
-              continue;
-            }
         }
-      if (!perm_ok)
+      if (!perm_ok && fchmod(fd, e->mode))
         {
-          if (fd >= 0)
-            r = fchmod(fd, e->mode);
-          else
-            r = chmod(e->file, e->mode);
-          if (r)
-            {
-              fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
-              errors++;
-            }
+          fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
+          errors++;
         }
-      if (!caps_ok)
+      if (!caps_ok && cap_set_fd(fd, e->caps))
         {
-          if (fd >= 0)
-            r = cap_set_fd(fd, e->caps);
-          else
-            r = cap_set_file(e->file, e->caps);
-          if (r)
-            {
-              fprintf(stderr, "%s: cap_set_file: %s\n", e->file+rootl, strerror(errno));
-              errors++;
-            }
+          fprintf(stderr, "%s: cap_set_file: %s\n", e->file+rootl, strerror(errno));
+          errors++;
         }
-      if (fd >= 0)
-        close(fd);
     }
+  if (fd >= 0) {
+    close(fd);
+    fd = -1;
+  }
   if (errors)
     {
       fprintf(stderr, "ERROR: not all operations were successful.\n");
