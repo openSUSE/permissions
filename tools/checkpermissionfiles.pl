@@ -8,12 +8,12 @@ use strict;
 use Data::Dumper;
 use File::Basename;
 
-my @deflevels = ('easy', 'secure', 'paranoid');
+my @deflevels = ('easy', 'secure', 'restrictive');
 
-my @defpermfiles = ('permissions', 'permissions.easy', 'permissions.secure', 'permissions.paranoid');
+my @defpermfiles = ('permissions', 'permissions.easy', 'permissions.secure', 'permissions.restrictive');
 
 # filename
-#   - level (DEFAULT, easy, secure, paranoid)
+#   - level (DEFAULT, easy, secure, restrictive)
 #      - owner
 #      - mode
 my %perms;

@@ -4,31 +4,24 @@
 # Copyright (c) 2019 SUSE Software Solutions Germany GmbH, Germany.
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
+# Author: Matthias Gerstner <matthias.gerstner@suse.de>, 2019
 #
-# 
-# See /etc/permissions for general hints on how to use this file.
+# See /etc/permissions and `man 5 permissions` for general hints on how to use
+# this file.
 #
-# /etc/permissions.paranoid is NOT designed to be used in a single-user as
-# well as a multi-user installation, be it networked or not.
+# This permissions profile has most sgid and suid bits cleared. As a result
+# parts of the system may become unusable for non-privileged users. In
+# addition, some of the configuration files are not readable for world any
+# more. This profile is considered to be used for very security sensitive use
+# cases where ease of use is not a requirement.
 #
-# Derived from /etc/permissions.secure, it has _all_ sgid and suid bits
-# cleared - therefore, the system is probably not useable for non-privileged
-# users except for simple tasks like changing passwords and such. In addition,
-# some of the configuration files are not readable for world any more.
-#
-# Feel free to use this file as a basis of a system configuration that meets
-# your understanding of "secure", for the case that you're a bit paranoid.
-# Since there is no such thing as "it works" with this configuration, please
-# use these settings with care. Some experience on behalf of the administrator
-# is needed to have a system running flawlessly when users are present.
-# In particular, all terminal emulators will not be able to write to utmp
-# and wtmp any more, which renders who(1) and finger(1) useless.
-#
-# Please always keep in mind that your system listens on network sockets
-# in the default configuration. Change this by disabling the services that 
-# you do not need or by restricting access to them using packet filters
-# or tcp wrappers (see hosts_access(5)) to gain a higher level of security
-# in your system.
+# You can use this profile as a basis for customizing your own conservative
+# permissions profile. Since there is no such thing as "it works" with this
+# configuration, please use these settings with care. Some experience on
+# behalf of the administrator is needed to have a system running flawlessly
+# when users are present. In particular, all terminal emulators will not be
+# able to write to utmp and wtmp any more, which renders who(1) and finger(1)
+# useless, for example.
 
 #
 # Directories
@@ -94,7 +87,7 @@
 /usr/lib/gnome-pty-helper                               root:utmp         0755
 
 #
-# mixed section: most of it is disabled in this permissions.paranoid:
+# mixed section: most of it is disabled in the restrictive profile:
 #
 # video
 /usr/bin/v4l-conf                                       root:video        0755
@@ -319,7 +312,7 @@
 /usr/bin/umount                                         root:root         0755
 
 # cdrecord of cdrtools from Joerg Schilling (bnc#550021)
-# in paranoid mode, no provisions are made for reliable cd burning, as admins
+# in restrictive mode, no provisions are made for reliable cd burning, as admins
 # will have very likely prohibited that anyway.
 /usr/bin/cdrecord                                       root:root       755
 /usr/bin/readcd                                         root:root       755

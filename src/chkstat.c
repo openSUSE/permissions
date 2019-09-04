@@ -202,6 +202,18 @@ add_level(char *e)
 {
   if (in_level(e))
     return;
+  if (strcmp(e, "paranoid") == 0)
+    {
+      // backward compatibility for the profile formerly called paranoid
+      //
+      // the rpm spec file contains a detection for this profile in
+      // /etc/sysconfig/security and warns upon update to change the
+      // configuration.
+      //
+      // printing out a warning directly here is difficult, because chkstat is
+      // called often times while updating.
+      e = "restrictive";
+    }
   e = strdup(e);
   if (e == 0)
     {
@@ -323,12 +335,12 @@ collect_permfiles()
   // 1. central fixed permissions file
   permfiles[npermfiles++] = strdup("/etc/permissions");
 
-  // 2. central easy, secure paranoid as those are defined by SUSE
+  // 2. central easy, secure restrictive as those are defined by SUSE
   for (i = 0; i < nlevel; ++i)
     {
       if (!strcmp(level[i], "easy")
 	      || !strcmp(level[i], "secure")
-	      || !strcmp(level[i], "paranoid"))
+	      || !strcmp(level[i], "restrictive"))
 	{
 	  char fn[4096];
 	  snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
@@ -403,7 +415,7 @@ collect_permfiles()
     {
       char fn[4096];
 
-      if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid"))
+      if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "restrictive"))
 	continue;
 
       snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);

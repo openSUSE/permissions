@@ -4,7 +4,7 @@
 ## Default:     "easy local"
 #
 # Permission settings to use. By default 'easy', 'secure' and
-# 'paranoid' exist. You may define your own though.
+# 'restrictive' exist. You may define your own though.
 #
 PERMISSION_SECURITY="easy local"
 
