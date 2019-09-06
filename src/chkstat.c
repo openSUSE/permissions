@@ -50,7 +50,7 @@ char **checklist;
 int nchecklist;
 uid_t euid;
 char *root;
-int rootl;
+size_t rootl;
 int nlevel;
 char** level;
 int do_set = -1;
@@ -222,7 +222,7 @@ int
 parse_sysconf(const char* file)
 {
   FILE* fp;
-  char line[1024];
+  char line[PATH_MAX];
   char* p;
   if ((fp = fopen(file, "r")) == 0)
     {
@@ -440,94 +440,121 @@ usage(int x)
 }
 
 int
-safe_open(char *path, bool *traversed_uid)
+safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
-  struct stat stb;
-  char pathbuf[1024];
-  char linkbuf[1024];
+  char pathbuf[PATH_MAX];
   char *p;
-  int l, l2, lcnt;
+  int lcnt;
   int pathfd = -1;
-  int nesting_level = 0;
-  *traversed_uid = false;
+  struct stat root_st;
+
+  *traversed_insecure = false;
 
   lcnt = 0;
-  l2 = strlen(path);
-  if ((unsigned)l2 >= sizeof(pathbuf))
+  if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + rootl) >= sizeof(pathbuf))
     goto fail;
-  strcpy(pathbuf, path);
-  if (pathbuf[0] != '/') 
-    goto fail;
-  p = pathbuf + rootl;
+  p = pathbuf;
   do
     {
       *p = '/';
       char *cursor = p + 1;
 
-      if (pathfd == -1) {
-        pathfd = open(rootl ? root : "/", O_PATH);
-        if (pathfd == -1) {
-          fprintf(stderr, "failed to open root directory\n");
-          goto fail;
+      if (pathfd == -1)
+        {
+          pathfd = open(rootl ? root : "/", O_PATH | O_CLOEXEC);
+          if (pathfd == -1)
+            {
+              fprintf(stderr, "failed to open root directory %s: %s\n", root, strerror(errno));
+              goto fail;
+            }
+          if (fstat(pathfd, &root_st))
+            {
+              fprintf(stderr, "failed to stat root directory %s: %s\n", root, strerror(errno));
+              goto fail;
+            }
         }
-      }
 
       p = strchr(cursor, '/');
+      // p is NULL when we reach the final path element
       if (p)
         *p = 0;
 
-      if (strcmp(cursor, "..") == 0) {
-        if (nesting_level == 0 && rootl)
+      // multiple consecutive slashes: ignore
+      if (p && *cursor == '\0')
+        continue;
+
+      // never move out of the configured root directory
+      if (strcmp(cursor, "..") == 0 && rootl && (pathfd == -1 || (stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)))
           continue;
-        nesting_level -= 1;
-      } else if(p) {
-        nesting_level += 1;
-      }
 
       int open_flags;
       if (p)
-        open_flags = O_PATH | O_NOFOLLOW;
+        open_flags = O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK;
       else
         // do not use O_PATH for the final file/dir since cap_get_fd() uses fgetxattr() which requires a proper file descriptor
-        open_flags = O_NOFOLLOW | O_NOCTTY | O_RDONLY | (euid ? 0 : O_NOATIME);
+        open_flags = O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY | O_RDONLY | (euid ? 0 : O_NOATIME);
+      // cursor is an empty string for trailing slashes, open again with different open_flags.
+      // TODO: are there any device files where just open()/stat() has side-effects?
       int newpathfd = openat(pathfd, *cursor ? cursor : ".", open_flags);
+      if (!p && newpathfd == -1 && (errno == ELOOP || errno == ENXIO || errno == ENODEV))
+        {
+          // fall back to O_PATH:
+          //    we hit a symlink: we follow the link so no problems with cap_get_fd() in this case
+          //    we hit a domain socket / non-existing device: cap_get_fd() won't work, caller just has to deal with it
+          newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+        }
       if (newpathfd == -1)
         goto fail;
 
       close(pathfd);
       pathfd = newpathfd;
 
-      if (fstat(pathfd, &stb))
+      if (fstat(pathfd, stb))
         goto fail;
 
       /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
       /* for euid != 0 it is also ok if the owner is euid */
-      if (stb.st_uid && stb.st_uid != euid && p)
-        *traversed_uid = true;
-
-      if (S_ISLNK(stb.st_mode))
+      if (stb->st_uid && stb->st_uid != euid && p)
+        *traversed_insecure = true;
+      // path is in a world-writable directory, or file is world-writable itself.
+      // TODO: how to best handle a world-writable file? fix permissions or error out due to unknown file integrity?
+      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && p)
+        *traversed_insecure = true;
+      // if parent directory is not owned by root, the file owner must match the owner of parent
+      if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
         {
+          fprintf(stderr, "%s: on an insecure path\n", path+rootl);
+          goto fail;
+        }
+
+      if (S_ISLNK(stb->st_mode))
+        {
+          // Don't follow symlinks owned by regular users.
+          // In theory, we could also trust symlinks where the owner of the target matches the owner
+          // of the link, but we're going the simple route for now.
+          if (stb->st_uid && stb->st_uid != euid)
+            {
+              fprintf(stderr, "%s: on an insecure path\n", path+rootl);
+              goto fail;
+            }
+
           if (++lcnt >= 256)
             goto fail;
-          l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
-          if (l <= 0 || (unsigned)l >= sizeof(linkbuf))
+          char linkbuf[PATH_MAX];
+          ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
+          if (l <= 0 || (size_t)l >= sizeof(linkbuf) - 1)
             goto fail;
           while(l && linkbuf[l - 1] == '/')
             l--;
-          if ((unsigned)l + 1 >= sizeof(linkbuf))
-            goto fail;
-          if (p)
-            linkbuf[l++] = '/';
           linkbuf[l] = 0;
-          size_t len;
-          char tmp[sizeof(pathbuf)];
           if (linkbuf[0] == '/')
             {
               // absolute link
-              nesting_level = 0;
               close(pathfd);
               pathfd = -1;
             }
+          size_t len;
+          char tmp[sizeof(pathbuf)]; // need a temporary buffer because p points into pathbuf and snprintf doesn't allow the same buffer as source and destination
           if (p)
             len = snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
           else
@@ -537,15 +564,7 @@ safe_open(char *path, bool *traversed_uid)
           strcpy(pathbuf, tmp);
           p = pathbuf;
         }
-      else if (!S_ISDIR(stb.st_mode) && !S_ISREG(stb.st_mode))
-        goto fail;
-
-      // TODO: what's that about? this PREVENTS setting the correct permissions on /tmp and children
-      /* write on directories is always forbidden for other */
-      if ((stb.st_mode & S_IWOTH) != 0 && S_ISDIR(stb.st_mode))
-        goto fail;
     } while (p);
-
 
   return pathfd;
 
@@ -906,16 +925,16 @@ main(int argc, char **argv)
       uid = pwd ? pwd->pw_uid : 0;
       gid = grp ? grp->gr_gid : 0;
 
-      bool traversed_uid;
-      if (fd >= 0) {
-        close(fd);
-        fd = -1;
-      }
+      bool traversed_insecure;
+      if (fd >= 0)
+        {
+          // close fd from previous loop iteration
+          close(fd);
+          fd = -1;
+        }
 
-      fd = safe_open(e->file, &traversed_uid);
+      fd = safe_open(e->file, &stb, uid, &traversed_insecure);
       if (fd < 0)
-        continue;
-      if (fstat(fd, &stb))
         continue;
       if (S_ISLNK(stb.st_mode))
         continue;
@@ -937,20 +956,34 @@ main(int argc, char **argv)
                           (int)(stb.st_mode&07777));
           continue;
         }
-      if (!pwd) {
+      if (!pwd)
+        {
           fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", e->file+rootl, e->owner);
           continue;
-        } else if (!grp) {
+        }
+      else if (!grp)
+        {
           fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", e->file+rootl, e->group);
           continue;
         }
       caps = cap_get_fd(fd);
       if (!caps)
         {
+          // we get EBADF for files that don't support capabilities, e.g. sockets or FIFOs
+          if (errno == EBADF)
+            {
+              if (e->caps)
+                {
+                  fprintf(stderr, "%s: cannot assign capabilities for this kind of file\n", e->file+rootl);
+                  cap_free(e->caps);
+                  errors++;
+                }
+              e->caps = NULL;
+            }
           if (errno == EOPNOTSUPP)
             {
-              //fprintf(stderr, "%s: fscaps not supported\n", e->file+rootl);
-              cap_free(e->caps);
+              if (e->caps)
+                cap_free(e->caps);
               e->caps = NULL;
             }
         }
@@ -1036,17 +1069,15 @@ main(int argc, char **argv)
         continue;
 
       // don't give high privileges to files controlled by non-root users
-      if (traversed_uid && (e->caps || (e->mode & S_ISUID) || ((e->mode & S_ISGID) && S_ISREG(stb.st_mode))))
+      if ((e->caps || (e->mode & S_ISUID) || (e->mode & S_ISGID)) && !S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
         {
-          fprintf(stderr, "%s: on an insecure path\n", e->file+rootl);
+          fprintf(stderr, "%s: will only assign capabilities or setXid bits to regular files or directories\n", e->file+rootl);
           errors++;
           continue;
         }
-
-      // TODO: do we want to handle sockets/device nodes? (needs adjustments in other places)
-      if (!S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
+      if (traversed_insecure && (e->caps || (e->mode & S_ISUID) || ((e->mode & S_ISGID) && S_ISREG(stb.st_mode))))
         {
-          fprintf(stderr, "%s: don't know what to do with that type of file\n", e->file+rootl);
+          fprintf(stderr, "%s: will not give away capabilities or setXid bits on an insecure path\n", e->file+rootl);
           errors++;
           continue;
         }
@@ -1074,10 +1105,12 @@ main(int argc, char **argv)
           errors++;
         }
     }
-  if (fd >= 0) {
-    close(fd);
-    fd = -1;
-  }
+  // close fd from last loop iteration
+  if (fd >= 0)
+    {
+      close(fd);
+      fd = -1;
+    }
   if (errors)
     {
       fprintf(stderr, "ERROR: not all operations were successful.\n");

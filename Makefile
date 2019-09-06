@@ -1,4 +1,4 @@
-CFLAGS=-W -Wall -g -O2
+CFLAGS=-W -Wall -g -O2 -std=c11
 CC=gcc
 DESTDIR=
 LDLIBS=-lcap
