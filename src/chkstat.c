@@ -34,7 +34,7 @@
 #include <stdbool.h>
 
 #define BAD_LINE() \
-  fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt);
+  fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
 
 struct perm {
   struct perm *next;
@@ -47,17 +47,17 @@ struct perm {
 
 struct perm *permlist;
 char **checklist;
-int nchecklist;
+size_t nchecklist;
 uid_t euid;
 char *root;
 size_t rootl;
-int nlevel;
+size_t nlevel;
 char** level;
 int do_set = -1;
 int default_set = 1;
 int have_fscaps = -1;
 char** permfiles = NULL;
-int npermfiles = 0;
+size_t npermfiles = 0;
 char* force_level;
 
 struct perm*
@@ -117,7 +117,7 @@ add_permlist(char *file, char *owner, char *group, mode_t mode)
 int
 in_checklist(char *e)
 {
-  int i;
+  size_t i;
   for (i = 0; i < nchecklist; i++)
     if (!strcmp(e, checklist[i]))
       return 1;
@@ -151,10 +151,10 @@ add_checklist(char *e)
 }
 
 int
-readline(FILE *fp, char *buf, int len)
+readline(FILE *fp, char *buf, size_t len)
 {
-  int l;
-  if (!fgets(buf, len, fp))
+  size_t l;
+  if (!fgets(buf, (int)len, fp))
     return 0;
   l = strlen(buf);
   if (l && buf[l - 1] == '\n')
@@ -165,7 +165,8 @@ readline(FILE *fp, char *buf, int len)
   if (l + 1 < len)
     return 1;
   fprintf(stderr, "warning: buffer overrun in line starting with '%s'\n", buf);
-  while ((l = getc(fp)) != EOF && l != '\n')
+  char c;
+  while ((c = getc(fp)) != EOF && c != '\n')
     ;
   buf[0] = 0;
   return 1;
@@ -174,7 +175,7 @@ readline(FILE *fp, char *buf, int len)
 int
 in_level(char *e)
 {
-  int i;
+  size_t i;
   for (i = 0; i < nlevel; i++)
     if (!strcmp(e, level[i]))
       return 1;
@@ -182,7 +183,7 @@ in_level(char *e)
 }
 
 void
-ensure_array(void** array, int* size)
+ensure_array(void** array, size_t* size)
 {
   if ((*size & 63) == 0)
     {
@@ -317,7 +318,7 @@ compare(const void* a, const void* b)
 static void
 collect_permfiles()
 {
-  int i;
+  size_t i;
   DIR* dir;
 
   ensure_array((void**)&permfiles, &npermfiles);
@@ -345,7 +346,7 @@ collect_permfiles()
   if (dir)
     {
       char** files = NULL;
-      int nfiles = 0;
+      size_t nfiles = 0;
       struct dirent* d;
       while ((d = readdir(dir)))
         {
@@ -373,7 +374,7 @@ collect_permfiles()
           for (i = 0; i < nfiles; ++i)
             {
               char fn[4096];
-              int l;
+              size_t l;
               // skip duplicates
               if (i && !strcmp(files[i-1], files[i]))
                 continue;
@@ -397,7 +398,12 @@ collect_permfiles()
                 }
 
             }
+          for (i = 0; i < nfiles; ++i)
+            {
+              free(files[i]);
+            }
         }
+      free(files);
     }
   // 4. central permissions files with user defined level incl 'local'
   for (i = 0; i < nlevel; ++i)
@@ -543,9 +549,9 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           size_t len;
           char tmp[sizeof(pathbuf)]; // need a temporary buffer because p points into pathbuf and snprintf doesn't allow the same buffer as source and destination
           if (p)
-            len = snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
+            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
           else
-            len = snprintf(tmp, sizeof(tmp), "%s", linkbuf);
+            len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
           if (len >= sizeof(pathbuf))
             goto fail;
           strcpy(pathbuf, tmp);
@@ -611,7 +617,7 @@ out:
 int
 main(int argc, char **argv)
 {
-  char *opt, *p, *str;
+  char *opt, *str;
   int told = 0;
   int use_checklist = 0;
   int systemmode = 0;
@@ -619,7 +625,8 @@ main(int argc, char **argv)
   FILE *fp;
   char line[512];
   char *part[4];
-  int i, pcnt, lcnt;
+  int pcnt, lcnt;
+  size_t i;
   int inpart;
   mode_t mode;
   struct perm *e;
@@ -806,7 +813,7 @@ main(int argc, char **argv)
         add_level("secure");
       add_level("local"); // always add local
 
-      for (i = 1; i < argc; i++)
+      for (i = 1; i < (size_t)argc; i++)
         {
           add_checklist(argv[i]);
           use_checklist = 1;
@@ -818,7 +825,7 @@ main(int argc, char **argv)
     usage(1);
   else
     {
-      npermfiles = argc-1;
+      npermfiles = (size_t)argc-1;
       permfiles = &argv[1];
     }
 
@@ -852,6 +859,7 @@ main(int argc, char **argv)
             continue;
           inpart = 0;
           pcnt = 0;
+          char *p;
           for (p = line; *p; p++)
             {
               if (*p == ' ' || *p == '\t')
@@ -917,7 +925,7 @@ main(int argc, char **argv)
               continue;
             }
           *part[2]++ = 0;
-          mode = strtoul(part[3], part + 3, 8);
+          mode = (mode_t)strtoul(part[3], part + 3, 8);
           if (mode > 07777 || part[3][0])
             {
               BAD_LINE();
@@ -1130,6 +1138,11 @@ main(int argc, char **argv)
       fprintf(stderr, "ERROR: not all operations were successful.\n");
       exit(1);
     }
+  for (i = 0; i < npermfiles; i++)
+    {
+      free(permfiles[i]);
+    }
+  free(permfiles);
   exit(0);
 }
 

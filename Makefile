@@ -1,4 +1,6 @@
-CFLAGS=-W -Wall -g -O2 -std=c11
+CFLAGS=-W -Wall -g -O2 -std=c11 -Wextra -pedantic -Wduplicated-cond  -Wduplicated-branches  -Wlogical-op  -Wrestrict  -Wnull-dereference  -Wjump-misses-init  -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
+# for testing, add sanitizers:
+# -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=undefined
 CC=gcc
 DESTDIR=
 LDLIBS=-lcap
