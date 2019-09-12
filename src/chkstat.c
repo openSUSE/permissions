@@ -472,6 +472,8 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
               fprintf(stderr, "failed to stat root directory %s: %s\n", root, strerror(errno));
               goto fail;
             }
+          // stb and pathfd must be in sync for the root-escape check below
+          memcpy(stb, &root_st, sizeof(*stb));
         }
 
       p = strchr(cursor, '/');
@@ -483,26 +485,12 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
       if (p && *cursor == '\0')
         continue;
 
-      // never move out of the configured root directory
-      if (strcmp(cursor, "..") == 0 && rootl && (pathfd == -1 || (stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)))
+      // never move up from the configured root directory (using the stat result from the previous loop iteration)
+      if (strcmp(cursor, "..") == 0 && rootl && stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)
           continue;
 
-      int open_flags;
-      if (p)
-        open_flags = O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK;
-      else
-        // do not use O_PATH for the final file/dir since cap_get_fd() uses fgetxattr() which requires a proper file descriptor
-        open_flags = O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | O_NOCTTY | O_RDONLY | (euid ? 0 : O_NOATIME);
       // cursor is an empty string for trailing slashes, open again with different open_flags.
-      // TODO: are there any device files where just open()/stat() has side-effects?
-      int newpathfd = openat(pathfd, *cursor ? cursor : ".", open_flags);
-      if (!p && newpathfd == -1 && (errno == ELOOP || errno == ENXIO || errno == ENODEV))
-        {
-          // fall back to O_PATH:
-          //    we hit a symlink: we follow the link so no problems with cap_get_fd() in this case
-          //    we hit a domain socket / non-existing device: cap_get_fd() won't work, caller just has to deal with it
-          newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-        }
+      int newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
       if (newpathfd == -1)
         goto fail;
 
@@ -517,7 +505,6 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
       if (stb->st_uid && stb->st_uid != euid && p)
         *traversed_insecure = true;
       // path is in a world-writable directory, or file is world-writable itself.
-      // TODO: how to best handle a world-writable file? fix permissions or error out due to unknown file integrity?
       if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && p)
         *traversed_insecure = true;
       // if parent directory is not owned by root, the file owner must match the owner of parent
@@ -565,6 +552,33 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           p = pathbuf;
         }
     } while (p);
+
+  // world-writable file: error out due to unknown file integrity
+  if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH)) {
+    fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+rootl);
+    goto fail;
+  }
+
+  // do not use O_PATH for the final file/dir since cap_get_fd() uses fgetxattr() which requires a proper file descriptor
+  // that call doesn't work for sockets/pipes/devices, so we don't want to risk weird side-effects during open() for them.
+  if (S_ISREG(stb->st_mode) || S_ISDIR(stb->st_mode))
+    {
+      // until openat2 arrives, /proc/self/fd is the only way to re-open a file descriptor
+      // based on a fd opened with O_PATH. https://lwn.net/Articles/796868/
+      char fd_path[100];
+      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", pathfd);
+      int newpathfd = open(fd_path, O_CLOEXEC | O_NONBLOCK | O_NOCTTY | O_RDONLY | (euid ? 0 : O_NOATIME));
+      if (newpathfd == -1)
+        {
+          // EPERM happens routinely when we don't have read permissions on the file
+          if (euid == 0 || errno == EPERM)
+            fprintf(stderr, "%s: open failed: %s\n", path+rootl, strerror(errno));
+          goto fail;
+        }
+
+      close(pathfd);
+      pathfd = newpathfd;
+    }
 
   return pathfd;
 
