@@ -430,3 +430,6 @@
 # 389-ds (bsc#1111564)
 /usr/sbin/ns-slapd					root:dirsrv	0750
  +capabilities cap_net_bind_service=ep
+
+# nagios (bsc#1028975)
+/var/spool/nagios/                                      nagios:nagcmd   2775
