@@ -323,11 +323,12 @@ collect_permfiles()
   // 1. central fixed permissions file
   permfiles[npermfiles++] = strdup("/etc/permissions");
 
-  // 2. central easy, secure paranoid as those are defined by SUSE
+  // 2. central easy, secure, restrivie, paranoid as those are defined by SUSE
   for (i = 0; i < nlevel; ++i)
     {
       if (!strcmp(level[i], "easy")
 	      || !strcmp(level[i], "secure")
+	      || !strcmp(level[i], "restrictive")
 	      || !strcmp(level[i], "paranoid"))
 	{
 	  char fn[4096];
@@ -403,7 +404,7 @@ collect_permfiles()
     {
       char fn[4096];
 
-      if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid"))
+      if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid") || !strcmp(level[i], "restrictive"))
 	continue;
 
       snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);

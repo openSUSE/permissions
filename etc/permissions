@@ -13,6 +13,7 @@
 # /etc/permissions.easy
 # /etc/permissions.secure
 # /etc/permissions.paranoid
+# /etc/permissions.restrictive
 # /etc/permissions.local
 # Please see the respective files for their meaning.
 #

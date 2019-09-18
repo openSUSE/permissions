@@ -3,7 +3,7 @@
 ## Type:        string
 ## Default:     "easy local"
 #
-# Permission settings to use. By default 'easy', 'secure' and
+# Permission settings to use. By default 'easy', 'secure', 'restrictive' and
 # 'paranoid' exist. You may define your own though.
 #
 PERMISSION_SECURITY="easy local"
