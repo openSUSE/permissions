@@ -516,7 +516,10 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
       // if parent directory is not owned by root, the file owner must match the owner of parent
       if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
         {
-          fprintf(stderr, "%s: on an insecure path\n", path+rootl);
+          if (p)
+            goto fail_insecure_path;
+          else
+            fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
           goto fail;
         }
 
@@ -526,10 +529,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           // In theory, we could also trust symlinks where the owner of the target matches the owner
           // of the link, but we're going the simple route for now.
           if (stb->st_uid && stb->st_uid != euid)
-            {
-              fprintf(stderr, "%s: on an insecure path\n", path+rootl);
-              goto fail;
-            }
+            goto fail_insecure_path;
 
           if (++lcnt >= 256)
             goto fail;
@@ -565,28 +565,17 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
     goto fail;
   }
 
-  // do not use O_PATH for the final file/dir since cap_get_fd() uses fgetxattr() which requires a proper file descriptor
-  // that call doesn't work for sockets/pipes/devices, so we don't want to risk weird side-effects during open() for them.
-  if (S_ISREG(stb->st_mode) || S_ISDIR(stb->st_mode))
-    {
-      // until openat2 arrives, /proc/self/fd is the only way to re-open a file descriptor
-      // based on a fd opened with O_PATH. https://lwn.net/Articles/796868/
-      char fd_path[100];
-      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", pathfd);
-      int newpathfd = open(fd_path, O_CLOEXEC | O_NONBLOCK | O_NOCTTY | O_RDONLY | (euid ? 0 : O_NOATIME));
-      if (newpathfd == -1)
-        {
-          // EPERM happens routinely when we don't have read permissions on the file
-          if (euid == 0 || errno == EPERM)
-            fprintf(stderr, "%s: open failed: %s\n", path+rootl, strerror(errno));
-          goto fail;
-        }
-
-      close(pathfd);
-      pathfd = newpathfd;
-    }
-
   return pathfd;
+fail_insecure_path:
+
+  {
+    char linkpath[PATH_MAX];
+    char procpath[100];
+    snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
+    ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
+    if (l > 0 && (size_t)l < sizeof(linkpath) - 1)
+      fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
+  }
 
 fail:
   if (pathfd >= 0)
@@ -988,7 +977,18 @@ main(int argc, char **argv)
           fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", e->file+rootl, e->group);
           continue;
         }
-      caps = cap_get_fd(fd);
+
+      // fd is opened with O_PATH, file oeprations like cap_get_fd() and fchown() don't work with it.
+      //
+      // We also don't want to do a proper open() of the file, since that doesn't even work for sockets
+      // and might have side effects for pipes or devices.
+      //
+      // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
+      // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
+      char fd_path[100];
+      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
+
+      caps = cap_get_file(fd_path);
       if (!caps)
         {
           // we get EBADF for files that don't support capabilities, e.g. sockets or FIFOs
@@ -1110,18 +1110,18 @@ main(int argc, char **argv)
             also set perms again */
           if (e->mode & (S_ISUID | S_ISGID))
               perm_ok = 0;
-          if (fchown(fd, uid, gid))
+          if (chown(fd_path, uid, gid))
             {
               fprintf(stderr, "%s: chown: %s\n", e->file+rootl, strerror(errno));
               errors++;
             }
         }
-      if (!perm_ok && fchmod(fd, e->mode))
+      if (!perm_ok && chmod(fd_path, e->mode))
         {
           fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
           errors++;
         }
-      if (!caps_ok && cap_set_fd(fd, e->caps))
+      if (!caps_ok && cap_set_file(fd_path, e->caps))
         {
           fprintf(stderr, "%s: cap_set_file: %s\n", e->file+rootl, strerror(errno));
           errors++;
