@@ -109,7 +109,7 @@
 # squid changes from bnc#891268
 /var/cache/squid/                                       squid:root        0750
 /var/log/squid/                                         squid:root        0750
-/usr/sbin/pinger                                        squid:root        0750
+/usr/sbin/pinger                                        root:squid        0750
  +capabilities cap_net_raw=ep
 /usr/sbin/basic_pam_auth                                root:shadow       2750
 
