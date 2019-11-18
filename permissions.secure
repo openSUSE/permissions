@@ -515,3 +515,7 @@
 
 # setuid bit for cockpit (bsc#1169614)
 /usr/lib/cockpit-session                                root:cockpit-wsinstance  4750
+
+# ksysguard network helper (bsc#1151190)
+/usr/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+ +capabilities cap_net_raw=ep
