@@ -1138,11 +1138,14 @@ main(int argc, char **argv)
       fprintf(stderr, "ERROR: not all operations were successful.\n");
       exit(1);
     }
-  for (i = 0; i < npermfiles; i++)
+  if (permfiles != argv + 1)
     {
-      free(permfiles[i]);
+      for (i = 0; i < npermfiles; i++)
+        {
+          free(permfiles[i]);
+        }
+      free(permfiles);
     }
-  free(permfiles);
   exit(0);
 }
 
