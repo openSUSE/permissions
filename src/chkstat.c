@@ -1116,10 +1116,31 @@ main(int argc, char **argv)
           fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
           errors++;
         }
-      if (!caps_ok && cap_set_file(fd_path, e->caps))
+      if (!caps_ok)
         {
-          fprintf(stderr, "%s: cap_set_file: %s\n", e->file+rootl, strerror(errno));
-          errors++;
+          if (S_ISREG(stb.st_mode))
+            {
+              // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
+              // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
+              int cap_fd = open(fd_path, O_NOATIME | O_CLOEXEC);
+              if (cap_fd == -1)
+                {
+                  fprintf(stderr, "%s: open() for changing capabilities: %s\n", e->file+rootl, strerror(errno));
+                  errors++;
+                }
+              else if (cap_set_fd(cap_fd, e->caps))
+                {
+                  fprintf(stderr, "%s: cap_set_fd: %s\n", e->file+rootl, strerror(errno));
+                  errors++;
+                }
+              if (cap_fd != -1)
+                close(cap_fd);
+            }
+          else
+            {
+              fprintf(stderr, "%s: cannot set capabilities: not a regular file\n", e->file+rootl);
+              errors++;
+            }
         }
     }
   // close fd from last loop iteration
