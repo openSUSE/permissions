@@ -137,10 +137,7 @@ add_checklist(char *e)
     }
   if ((nchecklist & 63) == 0)
     {
-      if (checklist == 0)
-        checklist = malloc(sizeof(char *) * (nchecklist + 64));
-      else
-        checklist = realloc(checklist, sizeof(char *) * (nchecklist + 64));
+      checklist = realloc(checklist, sizeof(char *) * (nchecklist + 64));
       if (checklist == 0)
         {
           perror("checklist alloc");
@@ -187,10 +184,7 @@ ensure_array(void** array, size_t* size)
 {
   if ((*size & 63) == 0)
     {
-      if (*array == NULL)
-        *array = malloc(sizeof(char *) * (*size + 64));
-      else
-        *array = realloc(*array, sizeof(char *) * (*size + 64));
+      *array = realloc(*array, sizeof(char *) * (*size + 64));
       if (*array == NULL)
         {
           perror("array alloc");
