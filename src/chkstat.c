@@ -950,15 +950,15 @@ main(int argc, char **argv)
           fprintf(stderr, "%s: cannot verify ", e->file+rootl);
           pwd = getpwuid(stb.st_uid);
           if (pwd)
-            fprintf(stderr, "%s", pwd->pw_name);
+            fprintf(stderr, "%s:", pwd->pw_name);
           else
-            fprintf(stderr, "%d", stb.st_uid);
+            fprintf(stderr, "%d:", stb.st_uid);
           grp = getgrgid(stb.st_gid);
           if (grp)
             fprintf(stderr, "%s", grp->gr_name);
           else
             fprintf(stderr, "%d", stb.st_gid);
-          fprintf(stderr, "%04o - not listed in /etc/permissions\n",
+          fprintf(stderr, " %04o - not listed in /etc/permissions\n",
                           (int)(stb.st_mode&07777));
           continue;
         }
