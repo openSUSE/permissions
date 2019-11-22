@@ -312,8 +312,7 @@
 #
 # sendfax
 #
-# restrictive, only for "trusted" group users:
-/usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4755
+/usr/lib/mgetty+sendfax/faxq-helper                     fax:trusted       4750
 /var/spool/fax/outgoing/                                fax:root          0755
 /var/spool/fax/outgoing/locks                           fax:root          0755
 
