@@ -1,4 +1,4 @@
-# /etc/permissions
+# /usr/share/permissions/permissions
 #
 # Copyright (c) 2001 SuSE GmbH Nuernberg, Germany.
 # Copyright (c) 2011 SUSE Linux Products GmbH Nuernberg, Germany.
@@ -9,10 +9,10 @@
 # to check or set the modes and ownerships of files and directories in the installation.
 #
 # There is a set of files with similar meaning in a SUSE installation:
-# /etc/permissions  (This file)
-# /etc/permissions.easy
-# /etc/permissions.secure
-# /etc/permissions.paranoid
+# /usr/share/permissions/permissions  (This file)
+# /usr/share/permissions/permissions.easy
+# /usr/share/permissions/permissions.secure
+# /usr/share/permissions/permissions.paranoid
 # /etc/permissions.local
 # Please see the respective files for their meaning.
 #
@@ -28,11 +28,11 @@
 # /etc/sysconfig/security to determine which security level to
 # apply.
 # In addition to the central files listed above the directory
-# /etc/permissions.d/ can contain permission files that belong to
-# the packages they modify file modes for. These permission files
-# are to switch between conflicting file modes of the same file
-# paths in different packages (popular example: sendmail and
-# postfix, path /usr/sbin/sendmail).
+# /usr/share/permissions/permissions.d/ can contain permission files
+# that belong to the packages they modify file modes for. These 
+# permission files are to switch between conflicting file modes of
+# the same file paths in different packages (popular example:
+# sendmail and postfix, path /usr/sbin/sendmail).
 
 #
 # root directories:

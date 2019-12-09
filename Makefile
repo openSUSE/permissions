@@ -6,6 +6,7 @@ DESTDIR=
 LDLIBS=-lcap
 prefix=/usr
 sysconfdir=/etc
+permissionsdir=/usr/share/permissions
 bindir=$(prefix)/bin
 fillupdir=/var/adm/fillup-templates
 datadir=$(prefix)/share
@@ -21,15 +22,16 @@ CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
 all: src/chkstat
 
 install: all
-	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \
+	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(permissionsdir) $(zypp_commit_plugins); \
 		do install -d -m 755 $(DESTDIR)$$i; done
 	@install -m 755 src/chkstat $(DESTDIR)$(bindir)
 	@install -m 644 man/chkstat.8 $(DESTDIR)$(man8dir)
 	@install -m 644 man/permissions.5 $(DESTDIR)$(man5dir)
 	@install -m 644 etc/sysconfig.security $(DESTDIR)$(fillupdir)
 	@install -m 755 zypper-plugin/permissions.py $(DESTDIR)$(zypp_commit_plugins)
-	@for i in etc/permissions* profiles/permissions.*; \
-		do install -m 644 $$i $(DESTDIR)$(sysconfdir); done
+	@for i in etc/permissions profiles/permissions.*; \
+		do install -m 644 $$i $(DESTDIR)$(permissionsdir); done
+	@install -m 644 etc/permissions.local $(DESTDIR)$(sysconfdir)
 
 
 clean:
