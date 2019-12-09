@@ -344,33 +344,12 @@ compare(const void* a, const void* b)
 }
 
 static void
-collect_permfiles()
+read_permissions_d(const char *directory)
 {
     size_t i;
     DIR* dir;
 
-    ensure_array((void**)&permfiles, &npermfiles);
-    // 1. central fixed permissions file
-    permfiles[npermfiles++] = strdup("/etc/permissions");
-
-    // 2. central easy, secure paranoid as those are defined by SUSE
-    for (i = 0; i < nlevel; ++i)
-    {
-        if (!strcmp(level[i], "easy")
-                || !strcmp(level[i], "secure")
-                || !strcmp(level[i], "paranoid"))
-        {
-            char fn[4096];
-            snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
-            if (access(fn, R_OK) == 0)
-            {
-                ensure_array((void**)&permfiles, &npermfiles);
-                permfiles[npermfiles++] = strdup(fn);
-            }
-        }
-    }
-    // 3. package specific permissions
-    dir = opendir("/etc/permissions.d");
+    dir = opendir(directory);
     if (dir)
     {
         char** files = NULL;
@@ -407,7 +386,7 @@ collect_permfiles()
                 if (i && !strcmp(files[i-1], files[i]))
                     continue;
 
-                snprintf(fn, sizeof(fn), "/etc/permissions.d/%s", files[i]);
+                snprintf(fn, sizeof(fn), "%s/%s", directory, files[i]);
                 if (access(fn, R_OK) == 0)
                 {
                     ensure_array((void**)&permfiles, &npermfiles);
@@ -416,7 +395,7 @@ collect_permfiles()
 
                 for (l = 0; l < nlevel; ++l)
                 {
-                    snprintf(fn, sizeof(fn), "/etc/permissions.d/%s.%s", files[i], level[l]);
+                    snprintf(fn, sizeof(fn), "%s/%s.%s", directory, files[i], level[l]);
 
                     if (access(fn, R_OK) == 0)
                     {
@@ -433,6 +412,54 @@ collect_permfiles()
         }
         free(files);
     }
+}
+
+static void
+collect_permfiles()
+{
+    size_t i;
+
+    // 1. central fixed permissions file
+    if (access("/usr/share/permissions/permissions", R_OK) == 0)
+    {
+        ensure_array((void**)&permfiles, &npermfiles);
+        permfiles[npermfiles++] = strdup("/usr/share/permissions/permissions");
+    }
+    else if (access("/etc/permissions", R_OK) == 0)
+    {
+        ensure_array((void**)&permfiles, &npermfiles);
+        permfiles[npermfiles++] = strdup("/etc/permissions");
+    }
+
+    // 2. central easy, secure paranoid as those are defined by SUSE
+    for (i = 0; i < nlevel; ++i)
+    {
+        if (!strcmp(level[i], "easy")
+                || !strcmp(level[i], "secure")
+                || !strcmp(level[i], "paranoid"))
+        {
+            char fn[4096];
+            snprintf(fn, sizeof(fn), "/usr/share/permissions/permissions.%s", level[i]);
+            if (access(fn, R_OK) == 0)
+            {
+                ensure_array((void**)&permfiles, &npermfiles);
+                permfiles[npermfiles++] = strdup(fn);
+            }
+            else
+            {
+                snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
+                if (access(fn, R_OK) == 0)
+                {
+                    ensure_array((void**)&permfiles, &npermfiles);
+                    permfiles[npermfiles++] = strdup(fn);
+                }
+            }
+        }
+    }
+    // 3. package specific permissions
+    read_permissions_d("/usr/share/permissions/permissions.d");
+    read_permissions_d("/etc/permissions.d");
+
     // 4. central permissions files with user defined level incl 'local'
     for (i = 0; i < nlevel; ++i)
     {

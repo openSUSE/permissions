@@ -1,14 +1,16 @@
-# /etc/permissions.paranoid
+# /usr/share/permissions/permissions.paranoid
 #
 # Copyright (c) 2001 SuSE GmbH Nuernberg, Germany.  All rights reserved.
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
 #
 # 
-# See /etc/permissions for general hints on how to use this file.
+# See /usr/share/permissions/permissions for general hints on how to use
+# this file.
 #
-# /etc/permissions.paranoid is NOT designed to be used in a single-user as
-# well as a multi-user installation, be it networked or not.
+# /usr/share/permissions/permissions.paranoid is NOT designed to be used
+# in a single-user as well as a multi-user installation, be it networked
+# or not.
 #
 # Derived from /etc/permissions.secure, it has _all_ sgid and suid bits
 # cleared - therefore, the system is probably not useable for non-privileged
