@@ -45,20 +45,20 @@ struct perm {
   cap_t caps;
 };
 
-struct perm *permlist;
-char **checklist;
-size_t nchecklist;
-uid_t euid;
-char *root;
-size_t rootl;
-size_t nlevel;
-char** level;
+struct perm *permlist = NULL;
+char **checklist = NULL;
+size_t nchecklist = 0;
+uid_t euid = 0;
+char *root = NULL;
+size_t rootl = 0;
+size_t nlevel = 0;
+char** level = NULL;
 int do_set = -1;
 int default_set = 1;
 int have_fscaps = -1;
 char** permfiles = NULL;
 size_t npermfiles = 0;
-char* force_level;
+char* force_level = NULL;
 
 struct perm*
 add_permlist(char *file, char *owner, char *group, mode_t mode)
