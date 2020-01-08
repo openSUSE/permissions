@@ -19,6 +19,7 @@ FSCAPS_DEFAULT_ENABLED = 1
 CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
 
 all: src/chkstat
+	@if grep -o -P '\t' src/chkstat.c ; then echo "error: chkstat.c mixes tabs and spaces!" ; touch src/chkstat.c ; exit 1 ; fi ; :
 
 install: all
 	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \

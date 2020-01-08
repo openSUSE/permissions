@@ -567,8 +567,10 @@ fail_insecure_path:
     char procpath[100];
     snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
     ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
-    if (l > 0 && (size_t)l < sizeof(linkpath) - 1)
-      linkpath[l] = '\0';
+    if (l > 0)
+        linkpath[(size_t)l < sizeof(linkpath) ? (size_t)l : sizeof(linkpath) - 1] = '\0';
+    else
+        memcpy(linkpath, "ancestor", 9);
     fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
   }
 
