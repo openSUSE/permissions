@@ -445,21 +445,22 @@ int
 safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
   char pathbuf[PATH_MAX];
-  char *p;
+  char *path_rest;
   int lcnt;
   int pathfd = -1;
   struct stat root_st;
+  bool is_final_path_element = false;
 
   *traversed_insecure = false;
 
   lcnt = 0;
   if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + rootl) >= sizeof(pathbuf))
     goto fail;
-  p = pathbuf;
-  do
+  path_rest = pathbuf;
+  while (!is_final_path_element)
     {
-      *p = '/';
-      char *cursor = p + 1;
+      *path_rest = '/';
+      char *cursor = path_rest + 1;
 
       if (pathfd == -1)
         {
@@ -478,13 +479,14 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           memcpy(stb, &root_st, sizeof(*stb));
         }
 
-      p = strchr(cursor, '/');
-      // p is NULL when we reach the final path element
-      if (p)
-        *p = 0;
+      path_rest = strchr(cursor, '/');
+      // path_rest is NULL when we reach the final path element
+      is_final_path_element = path_rest == NULL || strcmp("/", path_rest) == 0;
+      if (!is_final_path_element)
+        *path_rest = 0;
 
       // multiple consecutive slashes: ignore
-      if (p && *cursor == '\0')
+      if (!is_final_path_element && *cursor == '\0')
         continue;
 
       // never move up from the configured root directory (using the stat result from the previous loop iteration)
@@ -504,19 +506,21 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
       /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
       /* for euid != 0 it is also ok if the owner is euid */
-      if (stb->st_uid && stb->st_uid != euid && p)
+      if (stb->st_uid && stb->st_uid != euid && !is_final_path_element)
         *traversed_insecure = true;
       // path is in a world-writable directory, or file is world-writable itself.
-      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && p)
+      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && !is_final_path_element)
         *traversed_insecure = true;
       // if parent directory is not owned by root, the file owner must match the owner of parent
       if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
         {
-          if (p)
-            goto fail_insecure_path;
+          if (is_final_path_element)
+            {
+              fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
+              goto fail;
+            }
           else
-            fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
-          goto fail;
+            goto fail_insecure_path;
         }
 
       if (S_ISLNK(stb->st_mode))
@@ -543,17 +547,18 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
               pathfd = -1;
             }
           size_t len;
-          char tmp[sizeof(pathbuf)]; // need a temporary buffer because p points into pathbuf and snprintf doesn't allow the same buffer as source and destination
-          if (p)
-            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
-          else
+          char tmp[sizeof(pathbuf) - 1]; // need a temporary buffer because path_rest points into pathbuf and snprintf doesn't allow the same buffer as source and destination
+          if (is_final_path_element)
             len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
-          if (len >= sizeof(pathbuf))
+          else
+            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
+          if (len >= sizeof(tmp))
             goto fail;
-          strcpy(pathbuf, tmp);
-          p = pathbuf;
+          // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
+          strcpy(pathbuf + 1, tmp);
+          path_rest = pathbuf;
         }
-    } while (p);
+    }
 
   // world-writable file: error out due to unknown file integrity
   if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH)) {
