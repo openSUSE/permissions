@@ -24,6 +24,8 @@
 #include <grp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -580,6 +582,15 @@ fail:
   return -1;
 }
 
+static bool
+check_have_proc(void)
+{
+  struct statfs proc;
+  int r = statfs("/proc", &proc);
+  return r == 0 && proc.f_type == PROC_SUPER_MAGIC;
+}
+
+
 /* check /sys/kernel/fscaps, 2.6.39 */
 static int
 check_fscaps_enabled()
@@ -624,6 +635,7 @@ main(int argc, char **argv)
   int fd = -1;
   int errors = 0;
   cap_t caps = NULL;
+  bool have_proc = check_have_proc();
 
   while (argc > 1)
     {
@@ -922,6 +934,13 @@ main(int argc, char **argv)
       fclose(fp);
     }
 
+  if (!have_proc && do_set)
+    {
+      fprintf(stderr, "ERROR: /proc is not available. Chkstat can only warn about wrong permissions but not fix them.\n");
+      do_set = false;
+      errors++;
+    }
+
   euid = geteuid();
   for (e = permlist; e; e = e->next)
     {
@@ -982,8 +1001,20 @@ main(int argc, char **argv)
       //
       // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
       // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-      char fd_path[100];
-      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
+      char fd_path_buf[100];
+      char *fd_path;
+      if (have_proc)
+        {
+          snprintf(fd_path_buf, sizeof(fd_path_buf), "/proc/self/fd/%d", fd);
+          fd_path = fd_path_buf;
+        }
+      else
+        {
+          // We're running without /proc. This happens when we're run inside a chroot, e.g. during image builds.
+          // We can't give any security guarantees if there is unprivileged code running concurrently to us.
+          fd_path = e->file;
+        }
+
 
       caps = cap_get_file(fd_path);
       if (!caps)
