@@ -24,6 +24,8 @@
 #include <grp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +34,7 @@
 #include <sys/capability.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <sys/param.h>
 
 #define BAD_LINE() \
   fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
@@ -439,6 +442,39 @@ usage(int x)
   exit(x);
 }
 
+enum proc_mount_state {
+  PROC_MOUNT_STATE_UNKNOWN,
+  PROC_MOUNT_STATE_AVAIL,
+  PROC_MOUNT_STATE_UNAVAIL,
+};
+static enum proc_mount_state proc_mount_avail = PROC_MOUNT_STATE_UNKNOWN;
+
+static bool
+check_have_proc(void)
+{
+  if (proc_mount_avail == PROC_MOUNT_STATE_UNKNOWN)
+    {
+      char *override = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
+
+      struct statfs proc;
+      int r = statfs("/proc", &proc);
+      if (override == NULL && r == 0 && proc.f_type == PROC_SUPER_MAGIC)
+        proc_mount_avail = PROC_MOUNT_STATE_AVAIL;
+      else
+        proc_mount_avail = PROC_MOUNT_STATE_UNAVAIL;
+    }
+
+  return proc_mount_avail == PROC_MOUNT_STATE_AVAIL;
+}
+
+
+
+#define _STRINGIFY(s) #s
+#define STRINGIFY(s) _STRINGIFY(s)
+
+#define PROC_FD_PATH_SIZE (sizeof("/proc/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
+
+
 int
 safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
@@ -568,14 +604,12 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 fail_insecure_path:
 
   {
-    char linkpath[PATH_MAX];
-    char procpath[100];
+    char linkpath[PATH_MAX] = "ancestor";
+    char procpath[PROC_FD_PATH_SIZE];
     snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
     ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
     if (l > 0)
-        linkpath[(size_t)l < sizeof(linkpath) ? (size_t)l : sizeof(linkpath) - 1] = '\0';
-    else
-        memcpy(linkpath, "ancestor", 9);
+      linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
     fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
   }
 
@@ -584,6 +618,7 @@ fail:
     close(pathfd);
   return -1;
 }
+
 
 /* check /sys/kernel/fscaps, 2.6.39 */
 static int
@@ -987,8 +1022,17 @@ main(int argc, char **argv)
       //
       // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
       // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-      char fd_path[100];
-      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
+      char fd_path_buf[PROC_FD_PATH_SIZE];
+      char *fd_path;
+      if (check_have_proc())
+        {
+          snprintf(fd_path_buf, sizeof(fd_path_buf), "/proc/self/fd/%d", fd);
+          fd_path = fd_path_buf;
+        }
+      else
+        // fall back to plain path-access for read-only operation. (this much is fine)
+        // below we make sure that in this case we report errors instead of trying to fix policy violations insecurely
+        fd_path = e->file;
 
       caps = cap_get_file(fd_path);
       if (!caps)
@@ -1038,6 +1082,13 @@ main(int argc, char **argv)
             {
               printf("Using root %s\n", root);
             }
+        }
+
+      if (do_set && fd_path != fd_path_buf)
+        {
+          fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
+          errors++;
+          do_set = false;
         }
 
       if (!do_set)
