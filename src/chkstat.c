@@ -34,6 +34,8 @@
 #include <sys/capability.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <sys/mount.h>
+#include <limits.h>
 
 #define BAD_LINE() \
   fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
@@ -441,6 +443,86 @@ usage(int x)
   exit(x);
 }
 
+static bool
+check_have_proc(void)
+{
+  char *override = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
+
+  struct statfs proc;
+  int r = statfs("/proc", &proc);
+  return override == NULL && r == 0 && proc.f_type == PROC_SUPER_MAGIC;
+}
+
+static const char proc_mount_path_pattern[] = "/tmp/chkstat.proc.XXXXXX";
+static char proc_mount_path[sizeof(proc_mount_path_pattern)];
+static int proc_mount_avail = 0;
+
+static void
+cleanup_proc(void)
+{
+  if (proc_mount_avail != 2)
+    return;
+
+  // intentionally no error checking during cleanup
+  umount(proc_mount_path);
+  rmdir(proc_mount_path);
+}
+
+#define _STRINGIFY(s) #s
+#define STRINGIFY(s) _STRINGIFY(s)
+
+#define PROC_PATH_SIZE (sizeof(proc_mount_path) + sizeof("/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
+static int
+make_proc_path(int fd, char path[static PROC_PATH_SIZE])
+{
+  if (proc_mount_avail > 2)
+    return 1;
+
+  if (proc_mount_avail == 0)
+    {
+      if (check_have_proc())
+        {
+          proc_mount_avail = 1;
+        }
+      else
+        {
+          char *override = secure_getenv("CHKSTAT_PRETEND_PROC_MOUNT_FAIL");
+          if (override != NULL)
+            goto mount_fail;
+
+          // We're running without /proc mounted. This happens when we're run inside a chroot, e.g. during image
+          // builds, or during RPM install with the '--root' option.
+          //
+          // Other tools apparently sometimes misbehave and change things outside their chroot when they have
+          // working /proc so this can't be changed.
+          //
+          // As a work-around, we mount our own private proc in a temporary directory. This requires
+          // CAP_SYS_ADMIN (in addition to CAP_DAC_OVERRIDE like the rest of the tool).
+          memcpy(proc_mount_path, proc_mount_path_pattern, sizeof(proc_mount_path));
+          char *res = mkdtemp(proc_mount_path);
+          if (res == NULL)
+            goto mount_fail;
+          int r = mount("proc", proc_mount_path, "proc", MS_NOEXEC|MS_NOSUID|MS_NODEV|MS_RELATIME, "");
+          if (r != 0)
+            {
+              rmdir(proc_mount_path);
+              goto mount_fail;
+            }
+          proc_mount_avail = 2;
+          atexit(cleanup_proc);
+        }
+    }
+
+  snprintf(path, PROC_PATH_SIZE, "%s/self/fd/%d", proc_mount_avail == 1 ? "/proc" : proc_mount_path, fd);
+
+  return 0;
+
+mount_fail:
+  proc_mount_avail = 3;
+  return 1;
+}
+
+
 int
 safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
@@ -570,14 +652,15 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 fail_insecure_path:
 
   {
-    char linkpath[PATH_MAX];
-    char procpath[100];
-    snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
-    ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
-    if (l > 0)
-        linkpath[(size_t)l < sizeof(linkpath) ? (size_t)l : sizeof(linkpath) - 1] = '\0';
-    else
-        memcpy(linkpath, "ancestor", 9);
+    char linkpath[PATH_MAX] = "ancestor";
+    char procpath[PROC_PATH_SIZE];
+    int res = make_proc_path(pathfd, procpath);
+    if (res == 0)
+      {
+        ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
+        if (l > 0)
+          linkpath[(size_t)l < sizeof(linkpath) ? (size_t)l : sizeof(linkpath) - 1] = '\0';
+      }
     fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
   }
 
@@ -585,14 +668,6 @@ fail:
   if (pathfd >= 0)
     close(pathfd);
   return -1;
-}
-
-static bool
-check_have_proc(void)
-{
-  struct statfs proc;
-  int r = statfs("/proc", &proc);
-  return r == 0 && proc.f_type == PROC_SUPER_MAGIC;
 }
 
 
@@ -640,7 +715,6 @@ main(int argc, char **argv)
   int fd = -1;
   int errors = 0;
   cap_t caps = NULL;
-  bool have_proc = check_have_proc();
 
   while (argc > 1)
     {
@@ -939,13 +1013,6 @@ main(int argc, char **argv)
       fclose(fp);
     }
 
-  if (!have_proc && do_set)
-    {
-      fprintf(stderr, "ERROR: /proc is not available. Chkstat can only warn about wrong permissions but not fix them.\n");
-      do_set = false;
-      errors++;
-    }
-
   euid = geteuid();
   for (e = permlist; e; e = e->next)
     {
@@ -1006,20 +1073,15 @@ main(int argc, char **argv)
       //
       // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
       // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-      char fd_path_buf[100];
+      char fd_path_buf[PROC_PATH_SIZE];
       char *fd_path;
-      if (have_proc)
-        {
-          snprintf(fd_path_buf, sizeof(fd_path_buf), "/proc/self/fd/%d", fd);
-          fd_path = fd_path_buf;
-        }
+      int r = make_proc_path(fd, fd_path_buf);
+      if (r == 0)
+        fd_path = fd_path_buf;
       else
-        {
-          // We're running without /proc. This happens when we're run inside a chroot, e.g. during image builds.
-          // We can't give any security guarantees if there is unprivileged code running concurrently to us.
-          fd_path = e->file;
-        }
-
+        // fall back to plain path-access for read-only operation. (this is fine)
+        // below we make sure that in this case we report errors instead of trying to fix policy violations insecurely
+        fd_path = e->file;
 
       caps = cap_get_file(fd_path);
       if (!caps)
@@ -1069,6 +1131,13 @@ main(int argc, char **argv)
             {
               printf("Using root %s\n", root);
             }
+        }
+
+      if (do_set && fd_path != fd_path_buf)
+        {
+          fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
+          errors++;
+          do_set = false;
         }
 
       if (!do_set)
