@@ -398,4 +398,5 @@
 /var/spool/nagios/                                      nagios:nagcmd   0770
 
 # ksysguard network helper (bsc#1151190)
-/usr/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+/usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+/usr/lib64/libexec/ksysguard/ksgrd_network_helper             root:root       0755
