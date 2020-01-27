@@ -36,6 +36,7 @@
 #include <stdbool.h>
 #include <sys/mount.h>
 #include <limits.h>
+#include <sys/param.h>
 
 #define BAD_LINE() \
   fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
@@ -455,12 +456,18 @@ check_have_proc(void)
 
 static const char proc_mount_path_pattern[] = "/tmp/chkstat.proc.XXXXXX";
 static char proc_mount_path[sizeof(proc_mount_path_pattern)];
-static int proc_mount_avail = 0;
+enum proc_mount_state {
+  PROC_MOUNT_STATE_UNKNOWN,
+  PROC_MOUNT_STATE_SYSTEM,
+  PROC_MOUNT_STATE_CUSTOM,
+  PROC_MOUNT_STATE_UNAVAIL,
+};
+static enum proc_mount_state proc_mount_avail = PROC_MOUNT_STATE_UNKNOWN;
 
 static void
 cleanup_proc(void)
 {
-  if (proc_mount_avail != 2)
+  if (proc_mount_avail != PROC_MOUNT_STATE_CUSTOM)
     return;
 
   // intentionally no error checking during cleanup
@@ -475,14 +482,14 @@ cleanup_proc(void)
 static int
 make_proc_path(int fd, char path[static PROC_PATH_SIZE])
 {
-  if (proc_mount_avail > 2)
+  if (proc_mount_avail == PROC_MOUNT_STATE_UNAVAIL)
     return 1;
 
-  if (proc_mount_avail == 0)
+  if (proc_mount_avail == PROC_MOUNT_STATE_UNKNOWN)
     {
       if (check_have_proc())
         {
-          proc_mount_avail = 1;
+          proc_mount_avail = PROC_MOUNT_STATE_SYSTEM;
         }
       else
         {
@@ -508,7 +515,7 @@ make_proc_path(int fd, char path[static PROC_PATH_SIZE])
               rmdir(proc_mount_path);
               goto mount_fail;
             }
-          proc_mount_avail = 2;
+          proc_mount_avail = PROC_MOUNT_STATE_CUSTOM;
           atexit(cleanup_proc);
         }
     }
@@ -518,7 +525,7 @@ make_proc_path(int fd, char path[static PROC_PATH_SIZE])
   return 0;
 
 mount_fail:
-  proc_mount_avail = 3;
+  proc_mount_avail = PROC_MOUNT_STATE_UNAVAIL;
   return 1;
 }
 
@@ -659,7 +666,7 @@ fail_insecure_path:
       {
         ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
         if (l > 0)
-          linkpath[(size_t)l < sizeof(linkpath) ? (size_t)l : sizeof(linkpath) - 1] = '\0';
+          linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
       }
     fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
   }
