@@ -455,7 +455,7 @@ check_have_proc(void)
 }
 
 static const char proc_mount_path_pattern[] = "/tmp/chkstat.proc.XXXXXX";
-static char proc_mount_path[sizeof(proc_mount_path_pattern)];
+static char proc_mount_path[sizeof(proc_mount_path_pattern) + sizeof("/proc")];
 enum proc_mount_state {
   PROC_MOUNT_STATE_UNKNOWN,
   PROC_MOUNT_STATE_SYSTEM,
@@ -471,7 +471,9 @@ cleanup_proc(void)
     return;
 
   // intentionally no error checking during cleanup
-  umount(proc_mount_path);
+  umount2(proc_mount_path, MNT_DETACH);
+  rmdir(proc_mount_path);
+  proc_mount_path[sizeof(proc_mount_path_pattern)] = '\0';
   rmdir(proc_mount_path);
 }
 
@@ -505,16 +507,22 @@ make_proc_path(int fd, char path[static PROC_PATH_SIZE])
           //
           // As a work-around, we mount our own private proc in a temporary directory. This requires
           // CAP_SYS_ADMIN (in addition to CAP_DAC_OVERRIDE like the rest of the tool).
-          memcpy(proc_mount_path, proc_mount_path_pattern, sizeof(proc_mount_path));
+          memcpy(proc_mount_path, proc_mount_path_pattern, sizeof(proc_mount_path_pattern));
           char *res = mkdtemp(proc_mount_path);
           if (res == NULL)
-            goto mount_fail;
-          int r = mount("proc", proc_mount_path, "proc", MS_NOEXEC|MS_NOSUID|MS_NODEV|MS_RELATIME, "");
+            goto mkdtemp_fail;
+
+          // Mounting proc in our dir changes its mode to 0555. To make it less likely that anyone touches it
+          // (preventing a later umount) we mount it in a sub-dir "/proc" that can only be accessed by root
+          // thanks to the restrictive permissions of the mkdtemp directory.
+          memcpy(proc_mount_path + sizeof(proc_mount_path_pattern) - 1, "/proc", sizeof("/proc"));
+          int r = mkdir(proc_mount_path, S_IRWXU);
           if (r != 0)
-            {
-              rmdir(proc_mount_path);
-              goto mount_fail;
-            }
+            goto mkdir_fail;
+
+          r = mount("proc", proc_mount_path, "proc", MS_NOEXEC|MS_NOSUID|MS_NODEV|MS_RELATIME, "");
+          if (r != 0)
+            goto mount_fail;
           proc_mount_avail = PROC_MOUNT_STATE_CUSTOM;
           atexit(cleanup_proc);
         }
@@ -525,6 +533,11 @@ make_proc_path(int fd, char path[static PROC_PATH_SIZE])
   return 0;
 
 mount_fail:
+  rmdir(proc_mount_path);
+mkdir_fail:
+  proc_mount_path[sizeof(proc_mount_path_pattern)] = '\0';
+  rmdir(proc_mount_path);
+mkdtemp_fail:
   proc_mount_avail = PROC_MOUNT_STATE_UNAVAIL;
   return 1;
 }
