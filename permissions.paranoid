@@ -419,3 +419,7 @@
 
 # prometheus-blackbox_exporter (bsc#1191194)
 /usr/bin/blackbox_exporter                              root:root       0755
+
+# mariadb auth_pam_tool (bsc#1160285)
+/usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool   root:root       0755
+/usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool root:root       0755
