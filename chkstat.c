@@ -1250,13 +1250,15 @@ main(int argc, char **argv)
           fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
           errors++;
         }
-      if (!caps_ok)
+      // chown and - depending on the file system - chmod clear existing capabilities
+      // so apply the intended caps even if they were correct previously
+      if (e->caps || !caps_ok)
         {
           if (S_ISREG(stb.st_mode))
             {
               // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
               // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-              int cap_fd = open(fd_path, O_NOATIME | O_CLOEXEC);
+              int cap_fd = open(fd_path, O_NOATIME | O_CLOEXEC | O_RDONLY);
               if (cap_fd == -1)
                 {
                   fprintf(stderr, "%s: open() for changing capabilities: %s\n", e->file+rootl, strerror(errno));
@@ -1264,8 +1266,12 @@ main(int argc, char **argv)
                 }
               else if (cap_set_fd(cap_fd, e->caps))
                 {
-                  fprintf(stderr, "%s: cap_set_fd: %s\n", e->file+rootl, strerror(errno));
-                  errors++;
+                  // ignore ENODATA when clearing caps - it just means there were no caps to remove
+                  if (errno != ENODATA || e->caps)
+                    {
+                      fprintf(stderr, "%s: cap_set_fd: %s\n", e->file+rootl, strerror(errno));
+                      errors++;
+                    }
                 }
               if (cap_fd != -1)
                 close(cap_fd);
