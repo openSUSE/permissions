@@ -68,7 +68,6 @@
 /var/adm/                                               root:root          755
 /var/adm/backup/                                        root:root          700
 /var/cache/                                             root:root          755
-/var/cache/man/                                         man:root           755
 /var/yp/                                                root:root          755
 /var/run/nscd/socket					root:root	   666
 /run/nscd/socket					root:root	   666
