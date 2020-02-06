@@ -400,7 +400,3 @@
 # ksysguard network helper (bsc#1151190)
 /usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
 /usr/lib64/libexec/ksysguard/ksgrd_network_helper             root:root       0755
-
-# mariadb auth_pam_tool (bsc#1160285)
-/usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool    root:root         0755
-/usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool  root:root         0755

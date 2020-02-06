@@ -399,7 +399,3 @@
  +capabilities cap_net_raw=ep
 /usr/lib64/libexec/ksysguard/ksgrd_network_helper             root:root       0755
  +capabilities cap_net_raw=ep
-
-# mariadb auth_pam_tool (bsc#1160285)
-/usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool    root:root         4755
-/usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool  root:root         4755
