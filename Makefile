@@ -1,6 +1,8 @@
 CXXFLAGS=-g -O2 -std=c++17 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
+ifdef CHKSTAT_TEST
 # for testing, add sanitizers:
-# -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=undefined
+CXXFLAGS+=-fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=undefined
+endif
 CXX=g++
 # link statically against libstdc++. since some people are afraid of ABI
 # changes in this area and since permissions is a base package in SUSE this
