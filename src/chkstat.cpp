@@ -18,7 +18,9 @@
  ****************************************************************
  */
 
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+#  define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <pwd.h>
 #include <grp.h>
@@ -55,7 +57,7 @@ uid_t euid;
 char *root;
 size_t rootl;
 size_t nlevel;
-char** level;
+const char** level;
 int do_set = -1;
 int default_set = 1;
 int have_fscaps = -1;
@@ -64,16 +66,16 @@ size_t npermfiles = 0;
 char* force_level;
 
 struct perm*
-add_permlist(char *file, char *owner, char *group, mode_t mode)
+add_permlist(char *file, const char *p_owner, const char *p_group, mode_t mode)
 {
   struct perm *ec, **epp;
 
-  owner = strdup(owner);
-  group = strdup(group);
+  char *owner = strdup(p_owner);
+  char *group = strdup(p_group);
   if (rootl)
     {
       char *nfile;
-      nfile = malloc(strlen(file) + rootl + (*file != '/' ? 2 : 1));
+      nfile = (char*)malloc(strlen(file) + rootl + (*file != '/' ? 2 : 1));
       if (nfile)
         {
           strcpy(nfile, root);
@@ -101,7 +103,7 @@ add_permlist(char *file, char *owner, char *group, mode_t mode)
       }
     else
       epp = &ec->next;
-  ec = malloc(sizeof(struct perm));
+  ec = (perm*)malloc(sizeof(struct perm));
   if (ec == 0)
     {
       perror("permlist entry alloc");
@@ -140,7 +142,7 @@ add_checklist(char *e)
     }
   if ((nchecklist & 63) == 0)
     {
-      checklist = realloc(checklist, sizeof(char *) * (nchecklist + 64));
+      checklist = (char**)realloc(checklist, sizeof(char *) * (nchecklist + 64));
       if (checklist == 0)
         {
           perror("checklist alloc");
@@ -173,7 +175,7 @@ readline(FILE *fp, char *buf, size_t len)
 }
 
 int
-in_level(char *e)
+in_level(const char *e)
 {
   size_t i;
   for (i = 0; i < nlevel; i++)
@@ -197,7 +199,7 @@ ensure_array(void** array, size_t* size)
 }
 
 void
-add_level(char *e)
+add_level(const char *e)
 {
   if (in_level(e))
     return;

@@ -1,7 +1,12 @@
-CFLAGS=-W -Wall -g -O2 -std=c11 -Wextra -pedantic -Wduplicated-cond  -Wduplicated-branches  -Wlogical-op  -Wrestrict  -Wnull-dereference  -Wjump-misses-init  -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
+CXXFLAGS=-g -O2 -std=c++17 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
 # for testing, add sanitizers:
 # -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=undefined
-CC=gcc
+CXX=g++
+# link statically against libstdc++. since some people are afraid of ABI
+# changes in this area and since permissions is a base package in SUSE this
+# protects us from such potential breakage at the expense of some increased
+# binary size
+LDFLAGS=-static-libstdc++
 DESTDIR=
 LDLIBS=-lcap
 prefix=/usr
@@ -19,7 +24,7 @@ FSCAPS_DEFAULT_ENABLED = 1
 CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
 
 all: src/chkstat
-	@if grep -o -P '\t' src/chkstat.c ; then echo "error: chkstat.c mixes tabs and spaces!" ; touch src/chkstat.c ; exit 1 ; fi ; :
+	@if grep -o -P '\t' src/chkstat.cpp ; then echo "error: chkstat.c mixes tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
 
 install: all
 	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \
