@@ -420,6 +420,15 @@ class TestBase:
 				permissions_val
 			))
 
+	def switchSystemProfile(self, profile):
+		print("Switching to", profile, "system permissions profile")
+		# configure the given profile as default
+		self.createSecuritySysconfig(profile)
+
+	def applySystemProfile(self):
+		print("Applying current system profile using chkstat")
+		self.callChkstat("--system")
+
 	def extractPerms(self, s):
 		return s.st_mode & ~(stat.S_IFMT(s.st_mode))
 
@@ -495,9 +504,8 @@ class TestCorrectMode(TestBase):
 
 		entries = {}
 
-		for profile in modes:
+		for profile, perms in modes.items():
 			lines = entries.setdefault(profile, [])
-			perms = modes[profile]
 			for path, mode in ( (testdir, perms[0]), (testfile, perms[1])):
 				lines.append( self.buildProfileLine(path, mode) )
 
@@ -508,11 +516,9 @@ class TestCorrectMode(TestBase):
 			for p in testpaths:
 				self.printMode(p)
 
-			print("Switching to", profile, "profile")
 			# configure the given profile as default
-			self.createSecuritySysconfig(profile)
-
-			self.callChkstat("--system")
+			self.switchSystemProfile(profile)
+			self.applySystemProfile()
 
 			for path, mode in zip(testpaths, modes[profile]):
 				self.assertMode(path, mode)
