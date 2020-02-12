@@ -425,9 +425,10 @@ class TestBase:
 		# configure the given profile as default
 		self.createSecuritySysconfig(profile)
 
-	def applySystemProfile(self):
+	def applySystemProfile(self, extra_args = []):
 		print("Applying current system profile using chkstat")
-		self.callChkstat("--system")
+		args = ["--system"] + extra_args
+		self.callChkstat(args)
 
 	def extractPerms(self, s):
 		return s.st_mode & ~(stat.S_IFMT(s.st_mode))
@@ -749,12 +750,225 @@ class TestDefaultProfile(TestBase):
 
 		print()
 
+class TestCommandLineBase(TestBase):
+	"""A base class for a couple or simpler command line switch tests.
+	setupTest() provides a common profile setup for use by
+	specializations."""
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+
+	def setupTest(self):
+
+		testdir_root = self.createAndGetTestDir(0o755)
+		testdir_a = os.path.join(testdir_root, "sub1")
+		testfile_a = os.path.join(testdir_a, "file1")
+		testdir_b = os.path.join(testdir_root, "sub2")
+		testfile_b = os.path.join(testdir_b, "file2")
+		for d in (testdir_a, testdir_b):
+			os.mkdir(d, 0o755)
+		for f in (testfile_a, testfile_b):
+			self.createTestFile(f, 0o444)
+		package = "testpackage"
+
+		global_testpaths = (testdir_a, testfile_a)
+		pkg_testpaths = (testdir_b, testfile_b)
+
+		modes = {
+			"": (0o700, 0o400),
+			"easy": (0o755, 0o664),
+			"secure": (0o770, 0o660),
+			"paranoid": (0o700, 0o600)
+		}
+
+		entries = {}
+
+		for profile, perms in modes.items():
+			lines = entries.setdefault(profile, [])
+			for path, mode in zip(global_testpaths, modes[profile]):
+				lines.append( self.buildProfileLine(path, mode) )
+
+		self.addProfileEntries(entries)
+
+		entries = {}
+
+		for profile, perms in modes.items():
+			lines = entries.setdefault(profile, [])
+			for path, mode in zip(pkg_testpaths, modes[profile]):
+				lines.append( self.buildProfileLine(path, mode) )
+
+		self.addPackageProfileEntries(package, entries)
+
+		self.m_global_testpaths = global_testpaths
+		self.m_pkg_testpaths = pkg_testpaths
+		self.m_testpaths = self.m_global_testpaths + self.m_pkg_testpaths
+		self.m_modes = modes
+		self.m_testdir_root = testdir_root
+
+class TestForceProfile(TestCommandLineBase):
+
+	def __init__(self):
+
+		super().__init__("TestForceProfile", "Tests whether the `--level` override works")
+
+	def run(self):
+
+		self.setupTest()
+
+		forced_level = "paranoid"
+		expected_modes = self.m_modes[forced_level] * 2
+
+		for profile in self.m_profiles:
+			# independently of the configured system profile, the
+			# forced level should always be applied
+			self.switchSystemProfile(profile)
+			self.applySystemProfile(["--level", forced_level])
+
+			for path, mode in zip(self.m_testpaths, expected_modes):
+				self.assertMode(path, mode)
+
+class TestWarnMode(TestCommandLineBase):
+
+	def __init__(self):
+
+		super().__init__("TestWarnMode", "Tests whether the `--warn` switch works as expected")
+
+	def run(self):
+		self.setupTest()
+
+		init_profile = "easy"
+		expected_modes = self.m_modes[init_profile] * 2
+		self.switchSystemProfile(init_profile)
+		self.applySystemProfile()
+
+		for profile in self.m_profiles:
+			self.switchSystemProfile(profile)
+			self.applySystemProfile(["--warn"])
+
+			for path, mode in zip(self.m_testpaths, expected_modes):
+				# modes should never change after the initial switch
+				self.assertMode(path, mode)
+
+class TestExamineSwitch(TestCommandLineBase):
+
+	def __init__(self):
+
+		super().__init__("TestExamineSwitch", "Tests whether the `--examine` switch works as expected")
+
+	def run(self):
+		self.setupTest()
+
+		# first get a defined state
+		init_profile = "easy"
+		self.switchSystemProfile(init_profile)
+		self.applySystemProfile()
+		expected_modes = self.m_modes[init_profile] * 2
+
+		# choose an arbitrary config item for the test
+		examine_index = 0 # 0 is for the dir, 1 is for the file mode
+		examine_path = self.m_testpaths[2]
+
+		for profile in self.m_profiles:
+			self.switchSystemProfile(profile)
+			self.applySystemProfile(["--examine", examine_path])
+
+			# only examine_path should now be changed, all else
+			# should stay at "easy" level
+			for path, mode in zip(self.m_testpaths, expected_modes):
+				if path != examine_path:
+					self.assertMode(path, mode)
+				else:
+					# the --examine path should be
+					# switched to the according profile
+					self.assertMode(path, self.m_modes[profile][examine_index])
+
+class TestRootSwitch(TestCommandLineBase):
+
+	def __init__(self):
+
+		super().__init__("TestRootSwitch", "Tests whether the `--root` switch works as expected")
+
+	def run(self):
+		self.setupTest()
+
+		init_profile = "easy"
+		self.switchSystemProfile(init_profile)
+		self.applySystemProfile()
+		expected_modes = self.m_modes[init_profile] * 2
+
+		# now only operate on the alternative root directory
+		alt_root = "/altroot"
+		os.mkdir(alt_root)
+		# copy over our configured entries to the alt root
+		shutil.copytree(self.m_testdir_root, alt_root + self.m_testdir_root)
+
+		alt_testpaths = [ alt_root + path for path in self.m_testpaths ]
+
+		for profile in self.m_profiles:
+			self.switchSystemProfile(profile)
+			self.applySystemProfile(["--root", alt_root])
+
+			# the original root should be unaltered
+			for path, mode in zip(self.m_testpaths, expected_modes):
+				self.assertMode(path, mode)
+
+			# the alternative root should be accordingly adjusted
+			for path, mode in zip(alt_testpaths, self.m_modes[profile] * 2):
+				self.assertMode(path, mode)
+
+			print()
+
+class TestFilesSwitch(TestCommandLineBase):
+
+	def __init__(self):
+
+		super().__init__("TestFilesSwitch", "Tests whether the `--files` switch works as expected")
+
+	def run(self):
+		self.setupTest()
+
+		# this switch actually just reads a list of --examine paths
+		# from a file.
+
+		# get a defined start state
+		init_profile = "easy"
+		self.switchSystemProfile(init_profile)
+		self.applySystemProfile()
+
+		# write a custom profile file only affected one of the paths
+		# present in the other profiles
+		testpath = self.m_testpaths[0]
+		mode_index = 0
+		files_path = "/tmp/files.list"
+		with open(files_path, 'w') as files_file:
+			files_file.write(testpath + "\n")
+
+		for profile in self.m_profiles:
+			self.switchSystemProfile(profile)
+			self.applySystemProfile(["--files", files_path])
+
+			# modes should always be the same: easy profiles for
+			# everything but the testpath, which should be at
+			# the mode for the current profile
+			for path, mode in zip(self.m_testpaths, self.m_modes[init_profile] * 2):
+				if path != testpath:
+					self.assertMode(path, mode)
+				else:
+					self.assertMode(path, self.m_modes[profile][mode_index])
+
+			print()
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
 		TestBasePermissions,
 		TestPackagePermissions,
 		TestLocalPermissions,
-		TestDefaultProfile
+		TestDefaultProfile,
+		TestForceProfile,
+		TestWarnMode,
+		TestExamineSwitch,
+		TestRootSwitch,
+		TestFilesSwitch
 	))
 sys.exit(res)
