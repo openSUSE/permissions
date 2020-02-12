@@ -631,11 +631,78 @@ class TestPackagePermissions(TestBase):
 
 			print()
 
+class TestLocalPermissions(TestBase):
+
+	def __init__(self):
+		super().__init__("TestLocalPermissions", "checks whether entries in *.local profiles are respected")
+
+	def run(self):
+
+		# entries in *.local should always take precedence over the
+		# rest IIUC
+		#
+		# write arbitrary entries in the standard profiles, they
+		# should never apply.
+		#
+		# then add an entry for testdir in permissions.local and one
+		# in testpackage.local
+		testdir = self.createAndGetTestDir(0o750)
+		testfile = os.path.sep.join( (testdir, "testfile") )
+		testpaths = (testdir, testfile)
+		self.createTestFile(testfile, 0o640)
+		package = "testpackage"
+
+		modes = {
+			"": (0o770, 0o660),
+			"easy": (0o775, 0o664),
+			"secure": (0o710, 0o600),
+			"paranoid": (0o700, 0o400),
+		}
+
+		local_perms = (0o500, 0o000)
+
+		global_entries = {}
+		pkg_entries = {}
+
+		for profile, perms in modes.items():
+			global_lines = global_entries.setdefault(profile, [])
+			pkg_lines = pkg_entries.setdefault(profile, [])
+
+			line = self.buildProfileLine(testdir, perms[0])
+			global_lines.append( line )
+			line = self.buildProfileLine(testfile, perms[1])
+			pkg_lines.append( line )
+
+		# this should take precendence over all other entries
+		line = self.buildProfileLine(testdir, local_perms[0])
+		global_entries["local"] = [ line ]
+		line = self.buildProfileLine(testfile, local_perms[1])
+		pkg_entries["local"] = [ line ]
+
+		self.addProfileEntries(global_entries)
+		self.addPackageProfileEntries(package, pkg_entries)
+
+		for profile in modes.keys():
+
+			for p in testpaths:
+				self.printMode(p)
+
+			self.switchSystemProfile(profile if profile else "fake")
+			self.applySystemProfile()
+
+			for path, mode in zip (testpaths, local_perms):
+				self.assertMode(path, mode)
+				# corrupt the mode to make sure it's always
+				# restored later
+				os.chmod(path, 0o555)
+
+			print()
 
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
 		TestBasePermissions,
-		TestPackagePermissions
+		TestPackagePermissions,
+		TestLocalPermissions
 	))
 sys.exit(res)
