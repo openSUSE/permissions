@@ -421,7 +421,7 @@ class TestBase:
 			))
 
 	def switchSystemProfile(self, profile):
-		print("Switching to", profile, "system permissions profile")
+		print("Switching to", profile if profile else "(empty)", "system permissions profile")
 		# configure the given profile as default
 		self.createSecuritySysconfig(profile)
 
@@ -698,11 +698,63 @@ class TestLocalPermissions(TestBase):
 
 			print()
 
+class TestDefaultProfile(TestBase):
+
+	def __init__(self):
+		super().__init__("TestDefaultProfile", "checks whether the default profile is correctly selected")
+		# if no profile is explicitly configured then this one should
+		# be implicitly selected by chkstat
+		self.m_default_profile = "secure"
+
+	def run(self):
+
+		testdir = self.createAndGetTestDir(0o770)
+		testfile = os.path.sep.join( (testdir, "testfile") )
+		testpaths = (testdir, testfile)
+		self.createTestFile(testfile, 0o444)
+		package = "testpackage"
+
+		modes = {
+			"": (0o700, 0o400),
+			"easy": (0o775, 0o664),
+			"secure": (0o770, 0o660),
+			"paranoid": (0o700, 0o600)
+		}
+
+		global_entries = {}
+		pkg_entries = {}
+
+		for profile, perms in modes.items():
+			global_lines = global_entries.setdefault(profile, [])
+			pkg_lines = pkg_entries.setdefault(profile, [])
+
+			line = self.buildProfileLine(testdir, perms[0])
+			global_lines.append( line )
+			line = self.buildProfileLine(testfile, perms[1])
+			pkg_lines.append( line )
+
+		self.addProfileEntries(global_entries)
+		self.addPackageProfileEntries(package, pkg_entries)
+
+		for path in testpaths:
+			self.printMode(path)
+
+		# write an empty profile config, this should cause the default
+		# to kick in
+		self.switchSystemProfile("")
+		self.applySystemProfile()
+
+		for path, mode in zip(testpaths, modes[self.m_default_profile]):
+			self.assertMode(path, mode)
+
+		print()
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
 		TestBasePermissions,
 		TestPackagePermissions,
-		TestLocalPermissions
+		TestLocalPermissions,
+		TestDefaultProfile
 	))
 sys.exit(res)
