@@ -117,9 +117,11 @@ class ChkstatRegtest:
 			shell = False
 		)
 
-	def bindMount(self, src, dst, recursive = True):
+	def bindMount(self, src, dst, recursive = True, read_only = False):
+		bind_mode = "--rbind" if recursive else "--bind"
+		options = "ro" if read_only else "rw"
 		subprocess.check_call(
-			[ "mount", "--rbind" if recursive else "--bind", src, dst ],
+			[ "mount", bind_mode, src, dst, "-o" + options ],
 			close_fds = True,
 			shell = False
 		)
@@ -168,6 +170,19 @@ class ChkstatRegtest:
 				# tuples, but "error" is only a string in this
 				# case, not very helpful for evaluation
 				pass
+
+		# also bind-mount the permissions repo e.g. useful for
+		# debugging
+		permissions_repo_dst = self.m_fake_root + "/permissions"
+		os.makedirs(permissions_repo_dst)
+		# NOTE: would be good mounting this read-only, but trying so
+		# fails with
+		# `mount: /tmp/permissions: filesystem was mounted, but any subsequent operation failed: Unknown error 5005."
+		# reason is that a following MS_REC mount fails with EPERM,
+		# not quite sure why that is.
+		self.bindMount(
+			self.m_permissions_repo, permissions_repo_dst,
+		)
 
 		self.mountTmpFS(self.m_fake_root + "/usr/local")
 		local_bin = self.m_fake_root + "/usr/local/bin"
