@@ -393,32 +393,43 @@ class TestBase:
 				for line in lines:
 					profile_file.write(line + "\n")
 
-	def buildProfileLine(self, path, mode, owner = "root", group = "root"):
-		return "{} {}:{} {}".format(
+	def buildProfileLine(self, path, mode, owner = "root", group = "root", caps = []):
+		ret = "{} {}:{} {}".format(
 			path, owner, group,
 			format(mode, '04o')
 		)
 
-	def createSecuritySysconfig(self, permissions_val):
+		if caps:
+			ret += "\n +capabilities {}".format( ','.join(caps) )
+
+		return ret
+
+	def createSecuritySysconfig(self, permissions_val, fscaps_val = None):
 		"""Creates a /etc/sysconfig/security configuration using the
 		given configuration values.
 
 		:param str permissions_val: the value for the PERMISSION_SECURITY
 		                            setting. e.g. "easy local"
+		:param str fscaps_val: the value for the PERMISSIONS_FSCAPS
+		                            setting. e.g. yes/no
 		"""
 
-		permissions_key = "PERMISSION_SECURITY"
-
-		if '"' in permissions_val:
-			raise Exception("{} must not contain quotes".format(
-				permissions_key
-			))
+		items = {
+			"PERMISSION_SECURITY": permissions_val,
+			"PERMISSION_FSCAPS": fscaps_val
+		}
 
 		with open(self.m_sysconfig_security, 'w') as sec_file:
-			sec_file.write("{}=\"{}\"\n".format(
-				permissions_key,
-				permissions_val
-			))
+
+			for key, val in items.items():
+				if not val:
+					val = ""
+				elif '"' in val:
+					raise Exception("{} must not contain quotes".format(
+						key
+					))
+
+				sec_file.write("{}=\"{}\"\n".format(key, val))
 
 	def switchSystemProfile(self, profile):
 		print("Switching to", profile if profile else "(empty)", "system permissions profile")
