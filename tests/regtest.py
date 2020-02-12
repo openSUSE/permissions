@@ -306,6 +306,14 @@ class TestBase:
 			return self.m_permissions_base
 		return '.'.join((self.m_permissions_base, profile))
 
+	def getPackageProfilePath(self, package, profile):
+		base = os.path.sep.join((self.m_permissions_dir, package))
+
+		if not profile:
+			return base
+
+		return '.'.join((base, profile))
+
 	def getName(self):
 		return self.m_test_name
 
@@ -372,6 +380,16 @@ class TestBase:
 		for profile, lines in entries.items():
 
 			with open(self.getProfilePath(profile), 'a') as profile_file:
+				for line in lines:
+					profile_file.write(line + "\n")
+
+	def addPackageProfileEntries(self, package, entries):
+		"""Just like addProfileEntries, but for a specific package in
+		permissions.d."""
+
+		for profile, lines in entries.items():
+
+			with open(self.getPackageProfilePath(package, profile), 'a') as profile_file:
 				for line in lines:
 					profile_file.write(line + "\n")
 
