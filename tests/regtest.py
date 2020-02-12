@@ -525,8 +525,117 @@ class TestCorrectMode(TestBase):
 
 			print()
 
+class TestBasePermissions(TestBase):
+
+	def __init__(self):
+		super().__init__("TestBasePermissions", "checks whether entries in /etc/permissions correctly apply")
+
+	def run(self):
+
+		testdir = self.createAndGetTestDir(0o770)
+		testfile = os.path.sep.join( (testdir, "testfile") )
+		testpaths = (testdir, testfile)
+		self.createTestFile(testfile, 0o440)
+
+		modes = {
+			testfile: 0o444,
+			testdir: 0o777
+		}
+
+		lines = [ self.buildProfileLine(path, mode) for path, mode in modes.items() ]
+
+		self.addProfileEntries({
+			# an empty string will operate on the base permissions
+			# file
+			"": lines
+		})
+
+		# the mode should be the same for all profiles
+		for profile in self.m_profiles:
+			for p in testpaths:
+				self.printMode(p)
+
+			self.switchSystemProfile(profile)
+			self.applySystemProfile()
+
+			for path, mode in modes.items():
+				self.assertMode(path, mode)
+				# change the mode to something else so we can
+				# check that chkstat is always restoring the
+				# correct mode, independent of the active
+				# profile
+				os.chmod(path, mode & 0o111)
+
+		print()
+
+class TestPackagePermissions(TestBase):
+
+	def __init__(self):
+		super().__init__("TestPackagePermissions", "checks whether package entries in /etc/permissions.d correctly apply")
+
+	def run(self):
+
+		# for permissions.d the basename of a file and the
+		# basename.$profile, where $profile is the currently active
+		# profile, should be applied.
+		testdir = self.createAndGetTestDir(0o770)
+		testfile = os.path.sep.join( (testdir, "testfile") )
+		# this file should only be determined by the basename entry
+		basefile = os.path.sep.join( (testdir, "basefile") )
+		testpaths = (testdir, testfile, basefile)
+		self.createTestFile(testfile, 0o440)
+		self.createTestFile(basefile, 0o664)
+		package = "testpackage"
+
+		modes = {
+			"": (0o700, 0o400),
+			"easy": (0o775, 0o664),
+			"secure": (0o770, 0o660),
+			"paranoid": (0o700, 0o600)
+		}
+		# mode for basefile
+		basemode = 0o640
+
+		entries = {}
+
+		for profile, perms in modes.items():
+			lines = entries.setdefault(profile, [])
+			for path, mode in ( (testdir, perms[0]), (testfile, perms[1]) ):
+				lines.append( self.buildProfileLine(path, mode) )
+
+			if profile == "":
+				lines.append( self.buildProfileLine(basefile, basemode) )
+
+		self.addPackageProfileEntries(package, entries)
+
+		for profile, entries in entries.items():
+
+			for p in testpaths:
+				self.printMode(p)
+
+			# for the "empty" profile we need to choose some
+			# non-existing one, otherwise chkstat falls back to
+			# "secure"
+			self.switchSystemProfile(profile if profile else "fake")
+			self.applySystemProfile()
+
+			# for the basefile the mode should always be basemode
+			# independently of the active profile
+			for path, mode in zip(testpaths, modes[profile] + (basemode,)):
+				self.assertMode(path, mode)
+
+			# change mode for the basefile to check whether it's
+			# actually restored independently of the active
+			# profile
+			os.chmod(basefile, 0o444)
+
+			print()
+
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
+		TestBasePermissions,
+		TestPackagePermissions
 	))
 sys.exit(res)
