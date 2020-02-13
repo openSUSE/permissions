@@ -14,6 +14,7 @@ import traceback
 import pwd
 import grp
 import stat
+import errno
 
 # the basic test concept is as follows:
 #
@@ -1000,6 +1001,116 @@ class TestFilesSwitch(TestCommandLineBase):
 
 			print()
 
+class TestCapabilities(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestCapabilities", "checks whether capability settings and related command line options works")
+
+	def run(self):
+
+		testfile = "/caps_test"
+		self.createTestFile(testfile, 0o755)
+
+		# just test a single profile in this case, we just want to see
+		# whether caps work at all
+		profile = "easy"
+		mode = 0o750
+		caps = ["cap_net_admin", "cap_net_raw=ep"]
+
+		entries = {
+			profile: [ self.buildProfileLine(testfile, mode, caps = caps) ]
+		}
+
+		self.addProfileEntries(entries)
+
+		self.switchSystemProfile(profile)
+		# by default caps should be set, if in the sysconfig
+		# configuration not value is set (but the variable still needs
+		# to be there).
+		self.applySystemProfile()
+
+		self.assertHasCaps(testfile, caps)
+
+		os.unlink(testfile)
+		self.createTestFile(testfile, 0o755)
+		self.applySystemProfile(["--no-fscaps"])
+
+		# this time there should be no extended attribute at all
+		self.assertNoCaps(testfile)
+
+	def assertNoCaps(self, path):
+
+		try:
+			caps = os.getxattr(path, "security.capability")
+			self.printError(path, "has capabilities despite --no-fscaps")
+		except OSError as e:
+			if e.errno != errno.ENODATA:
+				raise
+
+	def assertAnyCaps(self, path):
+		# the returned data is binary data, don't want to parse that
+		# stuff here. using libc wrappers for libcap[-ng] might be
+		# another approach for not having to rely on `getcap`
+
+		try:
+			caps = os.getxattr(path, "security.capability")
+			if not caps:
+				return
+		except OSError as e:
+			if e.errno != errno.ENODATA:
+				raise
+
+		# either `not caps` or ENODATA
+		self.printError(path, "doesn't have capabilities despite expectations!")
+
+	def assertHasCaps(self, path, caps):
+
+		getcap = shutil.which("getcap")
+
+		if not getcap:
+			self.printWarning(
+				"Couldn't find `getcap` utility, can't fully check capability values"
+			)
+
+			# attempt some best effort logic, just checking
+			# whether any capability is set at all.
+			self.assertAnyCaps(path)
+			return
+
+		getcap_out = subprocess.check_output(
+			[ getcap, "-v", path ],
+			close_fds = True,
+			shell = False,
+		)
+
+		# getcap uses a '+' to indicate capability types, while
+		# permissions uses '=', so adjust accordingly
+		expected_caps = ','.join(caps).replace('=', '+')
+		actual_caps = ""
+
+		# output is something like "/path/to/file = cap_stuff+letters"
+		for line in getcap_out.decode('utf8').splitlines():
+			# be prudent about possible spaces or equals in paths,
+			# even though it should never occur in our test
+			# environment
+			parts = line.split('=')
+			if len(parts) < 2:
+				continue
+
+			cap_path = '='.join(parts[:-1]).strip()
+			if cap_path != path:
+				# not for our file
+				continue
+
+			actual_caps = parts[-1].strip()
+			break
+
+		if actual_caps != expected_caps:
+			self.printError(path, "doesn't have expected capabilities '{}' but '{}' instead".format(
+				expected_caps, actual_caps
+			))
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1011,6 +1122,7 @@ res = test.run((
 		TestWarnMode,
 		TestExamineSwitch,
 		TestRootSwitch,
-		TestFilesSwitch
+		TestFilesSwitch,
+		TestCapabilities
 	))
 sys.exit(res)
