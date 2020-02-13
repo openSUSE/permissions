@@ -245,6 +245,7 @@ class ChkstatRegtest:
 
 		tests_run = 0
 		tests_failed = 0
+		tests_warned = 0
 
 		for Test in tests:
 
@@ -260,10 +261,17 @@ class ChkstatRegtest:
 			test.prepare()
 			try:
 				test.run()
+				test.postrun()
 				failed = test.getResult() != 0
 			except Exception as e:
 				self.printException(e)
 				failed = True
+
+			if test.getNumErrors() != 0:
+				print(test.getName(), "encountered", test.getNumErrors(), "errors")
+			if test.getNumWarnings() != 0:
+				tests_warned += 1
+				print(test.getName(), "encountered", test.getNumWarnings(), "warnings")
 
 			if failed:
 				tests_failed += 1
@@ -274,9 +282,11 @@ class ChkstatRegtest:
 
 		if self.m_args.test and tests_run == 0:
 			print("No such test", self.m_args.test)
+			tests_failed += 1
 
 		print(str(tests_run).rjust(2), "tests run")
 		print(str(tests_failed).rjust(2), "tests failed")
+		print(str(tests_warned).rjust(2), "tests had warnings")
 
 		if tests_failed != 0:
 			return 1
@@ -300,6 +310,8 @@ class TestBase:
 		self.m_test_name = name
 		self.m_test_desc = desc
 		self.m_result = 0
+		self.m_warnings = 0
+		self.m_errors = 0
 
 	def getProfilePath(self, profile):
 		if not profile:
@@ -323,6 +335,12 @@ class TestBase:
 	def setResult(self, code):
 		self.m_result = code
 
+	def getNumErrors(self):
+		return self.m_errors
+
+	def getNumWarnings(self):
+		return self.m_warnings
+
 	def createAndGetTestDir(self, mode):
 		d = "/{}".format(self.getName())
 		os.mkdir(d, mode)
@@ -343,6 +361,11 @@ class TestBase:
 			self.global_init_performed = True
 
 		self.resetConfigs()
+
+	def postrun(self):
+
+		if self.m_errors != 0:
+			self.setResult(1)
 
 	def resetConfigs(self):
 
@@ -458,6 +481,12 @@ class TestBase:
 	def printError(self, *args, **kwargs):
 
 		print("FAILURE:", *args, **kwargs)
+		self.m_errors += 1
+
+	def printWarning(self, *args, **kwargs):
+
+		print("WARNING:", *args, **kwargs)
+		self.m_warnings += 1
 
 	def assertMode(self, path, expected):
 		s = os.stat(path)
@@ -467,7 +496,9 @@ class TestBase:
 			self.printError("{}: expected mode {} but encountered mode {}".format(
 				path, str(oct(expected)), str(oct(actual))
 			))
-			self.setResult(1)
+			return False
+
+		return True
 
 	def callChkstat(self, args):
 
