@@ -122,9 +122,6 @@
 # mtr is linked against ncurses. For dialout only.
 /usr/sbin/mtr                                           root:dialout      0750
  +capabilities cap_net_raw=ep
-/usr/bin/rcp                                            root:root         4755
-/usr/bin/rlogin                                         root:root         4755
-/usr/bin/rsh                                            root:root         4755
 
 # exim
 /usr/sbin/exim                                          root:root         4755
