@@ -573,9 +573,12 @@ class TestBase:
 		color_printer.reset()
 		self.m_warnings += 1
 
-	def assertMode(self, path, expected):
+	def getMode(self, path):
 		s = os.stat(path)
-		actual = self.extractPerms(s)
+		return self.extractPerms(s)
+
+	def assertMode(self, path, expected):
+		actual = self.getMode(path)
 
 		if actual != expected:
 			self.printError("{}: expected mode {} but encountered mode {}".format(
@@ -1208,6 +1211,88 @@ class TestCapabilities(TestBase):
 				expected_caps, actual_caps
 			))
 
+class TestUnexpectedPathOwner(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestUnexpectedPathOwner", "checks whether changes are rejected when parent dir owner and target path owner don't match")
+
+	def run(self):
+
+		testdir = self.createAndGetTestDir(0o755)
+		baddir = os.path.join( testdir, "dir" )
+		badfile = os.path.join( testdir, "file" )
+
+		self.createTestFile(badfile, 0o644)
+		self.createTestDir(baddir, 0o755)
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				# add a trailing slash to express that we want
+				# a directory here
+				self.buildProfileLine(baddir + "/", 0o500),
+				self.buildProfileLine(badfile, 0o600)
+			)
+		}
+
+		self.addProfileEntries(entries)
+		# for creating the mixed ownership we need to resort to bind
+		# mounts, since we're not really root and can't chown()
+		self.m_main_test_instance.bindMount("/bin/bash", badfile)
+		self.m_main_test_instance.bindMount("/usr/bin", baddir)
+		orig_file_mode = self.getMode(badfile)
+		orig_dir_mode = self.getMode(baddir)
+
+		try:
+			self.switchSystemProfile(testprofile)
+			code, lines = self.applySystemProfile()
+			# make sure modes actually didn't change
+			# before bind mounts are removed
+			self.assertMode(badfile, orig_file_mode)
+			self.assertMode(baddir, orig_dir_mode)
+		finally:
+			self.m_main_test_instance.unmount(badfile)
+			self.m_main_test_instance.unmount(baddir)
+
+		found_dir_reject = False
+		found_file_reject = False
+
+		# we can't evaluate the exit code in this case, even if the
+		# modes aren't corrected chkstat returns 0.
+		#
+		# instead parse chkstat's output to determine it correctly
+		# refused to do anything
+		for line in lines:
+			if not line.startswith(baddir) and not line.startswith(badfile):
+				continue
+
+			parts = line.split(':', 1)
+			if len(parts) != 2:
+				# bogus line?
+				continue
+
+			message = parts[1]
+
+			if message.find("unexpected owner") == -1:
+				# not the error message we expect
+				continue
+
+			if line.find(baddir) != -1:
+				found_dir_reject = True
+			elif line.find(badfile) != -1:
+				found_file_reject = True
+
+		print(baddir, "rejected =", found_dir_reject)
+		print(badfile, "rejected =", found_file_reject)
+
+		if found_dir_reject and found_file_reject:
+			# all fine
+			return
+
+		self.printError("bad directory and/or bad file were not rejected")
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1220,6 +1305,7 @@ res = test.run((
 		TestExamineSwitch,
 		TestRootSwitch,
 		TestFilesSwitch,
-		TestCapabilities
+		TestCapabilities,
+		TestUnexpectedPathOwner
 	))
 sys.exit(res)
