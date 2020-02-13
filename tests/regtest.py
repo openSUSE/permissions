@@ -629,6 +629,44 @@ class TestBase:
 
 		return proc.wait(), ret
 
+	def extractMessagesFromChkstat(self, output, paths):
+		"""output is a list of lines as returned from callChkstat(),
+		paths is a list of paths for which diagnostic/error messages
+		should be extracted from the output.
+
+		Returns a dictionary:
+
+		{
+		"path1": [ "diagnostic1", "diagnostic2", ... ],
+		...
+		}
+		"""
+
+		if isinstance(paths, str):
+			paths = [ paths ]
+
+		ret = dict( [ (p, []) for p in paths ] )
+
+		for line in output:
+
+			for path in paths:
+
+				if not line.startswith(path):
+					continue
+
+				parts = line.split(':', 1)
+
+				if len(parts) != 2:
+					# something else then
+					continue
+
+				message = parts[1]
+
+				ret[path].append(message)
+				break
+
+		return ret
+
 class TestCorrectMode(TestBase):
 
 	def __init__(self):
@@ -1264,25 +1302,17 @@ class TestUnexpectedPathOwner(TestBase):
 		#
 		# instead parse chkstat's output to determine it correctly
 		# refused to do anything
-		for line in lines:
-			if not line.startswith(baddir) and not line.startswith(badfile):
-				continue
+		messages = self.extractMessagesFromChkstat(lines, [baddir, badfile])
+		needle = "unexpected owner"
 
-			parts = line.split(':', 1)
-			if len(parts) != 2:
-				# bogus line?
-				continue
-
-			message = parts[1]
-
-			if message.find("unexpected owner") == -1:
-				# not the error message we expect
-				continue
-
-			if line.find(baddir) != -1:
+		for message in messages[baddir]:
+			if message.find(needle) != -1:
 				found_dir_reject = True
-			elif line.find(badfile) != -1:
+				break
+		for message in messages[badfile]:
+			if message.find(needle) != -1:
 				found_file_reject = True
+				break
 
 		print(baddir, "rejected =", found_dir_reject)
 		print(badfile, "rejected =", found_file_reject)
@@ -1292,6 +1322,50 @@ class TestUnexpectedPathOwner(TestBase):
 			return
 
 		self.printError("bad directory and/or bad file were not rejected")
+
+class TestRejectWorldWritable(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestRejectWorldWritable", "checks that world-writable target files aren't touched")
+
+	def run(self):
+
+		testdir = self.createAndGetTestDir(0o755)
+		badfile = os.path.join( testdir, "file" )
+
+		self.createTestFile(badfile, 0o666)
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(badfile, 0o640),
+			)
+		}
+
+		self.addProfileEntries(entries)
+
+		self.switchSystemProfile(testprofile)
+		code, lines = self.applySystemProfile()
+
+		# like in the other cases, don't check the exit code, rely on
+		# output parsing
+		messages = self.extractMessagesFromChkstat(lines, badfile)
+		needle = "world-writable"
+		found_rejection = False
+
+		for message in messages[badfile]:
+			if message.find(needle) != -1:
+				print("found rejection message")
+				found_rejection = True
+				break
+
+		if not found_rejection:
+			self.printError("world-writable file", badfile, "was not rejected")
+			return
+
+		self.assertMode(badfile, 0o666)
 
 test = ChkstatRegtest()
 res = test.run((
@@ -1306,6 +1380,7 @@ res = test.run((
 		TestRootSwitch,
 		TestFilesSwitch,
 		TestCapabilities,
-		TestUnexpectedPathOwner
+		TestUnexpectedPathOwner,
+		TestRejectWorldWritable
 	))
 sys.exit(res)
