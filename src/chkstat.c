@@ -591,6 +591,8 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
           strcpy(pathbuf + 1, tmp);
           path_rest = pathbuf;
+
+          is_final_path_element = false;
         }
     }
 
