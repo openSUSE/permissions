@@ -1427,6 +1427,64 @@ class TestRejectInsecurePath(TestBase):
 			self.printError("insecure path", testpath, "was not rejected")
 			return
 
+class TestUnknownOwnership(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestUnknownOwnership", "checks whether config entries for unknown user/group are rejected")
+
+	def run(self):
+
+		testroot = self.createAndGetTestDir(0o755)
+		username = "bad_user"
+		groupname = "bad_group"
+		baduser_file = os.path.join( testroot, username )
+		badgroup_file = os.path.join( testroot, groupname )
+		self.createTestFile(baduser_file, 0o400)
+		self.createTestFile(badgroup_file, 0o400)
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(baduser_file, 0o500, owner = username),
+				self.buildProfileLine(badgroup_file, 0o600, group = groupname)
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		code, lines = self.applySystemProfile()
+
+		messages = self.extractMessagesFromChkstat(lines, (baduser_file, badgroup_file))
+
+		found_baduser_report = False
+		baduser_needle = "unknown user {}".format(username)
+
+		for message in messages[baduser_file]:
+			if message.find(baduser_needle) != -1:
+				found_baduser_report = True
+				break
+
+		found_badgroup_report = False
+		badgroup_needle = "unknown group {}".format(groupname)
+
+		for message in messages[badgroup_file]:
+			if message.find(badgroup_needle) != -1:
+				found_badgroup_report = True
+				break
+
+		print(baduser_file, "rejected =", found_baduser_report)
+		print(badgroup_file, "rejected =", found_badgroup_report)
+
+		if not found_baduser_report or not found_badgroup_report:
+			self.printError("bad user and/or group were not rejected")
+			return
+
+		# make sure the mode really didn't change
+		self.assertMode(baduser_file, 0o400)
+		self.assertMode(badgroup_file, 0o400)
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1442,6 +1500,7 @@ res = test.run((
 		TestCapabilities,
 		TestUnexpectedPathOwner,
 		TestRejectWorldWritable,
-		TestRejectInsecurePath
+		TestRejectInsecurePath,
+		TestUnknownOwnership
 	))
 sys.exit(res)
