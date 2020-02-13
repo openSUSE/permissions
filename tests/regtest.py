@@ -3,18 +3,18 @@
 # sorry, I'm a Python PEP outlaw
 # vim: ts=8 noet sw=8 sts=8 :
 
-import os
-import sys
-import subprocess
-import shutil
 import argparse
-import glob
-import io
-import traceback
-import pwd
-import grp
-import stat
 import errno
+import glob
+import grp
+import io
+import os
+import pwd
+import shutil
+import stat
+import subprocess
+import sys
+import traceback
 
 # the basic test concept is as follows:
 #
@@ -37,6 +37,8 @@ import errno
 #
 # the downside is that we need to construct a fake root file system from what
 # we have on the host. This is what the ChkstatRegtest class is caring for.
+# Another downside is that we cannot chown() or chgrp() to any other group
+# than root (our fake root in the user namespace).
 #
 # for being able to inspect what is going on within the fake root if things go
 # bad you can use the `--enter-fakeroot` or `--on-error-enter-shell` options.
@@ -46,7 +48,10 @@ import errno
 # directory up, once the test terminates the mount namespace along with its
 # tmpfs mounts will be destroyed.
 
+
 class ChkstatRegtest:
+	"""The main test execution class. It sets up the fake root using
+	namespaces and runs each individual test case."""
 
 	def __init__(self):
 
