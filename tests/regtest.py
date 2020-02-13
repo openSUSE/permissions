@@ -1367,6 +1367,66 @@ class TestRejectWorldWritable(TestBase):
 
 		self.assertMode(badfile, 0o666)
 
+class TestRejectInsecurePath(TestBase):
+
+	def __init__(self):
+		super().__init__("TestRejectInsecurePath", "checks whether paths with insecure inter-mediate ownership are rejected")
+
+	def run(self):
+
+		# to construct this we need a deeper directory hierarchy
+		# constructed via bind-mounts, since we can't directly chown()
+		# anything
+
+		bind_mountpoints = []
+		testroot = self.createAndGetTestDir(0o755)
+		testpath = os.path.join( testroot, "middle" )
+		self.createTestDir( testpath, 0o755)
+		# this will make the path seemingly owned by "nobody"
+		self.m_main_test_instance.bindMount("/usr/share", testpath)
+		bind_mountpoints.append(testpath)
+		# now get our own tmp directory into the game again, seemingly
+		# owned by "root"
+		testpath = os.path.join( testpath, "man" )
+		self.m_main_test_instance.bindMount("/tmp", testpath)
+		bind_mountpoints.append(testpath)
+		testpath = os.path.join( testpath, "somefile" )
+		self.createTestFile( testpath, 0o644 )
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(testpath, 0o400),
+			)
+		}
+
+		try:
+			self.addProfileEntries(entries)
+			self.switchSystemProfile(testprofile)
+			code, lines = self.applySystemProfile()
+			# make sure the mode really didn't change, before bind
+			# mounts are removed again
+			self.assertMode(testpath, 0o644)
+		finally:
+			bind_mountpoints.reverse()
+			for mp in bind_mountpoints:
+				self.m_main_test_instance.unmount(mp)
+
+		messages = self.extractMessagesFromChkstat(lines, testpath)
+		needle = "on an insecure path"
+		found_rejection = False
+
+		for message in messages[testpath]:
+			if message.find(needle) != -1:
+				found_rejection = True
+				print("found rejection message")
+				break
+
+		if not found_rejection:
+			self.printError("insecure path", testpath, "was not rejected")
+			return
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1381,6 +1441,7 @@ res = test.run((
 		TestFilesSwitch,
 		TestCapabilities,
 		TestUnexpectedPathOwner,
-		TestRejectWorldWritable
+		TestRejectWorldWritable,
+		TestRejectInsecurePath
 	))
 sys.exit(res)
