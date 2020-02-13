@@ -175,6 +175,13 @@ class ChkstatRegtest:
 			shell = False
 		)
 
+	def unmount(self, mountpoint):
+		subprocess.check_call(
+			[ "umount", "-R", mountpoint ],
+			close_fds = True,
+			shell = False
+		)
+
 	def setupFakeRoot(self):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
@@ -301,6 +308,7 @@ class ChkstatRegtest:
 		for Test in tests:
 
 			test = Test()
+			test.setMainTestInstance(self)
 
 			if self.m_args.test and test.getName() != self.m_args.test:
 				continue
@@ -375,6 +383,10 @@ class TestBase:
 		self.m_result = 0
 		self.m_warnings = 0
 		self.m_errors = 0
+		self.m_main_test_instance = None
+
+	def setMainTestInstance(self, instance):
+		self.m_main_test_instance = instance
 
 	def getProfilePath(self, profile):
 		if not profile:
@@ -406,12 +418,18 @@ class TestBase:
 
 	def createAndGetTestDir(self, mode):
 		d = "/{}".format(self.getName())
-		os.mkdir(d, mode)
+		self.createTestDir(d, mode)
 		return d
 
 	def createTestFile(self, path, mode):
 		with open(path, 'w') as _file:
 			os.fchmod(_file.fileno(), mode)
+
+	def createTestDir(self, path, mode):
+		os.mkdir(path, mode)
+		# perform an explicit chown() to get umask calculations out of
+		# the way
+		os.chmod(path, mode)
 
 	def getDescription(self):
 		return self.m_test_desc
@@ -525,7 +543,7 @@ class TestBase:
 	def applySystemProfile(self, extra_args = []):
 		print("Applying current system profile using chkstat")
 		args = ["--system"] + extra_args
-		self.callChkstat(args)
+		return self.callChkstat(args)
 
 	def extractPerms(self, s):
 		return s.st_mode & ~(stat.S_IFMT(s.st_mode))
@@ -568,6 +586,14 @@ class TestBase:
 		return True
 
 	def callChkstat(self, args):
+		"""Calls chkstat passing the given command line arguments. The
+		function will capture chkstat's stdout and stderr via a pipe
+		and then print the output on the terminal in a marked up
+		fashion.
+
+		The function will return a tuple of (exit_code, list of
+		output lines).
+		"""
 
 		if isinstance(args, str):
 			args = [args]
@@ -584,6 +610,8 @@ class TestBase:
 			stderr = subprocess.STDOUT
 		)
 
+		ret = []
+
 		color_printer.setCyan()
 		while True:
 			line = proc.stdout.readline()
@@ -591,11 +619,12 @@ class TestBase:
 				break
 
 			line = line.decode('utf8')
+			ret.append(line)
 
 			print('> {}'.format(line), end = '')
 		color_printer.reset()
 
-		return proc.wait()
+		return proc.wait(), ret
 
 class TestCorrectMode(TestBase):
 
