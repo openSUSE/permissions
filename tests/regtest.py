@@ -48,6 +48,49 @@ import traceback
 # directory up, once the test terminates the mount namespace along with its
 # tmpfs mounts will be destroyed.
 
+class ColorPrinter:
+	"""Poor peoples' ANSI color escape sequences handling. I want to avoid
+	third-party dependencies as much as possible, but some basic color
+	output is really helpful when running a larger test suite. Therefore
+	this class handles only the very basics in color output we need."""
+
+	def __init__(self):
+
+		self.m_use_colors = os.isatty(sys.stdout.fileno())
+		if not self.m_use_colors and "FORCE_COLOR" in os.environ:
+			# allow override via environment, for example when run
+			# in Jenkins with ANSI color plugin support.
+			self.m_use_colors = True
+
+	def flush(self):
+		sys.stdout.flush()
+
+	def reset(self):
+		if self.m_use_colors:
+			print(u"\u001b[0m", end = '')
+
+	def setRed(self):
+		if self.m_use_colors:
+			print(u"\u001b[31m", end = '')
+
+	def setYellow(self):
+		if self.m_use_colors:
+			print(u"\u001b[33m", end = '')
+
+	def setGreen(self):
+		if self.m_use_colors:
+			print(u"\u001b[32m", end = '')
+
+	def setCyan(self):
+		if self.m_use_colors:
+			print(u"\u001b[36m", end = '')
+
+	def setMagenta(self):
+		if self.m_use_colors:
+			print(u"\u001b[35m", end = '')
+
+color_printer = ColorPrinter()
+
 
 class ChkstatRegtest:
 	"""The main test execution class. It sets up the fake root using
@@ -221,8 +264,10 @@ class ChkstatRegtest:
 		print(*args, **kwargs)
 
 		text = stream.getvalue()
+		color_printer.setMagenta()
 		print(text, end = '')
 		print('-' * (len(text) - 1))
+		color_printer.reset()
 
 	def printException(self, e):
 		_, _, tb = sys.exc_info()
@@ -274,14 +319,20 @@ class ChkstatRegtest:
 				failed = True
 
 			if test.getNumErrors() != 0:
+				color_printer.setRed()
 				print(test.getName(), "encountered", test.getNumErrors(), "errors")
 			if test.getNumWarnings() != 0:
+				color_printer.setYellow()
 				tests_warned += 1
 				print(test.getName(), "encountered", test.getNumWarnings(), "warnings")
 
+			color_printer.reset()
+
 			if failed:
 				tests_failed += 1
+				color_printer.setRed()
 				print("Test FAILED")
+				color_printer.reset()
 				if self.m_args.on_error_enter_shell:
 					print("Entering shell after failed test")
 					self.enterShell()
@@ -290,9 +341,15 @@ class ChkstatRegtest:
 			print("No such test", self.m_args.test)
 			tests_failed += 1
 
+		print("\n")
 		print(str(tests_run).rjust(2), "tests run")
+		color_printer.setGreen()
+		print(str(tests_run - tests_failed).rjust(2), "tests succeeded")
+		color_printer.setRed()
 		print(str(tests_failed).rjust(2), "tests failed")
+		color_printer.setYellow()
 		print(str(tests_warned).rjust(2), "tests had warnings")
+		color_printer.reset()
 
 		if tests_failed != 0:
 			return 1
@@ -486,12 +543,16 @@ class TestBase:
 
 	def printError(self, *args, **kwargs):
 
+		color_printer.setRed()
 		print("FAILURE:", *args, **kwargs)
+		color_printer.reset()
 		self.m_errors += 1
 
 	def printWarning(self, *args, **kwargs):
 
+		color_printer.setYellow()
 		print("WARNING:", *args, **kwargs)
+		color_printer.reset()
 		self.m_warnings += 1
 
 	def assertMode(self, path, expected):
@@ -523,6 +584,7 @@ class TestBase:
 			stderr = subprocess.STDOUT
 		)
 
+		color_printer.setCyan()
 		while True:
 			line = proc.stdout.readline()
 			if not line:
@@ -531,6 +593,7 @@ class TestBase:
 			line = line.decode('utf8')
 
 			print('> {}'.format(line), end = '')
+		color_printer.reset()
 
 		return proc.wait()
 
