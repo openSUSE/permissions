@@ -14,6 +14,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
 import traceback
 
 # the basic test concept is as follows:
@@ -38,7 +39,10 @@ import traceback
 # the downside is that we need to construct a fake root file system from what
 # we have on the host. This is what the ChkstatRegtest class is caring for.
 # Another downside is that we cannot chown() or chgrp() to any other group
-# than root (our fake root in the user namespace).
+# than root (our fake root in the user namespace). Actually: It is possible
+# when sub-uids and sub-gids are correctly configured in the host system.
+# This, sadly, isn't a given, therefore I'm adding some optional tests that
+# only run if the support is available.
 #
 # for being able to inspect what is going on within the fake root if things go
 # bad you can use the `--enter-fakeroot` or `--on-error-enter-shell` options.
@@ -96,6 +100,13 @@ class ChkstatRegtest:
 	"""The main test execution class. It sets up the fake root using
 	namespaces and runs each individual test case."""
 
+	# a couple of environment variable used to communicate namespace setup
+	# details to child instances of ourselves
+	REEXEC_ENV_MARKER = "CHKSTAT_REGTEST_REEXEC"
+	WAIT_FOR_SUBID_MAP_ENV_MARKER = "CHKSTAT_WAIT_FOR_SUBID_MAP"
+	SUB_UID_RANGE_ENV_VAR = "CHKSTAT_SUB_UID_RANGE"
+	SUB_GID_RANGE_ENV_VAR = "CHKSTAT_SUB_GID_RANGE"
+
 	def __init__(self):
 
 		self.setupArgParser()
@@ -107,6 +118,15 @@ class ChkstatRegtest:
 		if not os.path.exists(self.m_chkstat_bin):
 			print("Couldn't find compiled chkstat binary in", self.m_chkstat_bin, file = sys.stderr)
 			sys.exit(2)
+
+	def printDebug(self, *args, **kwargs):
+
+		if not self.m_args.debug:
+			return
+
+		color_printer.setCyan()
+		print("DEBUG:", *args, **kwargs)
+		color_printer.reset()
 
 	def setupArgParser(self):
 
@@ -134,16 +154,17 @@ class ChkstatRegtest:
 			help = "Instead of all tests tun only the given test. For names see --list-tests."
 		)
 
+		self.m_parser.add_argument(
+			"--debug", action = 'store_true',
+			help = "Add some debugging output regarding the test seuite itself."
+		)
+
 		self.m_args = self.m_parser.parse_args()
 
 	def ensureForkedNamespace(self):
 		"""This function reexecutes the current script in a forked user and
 		mount namespace for faking a root file system and root context for
 		testing chkstat."""
-		reexec_env_marker = "CHKSTAT_REGTEST_REEXEC"
-
-		if reexec_env_marker in os.environ:
-			return
 
 		unshare = shutil.which("unshare")
 
@@ -151,13 +172,224 @@ class ChkstatRegtest:
 			print("Couldn't find the 'unshare' program", file = sys.stderr)
 			sys.exit(1)
 
-		os.environ[reexec_env_marker] = "1"
-		res = subprocess.call(
-			[unshare, "-m", "-U", "-r"] + sys.argv,
+		unshare_cmdline = [unshare, "-m", "-U"]
+
+		self.m_sub_id_supported = self.checkSubIDSupport()
+
+		if self.m_sub_id_supported:
+			# this tells the child process to wait for us to map
+			# the sub*ids before actually doing anything
+			os.environ[self.WAIT_FOR_SUBID_MAP_ENV_MARKER] = "1"
+			# also forward the sub uids and gids to use, to avoid
+			# the child having to parse stuff again
+			os.environ[self.SUB_UID_RANGE_ENV_VAR] = "{}:{}".format(*self.m_sub_uid_range)
+			os.environ[self.SUB_GID_RANGE_ENV_VAR] = "{}:{}".format(*self.m_sub_gid_range)
+		else:
+			# without sub-*id support let unshare map the root
+			# user only
+			unshare_cmdline.append("-r")
+			color_printer.setYellow()
+			print("no user namespace sub-uid/sub-gid support detected:", self.m_sub_id_error)
+			print("won't be able to run certain tests reyling on chown()/chgrp()")
+			color_printer.reset()
+
+		os.environ[self.REEXEC_ENV_MARKER] = "1"
+		unshare_cmdline.extend(sys.argv)
+		self.printDebug("Running child instance:", ' '.join(unshare_cmdline))
+
+		# make sure any terminal codes are written out before the
+		# child starts, to avoid child output in wrong color and
+		# similar
+		color_printer.flush()
+
+		proc = subprocess.Popen(
+			unshare_cmdline,
 			close_fds = True,
 			shell = False
 		)
+
+		if self.m_sub_id_supported:
+			try:
+				self.setupChildSubIdMapping(proc)
+			except Exception as e:
+				color_printer.setRed()
+				print("Failed to setup sub-*id mapping:")
+				self.printException(e)
+				color_printer.reset()
+				print("Killing child")
+				proc.kill()
+
+		res = proc.wait()
 		sys.exit(res)
+
+	def haveSubIdSupport(self):
+		return self.m_sub_id_supported
+
+	def checkSubIDSupport(self):
+		"""Checks whether it's basically possible to employ
+		newuidmap/newgidmap to establish a number of sub-*id for the
+		current user.
+
+		Returns a boolean indicating whether support is available.
+		Also sets a couple of instance member variables containing the
+		sub-id information on success.
+		"""
+		subuid = "/etc/subuid"
+		subgid = "/etc/subgid"
+
+		for f in (subuid, subgid):
+			if not os.path.exists(f):
+				self.m_sub_id_error = "{} is not existing".format(f)
+				return False
+
+		# the setuid-root helpers for sub-*id mappings are also
+		# required
+		self.m_newuidmap = shutil.which("newuidmap")
+		self.m_newgidmap = shutil.which("newgidmap")
+
+		if not self.m_newuidmap or not self.m_newgidmap:
+			self.m_sub_id_error = "{} or {} command(s) not existing".format(self.m_newuidmap, self.m_newgidmap)
+			return False
+
+		# finally we need an entry for the current user and group in
+		# both files
+		our_uid = os.getuid()
+		our_user = pwd.getpwuid(our_uid).pw_name
+
+		sub_uid_ranges = self.collectSubIDRanges(subuid, our_uid, our_user)
+		sub_gid_ranges = self.collectSubIDRanges(subgid, our_uid, our_user)
+
+		if not sub_uid_ranges or not sub_gid_ranges:
+			self.m_sub_id_error = "no sub-uid and/or sub-gid range configured for uid {} / username {}".format(our_uid, our_user)
+			return False
+		elif len(sub_uid_ranges) > 1 or len(sub_gid_ranges) > 1:
+			self.m_sub_id_error = "more than one sub-uid/sub-gid entry for this account. Can't decide which one to use. Found uid ranges: {}, gid ranges: {}".format(sub_uid_ranges, sub_gid_ranges)
+			return False
+
+		self.m_sub_uid_range = sub_uid_ranges[0]
+		self.m_sub_gid_range = sub_gid_ranges[0]
+
+		return True
+
+	def collectSubIDRanges(self, config, number, name):
+
+		ret = []
+
+		with open(config, 'r') as config_fd:
+			for line in config_fd.readlines():
+				parts = line.strip().split(':')
+				if len(parts) != 3:
+					# bad line?
+					continue
+
+				who, start_id, amount = parts
+
+				if who != number and who != name:
+					continue
+
+				ret.append( (start_id, amount) )
+
+		return ret
+
+	def setupChildSubIdMapping(self, child):
+		"""For sub*id support this function applies the sub*id uid and
+		gid mapping to the already running child process that
+		currently lives in a usernamespace without any users
+		mapped."""
+
+		for helper, main_id, sub_ids in (
+			(self.m_newuidmap, os.getuid(), self.m_sub_uid_range),
+			(self.m_newgidmap, os.getgid(), self.m_sub_gid_range)
+		):
+			helper_cmdline = [
+				helper, str(child.pid),
+				# this line maps the current user/group to the
+				# root user/group.  this setting is implicitly
+				# allowed by new(u/g)idmap, without being
+				# configured in /etc/sub(u/g)id.
+				"0", str(main_id), "1",
+				# this maps the sub-ids starting from USER_NS
+				# (u/g) id 1 within the namespace. So all the
+				# system users and maybe more will be mapped.
+				"1", sub_ids[0], sub_ids[1]
+			]
+
+			self.printDebug("Running sub-uid helper:", ' '.join(helper_cmdline))
+
+			subprocess.check_call(
+				helper_cmdline,
+				close_fds = True,
+				shell = False
+			)
+
+	def handleNamespaceChildContext(self):
+		"""This function deals with any re-executed child instance of
+		the test program. It handles details regarding sub*id mapping
+		in the user namespace."""
+
+		if self.WAIT_FOR_SUBID_MAP_ENV_MARKER in os.environ:
+			# we already re-executed once, but need to wait
+			# for the user sub*id mapping by the parent
+			self.waitForSubIdMapping()
+			# even more complexity here: the capabilities will not
+			# be adjusted by the kernel right when uid_map is
+			# written, but we have to once again execve() to
+			# obtain the capabilities.
+			#
+			# thus once more re-execute ourselves. To avoid having
+			# a long process tree employ os.execve directly here,
+			# instead of subprocess
+			#
+			# clean up the environment to prevent another
+			# waitForSubIdMapping()
+			self.printDebug("Re-executing child to gain capabilities")
+			color_printer.flush()
+			os.environ.pop(self.WAIT_FOR_SUBID_MAP_ENV_MARKER)
+			os.execve(sys.argv[0], sys.argv, os.environ)
+			raise Exception("should never happen")
+
+		# in this case we either have no sub-*id support at all, or
+		# have re-executed twice, now owning capabilities and a range
+		# of sub-*ids to play with
+
+		try:
+			uid_range = os.environ.pop(self.SUB_UID_RANGE_ENV_VAR)
+		except KeyError:
+			uid_range = None
+
+		try:
+			gid_range = os.environ.pop(self.SUB_GID_RANGE_ENV_VAR)
+		except KeyError:
+			gid_range = None
+
+		self.m_sub_id_supported = uid_range != None and gid_range != None
+
+		if not self.m_sub_id_supported:
+			self.printDebug("no sub*-id support detected")
+			return
+
+		self.m_sub_uid_range = uid_range.split(':')
+		self.m_sub_gid_range = gid_range.split(':')
+		self.printDebug("Detected sub*-id support, uid range = {}, gid range = {}".format(uid_range, gid_range))
+
+	def waitForSubIdMapping(self):
+		"""In the context of the child process already running within
+		a user namespace, this function waits for the parent to apply
+		an actual uid and gid mapping so we can continue executing
+		with user namespace privileges."""
+
+		self.printDebug("Child is waiting for sub-id mapping")
+		sys.stdout.flush()
+
+		# get*id() actually suddenly changes once the uid/gid map is
+		# written by the parent. So lets just poll for that.
+		#
+		# an alternative would be some kind of IPC (e.g. signals) from
+		# the parent. However, since Python is quite fat, it seems
+		# like before the new child process hits this spot, the *id
+		# mapping is already there anyways.
+		while os.getuid() != 0 or os.getgid() != 0:
+			time.sleep(0.1)
 
 	def mountTmpFS(self, path):
 		subprocess.check_call(
@@ -293,7 +525,12 @@ class ChkstatRegtest:
 				))
 			sys.exit(0)
 
-		self.ensureForkedNamespace()
+		if self.REEXEC_ENV_MARKER in os.environ:
+			self.handleNamespaceChildContext()
+		else:
+			self.ensureForkedNamespace()
+			return
+
 		self.setupFakeRoot()
 
 		if self.m_args.enter_fakeroot:
@@ -1278,6 +1515,7 @@ class TestUnexpectedPathOwner(TestBase):
 		self.addProfileEntries(entries)
 		# for creating the mixed ownership we need to resort to bind
 		# mounts, since we're not really root and can't chown()
+		# (at least not without sub*id support)
 		self.m_main_test_instance.bindMount("/bin/bash", badfile)
 		self.m_main_test_instance.bindMount("/usr/bin", baddir)
 		orig_file_mode = self.getMode(badfile)
@@ -1376,7 +1614,7 @@ class TestRejectInsecurePath(TestBase):
 
 		# to construct this we need a deeper directory hierarchy
 		# constructed via bind-mounts, since we can't directly chown()
-		# anything
+		# anything (at least not without sub*-id support)
 
 		bind_mountpoints = []
 		testroot = self.createAndGetTestDir(0o755)
