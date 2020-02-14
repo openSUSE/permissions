@@ -1723,6 +1723,60 @@ class TestUnknownOwnership(TestBase):
 		self.assertMode(baduser_file, 0o400)
 		self.assertMode(badgroup_file, 0o400)
 
+class TestRejectUserSymlink(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestRejectUserSymlink", "checks whether user-owned symlinks in early path components are rejected")
+
+	def run(self):
+
+		if not self.m_main_test_instance.haveSubIdSupport():
+			self.printWarning("skipping this test since there is no sub*id support available")
+			return
+
+		testroot = self.createAndGetTestDir(0o755)
+
+		testlink = os.path.join( testroot, "link" )
+		os.symlink("subdir", testlink)
+		os.chown(testlink, 1, 1, follow_symlinks = False)
+
+		subdir = os.path.join(testroot, "subdir")
+		self.createTestDir(subdir, 0o755)
+
+		testfile = os.path.join(testlink, "testfile")
+		self.createTestFile(testfile, 0o700)
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(testfile, 0o744),
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		code, lines = self.applySystemProfile()
+
+		messages = self.extractMessagesFromChkstat(lines, testlink)
+		needle = "on an insecure path"
+
+		found_badlink_report = False
+
+		for message in messages[testlink]:
+			if message.find(needle) != -1:
+				found_badlink_report = True
+				break
+
+		print(testlink, "rejected =", found_badlink_report)
+
+		if not found_badlink_report:
+			self.printError("user owned symlink in path was not rejected")
+
+		# make sure that the mode actually didn't change
+		self.assertMode(testfile, 0o700)
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1739,6 +1793,7 @@ res = test.run((
 		TestUnexpectedPathOwner,
 		TestRejectWorldWritable,
 		TestRejectInsecurePath,
-		TestUnknownOwnership
+		TestUnknownOwnership,
+		TestRejectUserSymlink
 	))
 sys.exit(res)
