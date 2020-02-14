@@ -829,7 +829,8 @@ class TestBase:
 
 		try:
 			caps = os.getxattr(path, "security.capability")
-			self.printError(path, "has capabilities despite --no-fscaps")
+			if caps:
+				self.printError(path, "has capabilities despite --no-fscaps")
 		except OSError as e:
 			if e.errno != errno.ENODATA:
 				raise
@@ -841,7 +842,7 @@ class TestBase:
 
 		try:
 			caps = os.getxattr(path, "security.capability")
-			if not caps:
+			if caps:
 				return
 		except OSError as e:
 			if e.errno != errno.ENODATA:
