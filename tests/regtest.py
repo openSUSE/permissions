@@ -225,6 +225,9 @@ class ChkstatRegtest:
 	def haveSubIdSupport(self):
 		return self.m_sub_id_supported
 
+	def haveCapSupport(self):
+		return self.m_have_caps_support
+
 	def checkSubIDSupport(self):
 		"""Checks whether it's basically possible to employ
 		newuidmap/newgidmap to establish a number of sub-*id for the
@@ -414,6 +417,39 @@ class ChkstatRegtest:
 			shell = False
 		)
 
+	def checkCapsSupport(self):
+		"""In more recent kernels user namespaces are allowed to
+		set capabilities on files. These are specially annotated as
+		belonging to a certain user namespace. This is only supported
+		starting from kernel 4.14.
+
+		If we don't have this support then we can't test certain
+		capability related cases.
+		"""
+		import tempfile
+
+		self.m_have_caps_support = False
+
+		setcap = shutil.which("setcap")
+
+		if not setcap:
+			print("Can't test for capability support, no setcap found")
+			return
+
+		with tempfile.NamedTemporaryFile() as tmpfile:
+			try:
+				subprocess.check_call(
+					["setcap", "cap_net_raw+ep", tmpfile.name],
+					close_fds = True,
+					shell = False,
+					stdout = subprocess.DEVNULL,
+					stderr = subprocess.DEVNULL
+				)
+
+				self.m_have_caps_support = True
+			except subprocess.CalledProcessError:
+				pass
+
 	def setupFakeRoot(self):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
@@ -532,6 +568,7 @@ class ChkstatRegtest:
 			return
 
 		self.setupFakeRoot()
+		self.checkCapsSupport()
 
 		if self.m_args.enter_fakeroot:
 			print("Entering shell in fake root")
@@ -1453,9 +1490,13 @@ class TestCapabilities(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestCapabilities", "checks whether capability settings and related command line options works")
+		super().__init__("TestCapabilities", "checks whether capability settings and related command line options work")
 
 	def run(self):
+
+		if not self.m_main_test_instance.haveCapSupport():
+			self.printWarning("Cannot set file capabilities in user namespaces on this kernel. It only works starting from version 4.14")
+			return
 
 		testfile = "/caps_test"
 		self.createTestFile(testfile, 0o755)
