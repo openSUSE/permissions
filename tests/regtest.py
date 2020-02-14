@@ -825,6 +825,78 @@ class TestBase:
 
 		return True
 
+	def assertNoCaps(self, path):
+
+		try:
+			caps = os.getxattr(path, "security.capability")
+			self.printError(path, "has capabilities despite --no-fscaps")
+		except OSError as e:
+			if e.errno != errno.ENODATA:
+				raise
+
+	def assertAnyCaps(self, path):
+		# the returned data is binary data, don't want to parse that
+		# stuff here. using libc wrappers for libcap[-ng] might be
+		# another approach for not having to rely on `getcap`
+
+		try:
+			caps = os.getxattr(path, "security.capability")
+			if not caps:
+				return
+		except OSError as e:
+			if e.errno != errno.ENODATA:
+				raise
+
+		# either `not caps` or ENODATA
+		self.printError(path, "doesn't have capabilities despite expectations!")
+
+	def assertHasCaps(self, path, caps):
+
+		getcap = shutil.which("getcap")
+
+		if not getcap:
+			self.printWarning(
+				"Couldn't find `getcap` utility, can't fully check capability values. Run `zypper in libcap-progs` to install it."
+			)
+
+			# attempt some best effort logic, just checking
+			# whether any capability is set at all.
+			self.assertAnyCaps(path)
+			return
+
+		getcap_out = subprocess.check_output(
+			[ getcap, "-v", path ],
+			close_fds = True,
+			shell = False,
+		)
+
+		# getcap uses a '+' to indicate capability types, while
+		# permissions uses '=', so adjust accordingly
+		expected_caps = ','.join(caps).replace('=', '+')
+		actual_caps = ""
+
+		# output is something like "/path/to/file = cap_stuff+letters"
+		for line in getcap_out.decode('utf8').splitlines():
+			# be prudent about possible spaces or equals in paths,
+			# even though it should never occur in our test
+			# environment
+			parts = line.split('=')
+			if len(parts) < 2:
+				continue
+
+			cap_path = '='.join(parts[:-1]).strip()
+			if cap_path != path:
+				# not for our file
+				continue
+
+			actual_caps = parts[-1].strip()
+			break
+
+		if actual_caps != expected_caps:
+			self.printError(path, "doesn't have expected capabilities '{}' but '{}' instead".format(
+				expected_caps, actual_caps
+			))
+
 	def callChkstat(self, args):
 		"""Calls chkstat passing the given command line arguments. The
 		function will capture chkstat's stdout and stderr via a pipe
@@ -1414,78 +1486,6 @@ class TestCapabilities(TestBase):
 		# this time there should be no extended attribute at all
 		self.assertNoCaps(testfile)
 
-	def assertNoCaps(self, path):
-
-		try:
-			caps = os.getxattr(path, "security.capability")
-			self.printError(path, "has capabilities despite --no-fscaps")
-		except OSError as e:
-			if e.errno != errno.ENODATA:
-				raise
-
-	def assertAnyCaps(self, path):
-		# the returned data is binary data, don't want to parse that
-		# stuff here. using libc wrappers for libcap[-ng] might be
-		# another approach for not having to rely on `getcap`
-
-		try:
-			caps = os.getxattr(path, "security.capability")
-			if not caps:
-				return
-		except OSError as e:
-			if e.errno != errno.ENODATA:
-				raise
-
-		# either `not caps` or ENODATA
-		self.printError(path, "doesn't have capabilities despite expectations!")
-
-	def assertHasCaps(self, path, caps):
-
-		getcap = shutil.which("getcap")
-
-		if not getcap:
-			self.printWarning(
-				"Couldn't find `getcap` utility, can't fully check capability values"
-			)
-
-			# attempt some best effort logic, just checking
-			# whether any capability is set at all.
-			self.assertAnyCaps(path)
-			return
-
-		getcap_out = subprocess.check_output(
-			[ getcap, "-v", path ],
-			close_fds = True,
-			shell = False,
-		)
-
-		# getcap uses a '+' to indicate capability types, while
-		# permissions uses '=', so adjust accordingly
-		expected_caps = ','.join(caps).replace('=', '+')
-		actual_caps = ""
-
-		# output is something like "/path/to/file = cap_stuff+letters"
-		for line in getcap_out.decode('utf8').splitlines():
-			# be prudent about possible spaces or equals in paths,
-			# even though it should never occur in our test
-			# environment
-			parts = line.split('=')
-			if len(parts) < 2:
-				continue
-
-			cap_path = '='.join(parts[:-1]).strip()
-			if cap_path != path:
-				# not for our file
-				continue
-
-			actual_caps = parts[-1].strip()
-			break
-
-		if actual_caps != expected_caps:
-			self.printError(path, "doesn't have expected capabilities '{}' but '{}' instead".format(
-				expected_caps, actual_caps
-			))
-
 class TestUnexpectedPathOwner(TestBase):
 
 	def __init__(self):
@@ -1777,6 +1777,57 @@ class TestRejectUserSymlink(TestBase):
 		# make sure that the mode actually didn't change
 		self.assertMode(testfile, 0o700)
 
+class TestPrivsForSpecialFiles(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestPrivsForSpecialFiles", "checks that set*id bits and caps aren't assigned to special files")
+
+	def run(self):
+
+		testroot = self.createAndGetTestDir(0o755)
+		specials = []
+		for _type in ("uid", "gid", "caps"):
+			testspecial = os.path.join(testroot, "special." + _type)
+			os.mkfifo(testspecial)
+			orig_mode = self.getMode(testspecial)
+			specials.append((testspecial, orig_mode))
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(specials[0][0], 0o4755),
+				self.buildProfileLine(specials[1][0], 0o2755),
+				self.buildProfileLine(specials[2][0], 0o0644, caps = ["cap_net_admin=ep"])
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		code, lines = self.applySystemProfile()
+
+		messages = self.extractMessagesFromChkstat(lines, [ s[0] for s in specials ])
+		needle = "will only assign capabilities"
+		found_rejects = 0
+
+		for path, _ in specials:
+			for message in messages[path]:
+				if message.find(needle) != -1:
+					found_rejects += 1
+					break
+
+		print("Rejects found:", found_rejects)
+
+		if found_rejects != len(specials):
+			self.printError("setuid/setgid/caps for FIFO were not rejected")
+			return
+
+		for path, mode in specials:
+			self.assertMode(path, mode)
+
+		self.assertNoCaps(specials[2][0])
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1794,6 +1845,7 @@ res = test.run((
 		TestRejectWorldWritable,
 		TestRejectInsecurePath,
 		TestUnknownOwnership,
-		TestRejectUserSymlink
+		TestRejectUserSymlink,
+		TestPrivsForSpecialFiles
 	))
 sys.exit(res)
