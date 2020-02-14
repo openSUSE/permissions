@@ -1828,6 +1828,62 @@ class TestPrivsForSpecialFiles(TestBase):
 
 		self.assertNoCaps(specials[2][0])
 
+class TestPrivsOnInsecurePath(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestPrivsOnInsecurePath", "checks that no privileges are set beneath path owned by different users")
+
+	def run(self):
+
+		# create a world-writable testroot, which is the insecure part
+		# in this test
+		testroot = self.createAndGetTestDir(0o777)
+		targetdir = os.path.join(testroot, "subdir")
+		orig_file_mode = 0o755
+		targetfiles = []
+		for _type in ("uid", "gid", "caps"):
+			targetfile = os.path.join( targetdir, "testfile." + _type )
+			targetfiles.append(targetfile)
+
+		self.createTestDir(targetdir, 0o755)
+		for path in targetfiles:
+			self.createTestFile(path, orig_file_mode)
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(targetfiles[0], 0o4755),
+				self.buildProfileLine(targetfiles[1], 0o2755),
+				self.buildProfileLine(targetfiles[2], 0o700, caps = ["cap_net_admin=ep"])
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		code, lines = self.applySystemProfile()
+
+		for path in targetfiles:
+			self.assertMode(path, orig_file_mode)
+
+		self.assertNoCaps(targetfiles[2])
+
+		messages = self.extractMessagesFromChkstat(lines, targetfiles)
+		needle = "will not give away capabilities"
+		found_rejects = 0
+
+		for path in targetfiles:
+			for message in messages[path]:
+				if message.find(needle) != -1:
+					found_rejects += 1
+					break
+
+		print("Rejects found:", found_rejects)
+
+		if found_rejects != len(targetfiles):
+			self.printError("setuid/setgid/caps on insecure path were not rejected")
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1846,6 +1902,7 @@ res = test.run((
 		TestRejectInsecurePath,
 		TestUnknownOwnership,
 		TestRejectUserSymlink,
-		TestPrivsForSpecialFiles
+		TestPrivsForSpecialFiles,
+		TestPrivsOnInsecurePath
 	))
 sys.exit(res)
