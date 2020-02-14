@@ -1926,6 +1926,60 @@ class TestPrivsOnInsecurePath(TestBase):
 		if found_rejects != len(targetfiles):
 			self.printError("setuid/setgid/caps on insecure path were not rejected")
 
+class TestSymlinkBehaviour(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestSymlinkBehaviour", "checks that final symlink components in paths are handled correctly")
+
+	def run(self):
+
+		# this test is about what happens when the final path
+		# component is a valid, secure symlink.
+		#
+		# two cases are considered:
+		# - an absolute symlink
+		# - a relative symlink
+		#
+		# behaviour should be the same for both.
+		#
+		# in older chkstat versions symlinks have not been followed,
+		# in newer ones they are followed in a safe manner, but
+		# in-between an inconsistency was present between absolute and
+		# relative symlinks.
+		testroot = self.createAndGetTestDir(0o755)
+
+		testfile1 = os.path.join(testroot, "file1")
+		testfile2 = os.path.join(testroot, "file2")
+
+		self.createTestFile(testfile1, 0o600)
+		self.createTestFile(testfile2, 0o600)
+
+		testlink1 = os.path.join(testroot, "link1")
+		testlink2 = os.path.join(testroot, "link2")
+
+		# absolute symlink
+		os.symlink( testfile1, testlink1 )
+		# relative symlink
+		os.symlink( ".." + testfile2, testlink2 )
+
+		testprofile = "easy"
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(testlink1, 0o644),
+				self.buildProfileLine(testlink2, 0o644),
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		self.applySystemProfile()
+
+		if self.assertMode(testlink1, 0o644) and \
+			self.assertMode(testlink2, 0o644):
+			print("Modes of symlink targets have been adjusted correctly")
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -1945,6 +1999,7 @@ res = test.run((
 		TestUnknownOwnership,
 		TestRejectUserSymlink,
 		TestPrivsForSpecialFiles,
-		TestPrivsOnInsecurePath
+		TestPrivsOnInsecurePath,
+		TestSymlinkBehaviour
 	))
 sys.exit(res)
