@@ -41,6 +41,6 @@ install: all
 
 
 clean:
-	/bin/rm src/chkstat
+	/bin/rm -f src/chkstat
 
 .PHONY: all clean
