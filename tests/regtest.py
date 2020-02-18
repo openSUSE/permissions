@@ -115,10 +115,6 @@ class ChkstatRegtest:
 		self.m_permissions_repo = os.path.sep.join(perm_root)
 		self.m_chkstat_bin = os.path.sep.join([self.m_permissions_repo, "src/chkstat"])
 
-		if not os.path.exists(self.m_chkstat_bin):
-			print("Couldn't find compiled chkstat binary in", self.m_chkstat_bin, file = sys.stderr)
-			sys.exit(2)
-
 	def printDebug(self, *args, **kwargs):
 
 		if not self.m_args.debug:
@@ -157,6 +153,11 @@ class ChkstatRegtest:
 		self.m_parser.add_argument(
 			"--debug", action = 'store_true',
 			help = "Add some debugging output regarding the test seuite itself."
+		)
+
+		self.m_parser.add_argument(
+			"--skip-make", action = 'store_true',
+			help = "By default the regtest tries to (re)build the chkstat binary. If this switch is set then whichever binary is currently found will be used."
 		)
 
 		self.m_args = self.m_parser.parse_args()
@@ -549,6 +550,42 @@ class ChkstatRegtest:
 		fn, ln, _, _ = frame = traceback.extract_tb(tb)[-1]
 		print("Exception in {}:{}:".format(fn, ln), str(e), file = sys.stderr)
 
+
+	def buildChkstat(self):
+
+		if self.m_args.skip_make:
+			if not os.path.exists(self.m_chkstat_bin):
+				print("Couldn't find compiled chkstat binary in",
+					self.m_chkstat_bin, file = sys.stderr)
+				sys.exit(2)
+
+			return
+
+		self.printHeading("Rebuilding test version of chkstat")
+		print()
+
+		subprocess.check_call(
+			["make", "clean"],
+			cwd = self.m_permissions_repo
+		)
+
+		# this causes a debug version with additional libasan routines
+		# to be built for testing
+		make_env = os.environ.copy()
+		make_env["CHKSTAT_TEST"] = "1"
+
+		try:
+			subprocess.check_call(
+				["make"],
+				cwd = self.m_permissions_repo,
+				env = make_env
+			)
+			print()
+		except subprocess.CalledProcessError:
+			color_printer.setRed()
+			print("Failed to compile test version of chkstat")
+			sys.exit(1)
+
 	def run(self, tests):
 
 		if self.m_args.list_tests:
@@ -566,6 +603,8 @@ class ChkstatRegtest:
 		else:
 			self.ensureForkedNamespace()
 			return
+
+		self.buildChkstat()
 
 		self.setupFakeRoot()
 		self.checkCapsSupport()
