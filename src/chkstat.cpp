@@ -543,6 +543,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
     char *path_rest;
     int lcnt;
     int pathfd = -1;
+    int parentfd = -1;
     struct stat root_st;
     bool is_final_path_element = false;
 
@@ -659,6 +660,15 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
                 close(pathfd);
                 pathfd = -1;
             }
+            else
+            {
+                // relative link: continue relative to the parent directory
+                close(pathfd);
+                if (parentfd == -1) // we encountered a link directly below /
+                    pathfd = -1;
+                else
+                    pathfd = dup(parentfd);
+            }
 
             size_t len;
             // need a temporary buffer because path_rest points into pathbuf
@@ -684,6 +694,14 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
             is_final_path_element = false;
         }
+        else if (S_ISDIR(stb->st_mode))
+        {
+            if (parentfd >= 0)
+                close(parentfd);
+            // parentfd is only needed to find the parent of a symlink.
+            // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
+            parentfd = dup(pathfd);
+        }
     }
 
     // world-writable file: error out due to unknown file integrity
@@ -691,6 +709,11 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
     {
         fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+rootl);
         goto fail;
+    }
+
+    if (parentfd >= 0)
+    {
+        close(parentfd);
     }
 
     return pathfd;
@@ -712,6 +735,10 @@ fail:
     if (pathfd >= 0)
     {
         close(pathfd);
+    }
+    if (parentfd >= 0)
+    {
+        close(parentfd);
     }
     return -1;
 }
