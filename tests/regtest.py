@@ -2046,6 +2046,64 @@ class TestSymlinkBehaviour(TestBase):
 			self.assertMode(testlink2, 0o644):
 			print("Modes of symlink targets have been adjusted correctly")
 
+class TestSymlinkDirBehaviour(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestSymlinkDirBehaviour", "checks that intermediary trusted symlink components in paths are handled correctly")
+
+	def run(self):
+
+		# this test is about what happens when a directory
+		# is a valid, secure symlink. It should always be followed.
+		#
+		# two cases are considered:
+		# - an absolute symlink
+		# - a relative symlink
+		#
+		# behaviour should be the same for both.
+		#
+		# symlink handling is difficult:
+		#  - for relative links chkstat needs to keep proper track of the parent directory
+		#  - for absolute links, the configured root may not be escaped
+
+		testroot = self.createAndGetTestDir(0o755)
+
+		testfile1 = os.path.join(testroot, "file1")
+		testfile2 = os.path.join(testroot, "file2")
+
+		self.createTestFile(testfile1, 0o600)
+		self.createTestFile(testfile2, 0o600)
+
+		testlink1 = os.path.join(testroot, self.getName() + "_rel_link")
+		testlink2 = os.path.join(testroot, self.getName() + "_abs_link")
+
+		# absolute symlink
+		os.symlink("../../../../../" + testroot, testlink1)
+		# relative symlink
+		os.symlink("/../../../../../" + testroot, testlink2)
+
+		testprofile = "easy"
+
+		# the configured paths, where a dir is a link
+		testpath1 = os.path.join(testlink1, "file1")
+		testpath2 = os.path.join(testlink2, "file2")
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(testpath1, 0o644),
+				self.buildProfileLine(testpath2, 0o644),
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		self.applySystemProfile()
+
+		if self.assertMode(testfile1, 0o644) and \
+			self.assertMode(testfile2, 0o644):
+			print("Modes of symlink targets have been adjusted correctly")
+
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
@@ -2066,6 +2124,7 @@ res = test.run((
 		TestRejectUserSymlink,
 		TestPrivsForSpecialFiles,
 		TestPrivsOnInsecurePath,
-		TestSymlinkBehaviour
+		TestSymlinkBehaviour,
+		TestSymlinkDirBehaviour,
 	))
 sys.exit(res)
