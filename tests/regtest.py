@@ -2004,9 +2004,11 @@ class TestSymlinkBehaviour(TestBase):
 		# behaviour should be the same for both.
 		#
 		# in older chkstat versions symlinks have not been followed,
-		# in newer ones they are followed in a safe manner, but
+		# in newer ones they were followed in a safe manner, but
 		# in-between an inconsistency was present between absolute and
 		# relative symlinks.
+		# Current versions revert to the legacy behaviour of only following
+		# dir symlinks but not links in the final path element.
 		testroot = self.createAndGetTestDir(0o755)
 
 		testfile1 = os.path.join(testroot, "file1")
@@ -2036,9 +2038,9 @@ class TestSymlinkBehaviour(TestBase):
 		self.switchSystemProfile(testprofile)
 		self.applySystemProfile()
 
-		if self.assertMode(testlink1, 0o644) and \
-			self.assertMode(testlink2, 0o644):
-			print("Modes of symlink targets have been adjusted correctly")
+		if self.assertMode(testlink1, 0o600) and \
+			self.assertMode(testlink2, 0o600):
+			print("Modes of symlink targets have been ignored correctly")
 
 class TestSymlinkDirBehaviour(TestBase):
 
