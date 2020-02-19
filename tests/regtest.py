@@ -173,7 +173,7 @@ class ChkstatRegtest:
 			print("Couldn't find the 'unshare' program", file = sys.stderr)
 			sys.exit(1)
 
-		unshare_cmdline = [unshare, "-m", "-U"]
+		unshare_cmdline = [unshare, "-p", "-f", "-m", "-U"]
 
 		self.m_sub_id_supported = self.checkSubIDSupport()
 
@@ -402,6 +402,13 @@ class ChkstatRegtest:
 			shell = False
 		)
 
+	def mountProc(self, path):
+		subprocess.check_call(
+			["mount", "-t", "proc", "none", path],
+			close_fds = True,
+			shell = False
+		)
+
 	def bindMount(self, src, dst, recursive = True, read_only = False):
 		bind_mode = "--rbind" if recursive else "--bind"
 		options = "ro" if read_only else "rw"
@@ -483,7 +490,7 @@ class ChkstatRegtest:
 		# to own the root filesystem '/', thus let's chroot into /tmp,
 		# where we only bind mount the most important stuff from the
 		# root mount namespace
-		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var", "/proc"]
+		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var"]
 		# add any /lib32/64 symlinks whatever
 		bind_dirs.extend( glob.glob("/lib*") )
 		# /etc needs to be copied, we need to be able to write in
@@ -515,6 +522,11 @@ class ChkstatRegtest:
 				# tuples, but "error" is only a string in this
 				# case, not very helpful for evaluation
 				pass
+
+		# mount a new proc corresponding to our forked pid namespace
+		new_proc = self.m_fake_root + "/proc"
+		os.mkdir(new_proc)
+		self.mountProc(new_proc)
 
 		# also bind-mount the permissions repo e.g. useful for
 		# debugging
