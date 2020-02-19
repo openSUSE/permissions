@@ -424,7 +424,8 @@ class ChkstatRegtest:
 		)
 
 	def unmount(self, mountpoint):
-		subprocess.check_call(
+		# this may fail without /proc, so ignore errors
+		subprocess.call(
 			[ "umount", "-R", mountpoint ],
 			close_fds = True,
 			shell = False
@@ -1657,11 +1658,11 @@ class TestUnexpectedPathOwner(TestBase):
 		print(baddir, "rejected =", found_dir_reject)
 		print(badfile, "rejected =", found_file_reject)
 
-		if found_dir_reject and found_file_reject:
+		if not found_dir_reject and not found_file_reject:
 			# all fine
 			return
 
-		self.printError("bad directory and/or bad file were not rejected")
+		self.printError("bad directory and/or bad file were rejected, this is not wanted on legacy branches")
 
 class TestRejectWorldWritable(TestBase):
 
