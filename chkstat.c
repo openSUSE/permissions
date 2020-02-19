@@ -637,14 +637,17 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
       if (S_ISLNK(stb->st_mode))
         {
+          // If the path configured in the permissions configuration is a symlink, we don't follow it.
+          // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
+          if (is_final_path_element || ++lcnt >= 256)
+            goto fail;
+
           // Don't follow symlinks owned by regular users.
           // In theory, we could also trust symlinks where the owner of the target matches the owner
           // of the link, but we're going the simple route for now.
           if (stb->st_uid && stb->st_uid != euid)
             goto fail_insecure_path;
 
-          if (++lcnt >= 256)
-            goto fail;
           char linkbuf[PATH_MAX];
           ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
 
@@ -674,20 +677,12 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
                 pathfd = dup(parentfd);
             }
 
-          size_t len;
           // need a temporary buffer because path_rest points into pathbuf
           // and snprintf doesn't allow the same buffer as source and
           // destination
           char tmp[sizeof(pathbuf) - 1];
 
-          if (is_final_path_element)
-            {
-              len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
-            }
-          else
-            {
-              len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
-            }
+          size_t len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
 
           if (len >= sizeof(tmp))
             goto fail;
