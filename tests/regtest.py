@@ -550,7 +550,7 @@ class ChkstatRegtest:
 		os.umask(0o022)
 		# use a defined standard PATH list, include sbin
 		# to make sure we also find admin tools
-		os.environ["PATH"] =  "/bin:/sbin:/sbin:/usr/sbin"
+		os.environ["PATH"] =  "/bin:/sbin:/usr/bin:/usr/sbin"
 		os.chdir("/")
 
 		# setup a tmp directory just in case
