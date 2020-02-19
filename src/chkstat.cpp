@@ -21,7 +21,7 @@
 #ifndef _GNU_SOURCE
 #   define _GNU_SOURCE
 #endif
-#include <stdio.h>
+#include <cstdio>
 #include <pwd.h>
 #include <grp.h>
 #include <sys/types.h>
@@ -29,19 +29,20 @@
 #include <sys/vfs.h>
 #include <linux/magic.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/capability.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <sys/param.h>
+#include <cassert>
 
 #define BAD_LINE() \
     fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
 
-struct perm {
+struct perm
+{
     struct perm *next;
     char *file;
     char *owner;
@@ -500,7 +501,8 @@ usage(int x)
     exit(x);
 }
 
-enum proc_mount_state {
+enum proc_mount_state
+{
     PROC_MOUNT_STATE_UNKNOWN,
     PROC_MOUNT_STATE_AVAIL,
     PROC_MOUNT_STATE_UNAVAIL,
