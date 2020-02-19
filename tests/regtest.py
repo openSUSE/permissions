@@ -160,6 +160,11 @@ class ChkstatRegtest:
 			help = "By default the regtest tries to (re)build the chkstat binary. If this switch is set then whichever binary is currently found will be used."
 		)
 
+		self.m_parser.add_argument(
+			"--skip-proc", action = 'store_true',
+			help = "Run chkstat without a mounted /proc to test these special chkstat code paths that deal with that condition. This is only really useful in old code streams that attempt to mount their own /proc for backwards compatibility."
+		)
+
 		self.m_args = self.m_parser.parse_args()
 
 	def ensureForkedNamespace(self):
@@ -458,7 +463,7 @@ class ChkstatRegtest:
 			except subprocess.CalledProcessError:
 				pass
 
-	def setupFakeRoot(self):
+	def setupFakeRoot(self, skip_proc):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
 		# mount namespace we don't leave behind garbage this way, we
@@ -502,6 +507,13 @@ class ChkstatRegtest:
 				# tuples, but "error" is only a string in this
 				# case, not very helpful for evaluation
 				pass
+
+		# mount a new proc corresponding to our forked pid namespace
+		# unless this is disabled, to test chkstat behaviour without /proc
+		if not skip_proc:
+			new_proc = self.m_fake_root + "/proc"
+			os.mkdir(new_proc)
+			self.mountProc(new_proc)
 
 		# also bind-mount the permissions repo e.g. useful for
 		# debugging
@@ -578,8 +590,10 @@ class ChkstatRegtest:
 
 		# this causes a debug version with additional libasan routines
 		# to be built for testing
+		# asan requires /proc so don't use it if we don't mount it
 		make_env = os.environ.copy()
-		make_env["CHKSTAT_TEST"] = "1"
+		if not self.m_args.skip_proc:
+			make_env["CHKSTAT_TEST"] = "1"
 
 		try:
 			subprocess.check_call(
@@ -613,7 +627,7 @@ class ChkstatRegtest:
 
 		self.buildChkstat()
 
-		self.setupFakeRoot()
+		self.setupFakeRoot(self.m_args.skip_proc)
 		self.checkCapsSupport()
 
 		if self.m_args.enter_fakeroot:
