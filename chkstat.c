@@ -24,6 +24,8 @@
 #include <grp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +34,9 @@
 #include <sys/capability.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <sys/mount.h>
+#include <limits.h>
+#include <sys/param.h>
 
 #define BAD_LINE() \
   fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
@@ -445,25 +450,125 @@ usage(int x)
   exit(x);
 }
 
+static bool
+check_have_proc(void)
+{
+  char *override = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
+
+  struct statfs proc;
+  int r = statfs("/proc", &proc);
+  return override == NULL && r == 0 && proc.f_type == PROC_SUPER_MAGIC;
+}
+
+static const char proc_mount_path_pattern[] = "/tmp/chkstat.proc.XXXXXX";
+static char proc_mount_path[sizeof(proc_mount_path_pattern) + sizeof("/proc")];
+enum proc_mount_state {
+  PROC_MOUNT_STATE_UNKNOWN,
+  PROC_MOUNT_STATE_SYSTEM,
+  PROC_MOUNT_STATE_CUSTOM,
+  PROC_MOUNT_STATE_UNAVAIL,
+};
+static enum proc_mount_state proc_mount_avail = PROC_MOUNT_STATE_UNKNOWN;
+
+static void
+cleanup_proc(void)
+{
+  if (proc_mount_avail != PROC_MOUNT_STATE_CUSTOM)
+    return;
+
+  // intentionally no error checking during cleanup
+  umount2(proc_mount_path, MNT_DETACH);
+  rmdir(proc_mount_path);
+  proc_mount_path[sizeof(proc_mount_path_pattern)] = '\0';
+  rmdir(proc_mount_path);
+}
+
+#define _STRINGIFY(s) #s
+#define STRINGIFY(s) _STRINGIFY(s)
+
+#define PROC_PATH_SIZE (sizeof(proc_mount_path) + sizeof("/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
+static int
+make_proc_path(int fd, char path[static PROC_PATH_SIZE])
+{
+  if (proc_mount_avail == PROC_MOUNT_STATE_UNAVAIL)
+    return 1;
+
+  if (proc_mount_avail == PROC_MOUNT_STATE_UNKNOWN)
+    {
+      if (check_have_proc())
+        {
+          proc_mount_avail = PROC_MOUNT_STATE_SYSTEM;
+        }
+      else
+        {
+          char *override = secure_getenv("CHKSTAT_PRETEND_PROC_MOUNT_FAIL");
+          if (override != NULL)
+            goto mount_fail;
+
+          // We're running without /proc mounted. This happens when we're run inside a chroot, e.g. during image
+          // builds, or during RPM install with the '--root' option.
+          //
+          // Other tools apparently sometimes misbehave and change things outside their chroot when they have
+          // working /proc so this can't be changed.
+          //
+          // As a work-around, we mount our own private proc in a temporary directory. This requires
+          // CAP_SYS_ADMIN (in addition to CAP_DAC_OVERRIDE like the rest of the tool).
+          memcpy(proc_mount_path, proc_mount_path_pattern, sizeof(proc_mount_path_pattern));
+          char *res = mkdtemp(proc_mount_path);
+          if (res == NULL)
+            goto mkdtemp_fail;
+
+          // Mounting proc in our dir changes its mode to 0555. To make it less likely that anyone touches it
+          // (preventing a later umount) we mount it in a sub-dir "/proc" that can only be accessed by root
+          // thanks to the restrictive permissions of the mkdtemp directory.
+          memcpy(proc_mount_path + sizeof(proc_mount_path_pattern) - 1, "/proc", sizeof("/proc"));
+          int r = mkdir(proc_mount_path, S_IRWXU);
+          if (r != 0)
+            goto mkdir_fail;
+
+          r = mount("proc", proc_mount_path, "proc", MS_NOEXEC|MS_NOSUID|MS_NODEV|MS_RELATIME, "");
+          if (r != 0)
+            goto mount_fail;
+          proc_mount_avail = PROC_MOUNT_STATE_CUSTOM;
+          atexit(cleanup_proc);
+        }
+    }
+
+  snprintf(path, PROC_PATH_SIZE, "%s/self/fd/%d", proc_mount_avail == 1 ? "/proc" : proc_mount_path, fd);
+
+  return 0;
+
+mount_fail:
+  rmdir(proc_mount_path);
+mkdir_fail:
+  proc_mount_path[sizeof(proc_mount_path_pattern)] = '\0';
+  rmdir(proc_mount_path);
+mkdtemp_fail:
+  proc_mount_avail = PROC_MOUNT_STATE_UNAVAIL;
+  return 1;
+}
+
+
 int
 safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
   char pathbuf[PATH_MAX];
-  char *p;
+  char *path_rest;
   int lcnt;
   int pathfd = -1;
   struct stat root_st;
+  bool is_final_path_element = false;
 
   *traversed_insecure = false;
 
   lcnt = 0;
   if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + rootl) >= sizeof(pathbuf))
     goto fail;
-  p = pathbuf;
-  do
+  path_rest = pathbuf;
+  while (!is_final_path_element)
     {
-      *p = '/';
-      char *cursor = p + 1;
+      *path_rest = '/';
+      char *cursor = path_rest + 1;
 
       if (pathfd == -1)
         {
@@ -482,13 +587,14 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           memcpy(stb, &root_st, sizeof(*stb));
         }
 
-      p = strchr(cursor, '/');
-      // p is NULL when we reach the final path element
-      if (p)
-        *p = 0;
+      path_rest = strchr(cursor, '/');
+      // path_rest is NULL when we reach the final path element
+      is_final_path_element = path_rest == NULL || strcmp("/", path_rest) == 0;
+      if (!is_final_path_element)
+        *path_rest = 0;
 
       // multiple consecutive slashes: ignore
-      if (p && *cursor == '\0')
+      if (!is_final_path_element && *cursor == '\0')
         continue;
 
       // never move up from the configured root directory (using the stat result from the previous loop iteration)
@@ -508,20 +614,22 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
       /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
       /* for euid != 0 it is also ok if the owner is euid */
-      if (stb->st_uid && stb->st_uid != euid && p)
+      if (stb->st_uid && stb->st_uid != euid && !is_final_path_element)
         *traversed_insecure = true;
       // path is in a world-writable directory, or file is world-writable itself.
-      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && p)
+      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && !is_final_path_element)
         *traversed_insecure = true;
       // if parent directory is not owned by root, the file owner must match the owner of parent
       if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
         {
-          if (p)
+          if (is_final_path_element)
+            {
+          // do not backport behavior change
+          //    fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
+          //    goto fail;
+            }
+          else
             goto fail_insecure_path;
-          // don't backport this behavior change
-          //else
-          //  fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
-          //goto fail;
         }
 
       if (S_ISLNK(stb->st_mode))
@@ -548,17 +656,18 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
               pathfd = -1;
             }
           size_t len;
-          char tmp[sizeof(pathbuf)]; // need a temporary buffer because p points into pathbuf and snprintf doesn't allow the same buffer as source and destination
-          if (p)
-            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
-          else
+          char tmp[sizeof(pathbuf) - 1]; // need a temporary buffer because path_rest points into pathbuf and snprintf doesn't allow the same buffer as source and destination
+          if (is_final_path_element)
             len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
-          if (len >= sizeof(pathbuf))
+          else
+            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
+          if (len >= sizeof(tmp))
             goto fail;
-          strcpy(pathbuf, tmp);
-          p = pathbuf;
+          // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
+          strcpy(pathbuf + 1, tmp);
+          path_rest = pathbuf;
         }
-    } while (p);
+    }
 
   // world-writable file: error out due to unknown file integrity
   if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH)) {
@@ -570,13 +679,16 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 fail_insecure_path:
 
   {
-    char linkpath[PATH_MAX];
-    char procpath[100];
-    snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
-    ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
-    if (l > 0 && (size_t)l < sizeof(linkpath) - 1)
-      linkpath[l] = '\0';
-      fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
+    char linkpath[PATH_MAX] = "ancestor";
+    char procpath[PROC_PATH_SIZE];
+    int res = make_proc_path(pathfd, procpath);
+    if (res == 0)
+      {
+        ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
+        if (l > 0)
+          linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
+      }
+    fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
   }
 
 fail:
@@ -584,6 +696,7 @@ fail:
     close(pathfd);
   return -1;
 }
+
 
 /* check /sys/kernel/fscaps, 2.6.39 */
 static int
@@ -987,8 +1100,15 @@ main(int argc, char **argv)
       //
       // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
       // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-      char fd_path[100];
-      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
+      char fd_path_buf[PROC_PATH_SIZE];
+      char *fd_path;
+      int r = make_proc_path(fd, fd_path_buf);
+      if (r == 0)
+        fd_path = fd_path_buf;
+      else
+        // fall back to plain path-access for read-only operation. (this is fine)
+        // below we make sure that in this case we report errors instead of trying to fix policy violations insecurely
+        fd_path = e->file;
 
       caps = cap_get_file(fd_path);
       if (!caps)
@@ -1038,6 +1158,13 @@ main(int argc, char **argv)
             {
               printf("Using root %s\n", root);
             }
+        }
+
+      if (do_set && fd_path != fd_path_buf)
+        {
+          fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
+          errors++;
+          do_set = false;
         }
 
       if (!do_set)
