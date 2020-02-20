@@ -1,0 +1,78 @@
+.\"
+.\" SUSE man page for chkstat
+.\"
+.\" Author: Ruediger Oertel
+.\"
+.TH CHKSTAT 8 "2008-04-17" "SUSE Linux" "Tool to check and set file permissions"
+.\"
+.UC 8
+.SH NAME
+.\"
+chkstat \- Tool to check and set file permissions
+.SH SYNOPSIS
+.\"
+.B chkstat
+.RB \|[\| \-\-set|\-set ]
+.RB \|[\| \-\-noheader ]
+.RB \|[\|\|[\| \-\-examine\  file\ ] ... ]
+.RB \|[\|\|[\| \-\-files\  filelist\ ] ... ]
+.RB \|[\|\|[\| \-\-root\  directory\ ] ... ]
+.B permission-file ...
+.\"
+.SH DESCRIPTION
+The program
+.I /usr/bin/chkstat
+is a tool to check and set file permissions.
+.PP
+Multiple permissions files can be given on the commandline.
+If the permission files contain multiple entries for a single
+file, the last entry found will be used.
+.PP
+.\"
+.SS General Options
+.TP
+.IR \-\-set ,\  \-set
+This option enables setting the file permissions,
+the default is to check and warn only.
+.TP
+.IR \-\-noheader
+Omit printing the output header lines.
+.TP
+.IR \-\-examine\ file
+Check permissions for this file and not all files listed in the permissions files.
+.TP
+.IR \-\-files\ filelist
+Check permissions for the files listed in
+.IR filelist
+and not for all files listed in the permissions files.
+.TP
+.IR \-\-root\ directory
+Prefix the files given in the permissions files by this directory.
+.PP
+.SH EXAMPLE
+.PP
+The command
+.PP
+.RS
+.B chkstat -set /etc/permissions
+.RE
+.PP
+will parse the file /etc/permissions and set the access mode and the
+user- and group memberships each file listed. The format
+for the input file is
+.PP
+.B FILEPATH
+.B OWNER:GROUP
+.B MODE
+.PP
+and wildcards are not supported for the filepath. Lines starting
+with '#' and empty lines are treated as comments.
+.SH COPYRIGHT
+1996-2003 SuSE Linux AG, Nuernberg, Germany.
+
+2008 SUSE LINUX Products GmbH
+.SH AUTHORS
+Reinhold Sojer, Ruediger Oertel, Michael Schroeder
+.PP
+Useful changes and additions by Tobias Burnus
+

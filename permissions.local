@@ -1,0 +1,32 @@
+#
+# /etc/permissions.local
+#
+# This file is used by SuSEconfig and chkstat to check or set the modes
+# and ownerships of files and directories in the installation.
+#
+# In particular, this file will not be touched during an upgrade of the
+# SuSE Linux installation. It is designed to be a placeholder for local
+# additions by the administrator of the system to reflect filemodes
+# of locally installed packages or to override file permissions as
+# shipped with the distribution.
+#
+# Format:
+# <file> <owner>:<group> <permission>
+#
+# Please see the file /etc/permissions for general usage hints of the
+# /etc/permissions* files.
+# Keep in mind that this file (/etc/permissions.local) is being used by
+# default by SuSEconfig, the shell script that is used by yast and yast2
+# after package installation and configuration changes to make the changes
+# effective for the respective packages (eg generating the "real"
+# configuration files).
+# Always check if there are no conflicts between your "local" changes here
+# and the settings in the other permissions files by calling
+# "SuSEconfig" as root!
+# Please remember that logfiles might be modified by the logfile
+# rotation facilities (e.g. logrotate) so settings entered here might
+# be overridden.
+# This file needs to end with a newline.
+#
+# example:
+#/usr/bin/sperl5.8.8         root:root       4755
