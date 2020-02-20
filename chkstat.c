@@ -18,6 +18,7 @@
  ****************************************************************
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <pwd.h>
 #include <grp.h>
@@ -27,9 +28,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#define __USE_GNU
+#include <dirent.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
+#ifndef O_PATH
+#if defined(__alpha__)
+#define O_PATH 040000000
+#elif defined(__sparc__)
+#define O_PATH 0x1000000
+#else
+#define O_PATH 010000000
+#endif
+#endif
+
+#define BAD_LINE() \
+  fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
 
 struct perm {
   struct perm *next;
@@ -41,12 +55,19 @@ struct perm {
 
 struct perm *permlist;
 char **checklist;
-int nchecklist;
+size_t nchecklist;
 uid_t euid;
 char *root;
-int rootl;
+size_t rootl;
+size_t nlevel;
+char** level;
+int do_set = -1;
+int default_set = 1;
+char** permfiles = NULL;
+size_t npermfiles = 0;
+char* force_level;
 
-void
+struct perm*
 add_permlist(char *file, char *owner, char *group, mode_t mode)
 {
   struct perm *ec, **epp;
@@ -58,12 +79,12 @@ add_permlist(char *file, char *owner, char *group, mode_t mode)
       char *nfile;
       nfile = malloc(strlen(file) + rootl + (*file != '/' ? 2 : 1));
       if (nfile)
-	{
-	  strcpy(nfile, root);
-	  if (*file != '/')
-	    strcat(nfile, "/");
-	  strcat(nfile, file);
-	}
+        {
+          strcpy(nfile, root);
+          if (*file != '/')
+            strcat(nfile, "/");
+          strcat(nfile, file);
+        }
       file = nfile;
     }
   else
@@ -96,12 +117,13 @@ add_permlist(char *file, char *owner, char *group, mode_t mode)
   ec->mode = mode;
   ec->next = 0;
   *epp = ec;
+  return ec;
 }
 
 int
 in_checklist(char *e)
 {
-  int i;
+  size_t i;
   for (i = 0; i < nchecklist; i++)
     if (!strcmp(e, checklist[i]))
       return 1;
@@ -122,23 +144,23 @@ add_checklist(char *e)
   if ((nchecklist & 63) == 0)
     {
       if (checklist == 0)
-	checklist = malloc(sizeof(char *) * (nchecklist + 64));
+        checklist = malloc(sizeof(char *) * (nchecklist + 64));
       else
-	checklist = realloc(checklist, sizeof(char *) * (nchecklist + 64));
+        checklist = realloc(checklist, sizeof(char *) * (nchecklist + 64));
       if (checklist == 0)
-	{
-	  perror("checklist alloc");
-	  exit(1);
-	}
+        {
+          perror("checklist alloc");
+          exit(1);
+        }
     }
   checklist[nchecklist++] = e;
 }
 
 int
-readline(FILE *fp, char *buf, int len)
+readline(FILE *fp, char *buf, size_t len)
 {
-  int l;
-  if (!fgets(buf, len, fp))
+  size_t l;
+  if (!fgets(buf, (int)len, fp))
     return 0;
   l = strlen(buf);
   if (l && buf[l - 1] == '\n')
@@ -149,438 +171,841 @@ readline(FILE *fp, char *buf, int len)
   if (l + 1 < len)
     return 1;
   fprintf(stderr, "warning: buffer overrun in line starting with '%s'\n", buf);
-  while ((l = getc(fp)) != EOF && l != '\n')
+  char c;
+  while ((c = getc(fp)) != EOF && c != '\n')
     ;
   buf[0] = 0;
   return 1;
 }
 
+int
+in_level(char *e)
+{
+  size_t i;
+  for (i = 0; i < nlevel; i++)
+    if (!strcmp(e, level[i]))
+      return 1;
+  return 0;
+}
+
+void
+ensure_array(void** array, size_t* size)
+{
+  if ((*size & 63) == 0)
+    {
+      if (*array == NULL)
+        *array = malloc(sizeof(char *) * (*size + 64));
+      else
+        *array = realloc(*array, sizeof(char *) * (*size + 64));
+      if (*array == NULL)
+        {
+          perror("array alloc");
+          exit(1);
+        }
+    }
+}
+
+void
+add_level(char *e)
+{
+  if (in_level(e))
+    return;
+  e = strdup(e);
+  if (e == 0)
+    {
+      perror("level entry alloc");
+      exit(1);
+    }
+  ensure_array((void**)&level, &nlevel);
+  level[nlevel++] = e;
+}
+
+static inline int isquote(char c)
+{
+    return (c == '"' || c == '\'');
+}
+
+int
+parse_sysconf(const char* file)
+{
+  FILE* fp;
+  char line[PATH_MAX];
+  char* p;
+  if ((fp = fopen(file, "r")) == 0)
+    {
+      fprintf(stderr, "error opening: %s: %s\n", file, strerror(errno));
+      return 0;
+    }
+  while (readline(fp, line, sizeof(line)))
+    {
+      if (!*line)
+        continue;
+      for (p = line; *p == ' '; ++p);
+      if (!*p || *p == '#')
+        continue;
+      if (!strncmp(p, "PERMISSION_SECURITY=", 20))
+        {
+          if (force_level)
+            continue;
+
+          p+=20;
+          if (isquote(*p))
+            ++p;
+          p = strtok(p, " ");
+          if (p && !isquote(*p))
+            {
+              do
+                {
+                  if (isquote(p[strlen(p)-1]))
+                    {
+                      p[strlen(p)-1] = '\0';
+                    }
+                  if (*p && strcmp(p, "local"))
+                      add_level(p);
+                }
+              while ((p = strtok(NULL, " ")));
+            }
+        }
+      else if (!strncmp(p, "CHECK_PERMISSIONS=", 18))
+        {
+          p+=18;
+          if (isquote(*p))
+            ++p;
+          if (!strncmp(p, "set", 3))
+            {
+              p+=3;
+              if (isquote(*p) || !*p)
+                default_set=1;
+            }
+          else if ((!strncmp(p, "no", 2) && (!p[3] || isquote(p[3]))) || !*p || isquote(*p))
+            {
+              p+=2;
+              if (isquote(*p) || !*p)
+                {
+                  default_set = -1;
+                }
+            }
+          else
+            {
+              //fprintf(stderr, "invalid value for CHECK_PERMISSIONS (must be 'set', 'warn' or 'no')\n");
+            }
+        }
+    }
+  fclose(fp);
+  return 0;
+}
+
+static int
+compare(const void* a, const void* b)
+{
+  return strcmp(*(char* const*)a, *(char* const*)b);
+}
+
+static void
+collect_permfiles()
+{
+  size_t i;
+  DIR* dir;
+
+  ensure_array((void**)&permfiles, &npermfiles);
+  // 1. central fixed permissions file
+  permfiles[npermfiles++] = strdup("/etc/permissions");
+
+  // 2. central easy, secure paranoid as those are defined by SUSE
+  for (i = 0; i < nlevel; ++i)
+    {
+      if (!strcmp(level[i], "easy")
+              || !strcmp(level[i], "secure")
+              || !strcmp(level[i], "paranoid"))
+        {
+          char fn[4096];
+          snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
+          if (access(fn, R_OK) == 0)
+            {
+              ensure_array((void**)&permfiles, &npermfiles);
+              permfiles[npermfiles++] = strdup(fn);
+            }
+        }
+    }
+  // 3. package specific permissions
+  dir = opendir("/etc/permissions.d");
+  if (dir)
+    {
+      char** files = NULL;
+      size_t nfiles = 0;
+      struct dirent* d;
+      while ((d = readdir(dir)))
+        {
+          char* p;
+          if (!strcmp("..", d->d_name) || !strcmp(".", d->d_name))
+            continue;
+
+          /* filter out backup files */
+          if ((strlen(d->d_name)>2) && (d->d_name[strlen(d->d_name)-1] == '~'))
+            continue;
+          if (strstr(d->d_name,".rpmnew") || strstr(d->d_name,".rpmsave"))
+            continue;
+
+          ensure_array((void**)&files, &nfiles);
+          if ((p = strchr(d->d_name, '.')))
+            {
+              *p = '\0';
+            }
+          files[nfiles++] = strdup(d->d_name);
+        }
+      closedir(dir);
+      if (nfiles)
+        {
+          qsort(files, nfiles, sizeof(char*), compare);
+          for (i = 0; i < nfiles; ++i)
+            {
+              char fn[4096];
+              size_t l;
+              // skip duplicates
+              if (i && !strcmp(files[i-1], files[i]))
+                continue;
+
+              snprintf(fn, sizeof(fn), "/etc/permissions.d/%s", files[i]);
+              if (access(fn, R_OK) == 0)
+                {
+                  ensure_array((void**)&permfiles, &npermfiles);
+                  permfiles[npermfiles++] = strdup(fn);
+                }
+
+              for (l = 0; l < nlevel; ++l)
+                {
+                  snprintf(fn, sizeof(fn), "/etc/permissions.d/%s.%s", files[i], level[l]);
+
+                  if (access(fn, R_OK) == 0)
+                    {
+                      ensure_array((void**)&permfiles, &npermfiles);
+                      permfiles[npermfiles++] = strdup(fn);
+                    }
+                }
+
+            }
+          for (i = 0; i < nfiles; ++i)
+            {
+              free(files[i]);
+            }
+        }
+      free(files);
+    }
+  // 4. central permissions files with user defined level incl 'local'
+  for (i = 0; i < nlevel; ++i)
+    {
+      char fn[4096];
+
+      if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid"))
+        continue;
+
+      snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
+      if (access(fn, R_OK) == 0)
+        {
+          ensure_array((void**)&permfiles, &npermfiles);
+          permfiles[npermfiles++] = strdup(fn);
+        }
+    }
+}
+
+
 void
 usage(int x)
 {
-  fprintf(stderr, "Usage: chkstat [--set] [--noheader] [[--examine file] ...] [ [--files filelist] ...] permission-file ...\n");
+  printf("Usage:\n"
+"a) chkstat [OPTIONS] <permission-files>...\n"
+"b) chkstat --system [OPTIONS] <files>...\n"
+"\n"
+"Options:\n"
+"  --set                        apply changes\n"
+"  --warn                only tell which changes are needed\n"
+"  --noheader                don't print intro message\n"
+"  --system                system mode, act according to /etc/sysconfig/security\n"
+"  --level LEVEL                force use LEVEL (only with --system)\n"
+"  --examine FILE        apply to specified file only\n"
+"  --files FILELIST        read list of files to apply from FILELIST\n"
+"  --root DIR                check files relative to DIR\n"
+);
   exit(x);
 }
 
 int
-safepath(char *path, uid_t uid, gid_t gid)
+safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
-  struct stat stb;
-  char pathbuf[1024];
-  char linkbuf[1024];
-  char *p, *p2;
-  int l, l2, lcnt;
+  char pathbuf[PATH_MAX];
+  char *p;
+  int lcnt;
+  int pathfd = -1;
+  struct stat root_st;
+
+  *traversed_insecure = false;
 
   lcnt = 0;
-  l2 = strlen(path);
-  if (l2 >= sizeof(pathbuf))
-    return 0;
-  strcpy(pathbuf, path);
-  if (pathbuf[0] != '/') 
-    return 0;
-  p = pathbuf + rootl;
-  for (;;)
+  if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + rootl) >= sizeof(pathbuf))
+    goto fail;
+  p = pathbuf;
+  do
     {
-      p = strchr(p, '/');
-      if (!p)
-        return 1;
-      *p = 0;
-      if (lstat(*pathbuf ? pathbuf : "/", &stb))
-	return 0;
-      if (S_ISLNK(stb.st_mode))
-	{
-	  if (++lcnt >= 256)
-	    return 0;
-	  l = readlink(pathbuf, linkbuf, sizeof(linkbuf));
-	  if (l <= 0 || l >= sizeof(linkbuf))
-	    return 0;
-	  while(l && linkbuf[l - 1] == '/')
-	    l--;
-	  if (l + 1 >= sizeof(linkbuf))
-	    return 0;
-	  linkbuf[l++] = '/';
-	  linkbuf[l] = 0;
-	  *p++ = '/';
-	  if (linkbuf[0] == '/')
-	    {
-	      if (rootl)
-		{
-		  p[-1] = 0;
-		  fprintf(stderr, "can't handle symlink %s at the moment\n", pathbuf);
-		  return 0;
-		}
-	      l2 -= (p - pathbuf);
-	      memmove(pathbuf + rootl, p, l2 + 1);
-	      l2 += rootl;
-	      p = pathbuf + rootl;
-	    }
-	  else
-	    {
-	      if (p - 1 == pathbuf)
-		return 0;		/* huh, "/" is a symlink */
-	      for (p2 = p - 2; p2 >= pathbuf; p2--)
-		if (*p2 == '/')
-		  break;
-	      if (p2 < pathbuf + rootl)	/* cannot happen */
-		return 0;
-	      p2++;			/* am now after '/' */
-              memmove(p2, p, pathbuf + l2 - p + 1);
-	      l2 -= (p - p2);
-	      p = p2;
-	    }
-	  if (l + l2 >= sizeof(pathbuf))
-	    return 0;
-	  memmove(p + l, p, pathbuf + l2 - p + 1);
-	  memmove(p, linkbuf, l);
-	  l2 += l;
-	  if (pathbuf[0] != '/')	/* cannot happen */
-	    return 0;
-	  if (p == pathbuf)
-	    p++;
-	  continue;
-	}
-      if (!S_ISDIR(stb.st_mode))
-	return 0;
+      *p = '/';
+      char *cursor = p + 1;
 
-      /* write is always forbidden for other */
-      if ((stb.st_mode & 02) != 0)
-	return 0;
+      if (pathfd == -1)
+        {
+          pathfd = open(rootl ? root : "/", O_PATH | O_CLOEXEC);
+          if (pathfd == -1)
+            {
+              fprintf(stderr, "failed to open root directory %s: %s\n", root, strerror(errno));
+              goto fail;
+            }
+          if (fstat(pathfd, &root_st))
+            {
+              fprintf(stderr, "failed to stat root directory %s: %s\n", root, strerror(errno));
+              goto fail;
+            }
+          // stb and pathfd must be in sync for the root-escape check below
+          memcpy(stb, &root_st, sizeof(*stb));
+        }
 
-      /* owner must be ok as she may change the mode */
+      p = strchr(cursor, '/');
+      // p is NULL when we reach the final path element
+      if (p)
+        *p = 0;
+
+      // multiple consecutive slashes: ignore
+      if (p && *cursor == '\0')
+        continue;
+
+      // never move up from the configured root directory (using the stat result from the previous loop iteration)
+      if (strcmp(cursor, "..") == 0 && rootl && stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)
+          continue;
+
+      // cursor is an empty string for trailing slashes, open again with different open_flags.
+      int newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+      if (newpathfd == -1)
+        goto fail;
+
+      close(pathfd);
+      pathfd = newpathfd;
+
+      if (fstat(pathfd, stb))
+        goto fail;
+
+      /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
       /* for euid != 0 it is also ok if the owner is euid */
-      if (stb.st_uid && stb.st_uid != uid && stb.st_uid != euid)
-	return 0;
+      if (stb->st_uid && stb->st_uid != euid && p)
+        *traversed_insecure = true;
+      // path is in a world-writable directory, or file is world-writable itself.
+      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && p)
+        *traversed_insecure = true;
+      // if parent directory is not owned by root, the file owner must match the owner of parent
+      if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
+        {
+          if (p)
+            goto fail_insecure_path;
+          else
+            fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
+          goto fail;
+        }
 
-      /* group gid may do fancy things */
-      /* for euid != 0 we don't check this */
-      if ((stb.st_mode & 020) != 0 && !euid)
-	if (!gid || stb.st_gid != gid)
-	  return 0;
+      if (S_ISLNK(stb->st_mode))
+        {
+          // Don't follow symlinks owned by regular users.
+          // In theory, we could also trust symlinks where the owner of the target matches the owner
+          // of the link, but we're going the simple route for now.
+          if (stb->st_uid && stb->st_uid != euid)
+            goto fail_insecure_path;
 
-      *p++ = '/';
-    }
+          if (++lcnt >= 256)
+            goto fail;
+          char linkbuf[PATH_MAX];
+          ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
+          if (l <= 0 || (size_t)l >= sizeof(linkbuf) - 1)
+            goto fail;
+          while(l && linkbuf[l - 1] == '/')
+            l--;
+          linkbuf[l] = 0;
+          if (linkbuf[0] == '/')
+            {
+              // absolute link
+              close(pathfd);
+              pathfd = -1;
+            }
+          size_t len;
+          char tmp[sizeof(pathbuf)]; // need a temporary buffer because p points into pathbuf and snprintf doesn't allow the same buffer as source and destination
+          if (p)
+            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, p + 1);
+          else
+            len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
+          if (len >= sizeof(pathbuf))
+            goto fail;
+          strcpy(pathbuf, tmp);
+          p = pathbuf;
+        }
+    } while (p);
+
+  // world-writable file: error out due to unknown file integrity
+  if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH)) {
+    fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+rootl);
+    goto fail;
+  }
+
+  return pathfd;
+fail_insecure_path:
+
+  {
+    char linkpath[PATH_MAX];
+    char procpath[100];
+    snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
+    ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
+    if (l > 0 && (size_t)l < sizeof(linkpath) - 1)
+      fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
+  }
+
+fail:
+  if (pathfd >= 0)
+    close(pathfd);
+  return -1;
 }
+
 
 int
 main(int argc, char **argv)
 {
-  char *opt, *p;
-  int set = 0;
+  char *opt;
   int told = 0;
   int use_checklist = 0;
+  int systemmode = 0;
+  int suseconfig = 0;
   FILE *fp;
   char line[512];
   char *part[4];
-  int i, pcnt, lcnt;
+  int pcnt, lcnt;
+  size_t i;
   int inpart;
   mode_t mode;
   struct perm *e;
-  struct stat stb, stb2;
+  struct stat stb;
   struct passwd *pwd = 0;
   struct group *grp = 0;
   uid_t uid;
   gid_t gid;
-  int fd, r;
+  int fd = -1;
   int errors = 0;
 
   while (argc > 1)
     {
       opt = argv[1];
       if (!strcmp(opt, "--"))
-	break;
+        break;
       if (*opt == '-' && opt[1] == '-')
-	opt++;
+        opt++;
+      if (!strcmp(opt, "-system"))
+        {
+          argc--;
+          argv++;
+          systemmode = 1;
+          continue;
+        }
+      // hidden option for use by suseconfig only
+      if (!strcmp(opt, "-suseconfig"))
+        {
+          argc--;
+          argv++;
+          suseconfig = 1;
+          systemmode = 1;
+          continue;
+        }
       if (!strcmp(opt, "-s") || !strcmp(opt, "-set"))
-	{
-	  set = 1;
-	  argc--;
-	  argv++;
-	  continue;
-	}
+        {
+          do_set=1;
+          argc--;
+          argv++;
+          continue;
+        }
+      if (!strcmp(opt, "-warn"))
+        {
+          do_set=0;
+          argc--;
+          argv++;
+          continue;
+        }
       if (!strcmp(opt, "-n") || !strcmp(opt, "-noheader"))
-	{
-	  told = 1;
-	  argc--;
-	  argv++;
-	  continue;
-	}
+        {
+          told = 1;
+          argc--;
+          argv++;
+          continue;
+        }
       if (!strcmp(opt, "-e") || !strcmp(opt, "-examine"))
-	{
-	  argc--;
-	  argv++;
-	  if (argc == 1)
-	    {
-	      fprintf(stderr, "examine: argument required\n");
-	      exit(1);
-	    }
-	  add_checklist(argv[1]);
-	  use_checklist = 1;
-	  argc--;
-	  argv++;
-	  continue;
-	}
+        {
+          argc--;
+          argv++;
+          if (argc == 1)
+            {
+              fprintf(stderr, "examine: argument required\n");
+              exit(1);
+            }
+          add_checklist(argv[1]);
+          use_checklist = 1;
+          argc--;
+          argv++;
+          continue;
+        }
+      if (!strcmp(opt, "-level"))
+        {
+          argc--;
+          argv++;
+          if (argc == 1)
+            {
+              fprintf(stderr, "level: argument required\n");
+              exit(1);
+            }
+          force_level = argv[1];
+          argc--;
+          argv++;
+          continue;
+        }
       if (!strcmp(opt, "-f") || !strcmp(opt, "-files"))
-	{
-	  argc--;
-	  argv++;
-	  if (argc == 1)
-	    {
-	      fprintf(stderr, "files: argument required\n");
-	      exit(1);
-	    }
-	  if ((fp = fopen(argv[1], "r")) == 0)
-	    {
-	      fprintf(stderr, "files: %s: %s\n", argv[1], strerror(errno));
-	      exit(1);
-	    }
-	  while (readline(fp, line, sizeof(line)))
-	    {
-	      if (!*line)
-		continue;
-	      add_checklist(line);
-	    }
-	  fclose(fp);
-	  use_checklist = 1;
-	  argc--;
-	  argv++;
-	  continue;
-	}
+        {
+          argc--;
+          argv++;
+          if (argc == 1)
+            {
+              fprintf(stderr, "files: argument required\n");
+              exit(1);
+            }
+          if ((fp = fopen(argv[1], "r")) == 0)
+            {
+              fprintf(stderr, "files: %s: %s\n", argv[1], strerror(errno));
+              exit(1);
+            }
+          while (readline(fp, line, sizeof(line)))
+            {
+              if (!*line)
+                continue;
+              add_checklist(line);
+            }
+          fclose(fp);
+          use_checklist = 1;
+          argc--;
+          argv++;
+          continue;
+        }
       if (!strcmp(opt, "-r") || !strcmp(opt, "-root"))
-	{
-	  argc--;
-	  argv++;
-	  if (argc == 1)
-	    {
-	      fprintf(stderr, "root: argument required\n");
-	      exit(1);
-	    }
-	  root = argv[1];
-	  rootl = strlen(root);
-	  if (*root != '/')
-	    {
-	      fprintf(stderr, "root: must begin with '/'\n");
-	      exit(1);
-	    }
-	  argc--;
-	  argv++;
-	  continue;
-	}
+        {
+          argc--;
+          argv++;
+          if (argc == 1)
+            {
+              fprintf(stderr, "root: argument required\n");
+              exit(1);
+            }
+          root = argv[1];
+          rootl = strlen(root);
+          if (*root != '/')
+            {
+              fprintf(stderr, "root: must begin with '/'\n");
+              exit(1);
+            }
+          argc--;
+          argv++;
+          continue;
+        }
       if (*opt == '-')
-	usage(!strcmp(opt, "-h") || !strcmp(opt, "-help") ? 0 : 1);
+        usage(!strcmp(opt, "-h") || !strcmp(opt, "-help") ? 0 : 1);
       break;
     }
-  if (argc <= 1)
-    usage(1);
-  for (i = 1; i < argc; i++)
+
+  if (systemmode)
     {
-      if ((fp = fopen(argv[i], "r")) == 0)
-	{
-	  perror(argv[i]);
-	  exit(1);
-	}
+      const char file[] = "/etc/sysconfig/security";
+      parse_sysconf(file);
+      if(do_set == -1)
+        {
+          if (default_set < 0)
+            {
+              fprintf(stderr, "permissions handling disabled in %s\n", file);
+              exit(0);
+            }
+          if (suseconfig && default_set)
+            {
+              char* module = getenv("ONLY_MODULE");
+              if (!module || strcmp(module, "permissions"))
+                {
+                  puts("no permissions will be changed if not called explicitly");
+                  default_set = 0;
+                }
+            }
+          do_set = default_set;
+        }
+      if (force_level)
+        {
+          char *p = strtok(force_level, " ");
+          do
+            {
+              add_level(p);
+            }
+          while ((p = strtok(NULL, " ")));
+        }
+
+      if (!nlevel)
+        add_level("secure");
+      add_level("local"); // always add local
+
+      for (i = 1; i < (size_t)argc; i++)
+        {
+          add_checklist(argv[i]);
+          use_checklist = 1;
+          continue;
+        }
+      collect_permfiles();
+    }
+  else if (argc <= 1)
+    usage(1);
+  else
+    {
+      npermfiles = (size_t)argc-1;
+      permfiles = &argv[1];
+    }
+
+  if  (do_set == -1)
+    do_set = 0;
+
+  // add fake list entries for all files to check
+  for (i = 0; i < nchecklist; i++)
+    add_permlist(checklist[i], "unknown", "unknown", 0);
+
+  for (i = 0; i < npermfiles; i++)
+    {
+      if ((fp = fopen(permfiles[i], "r")) == 0)
+        {
+          perror(permfiles[i]);
+          exit(1);
+        }
       lcnt = 0;
+      struct perm* last = NULL;
+      int extline;
       while (readline(fp, line, sizeof(line)))
-	{
-	  lcnt++;
-	  if (*line == 0 || *line == '#' || *line == '$')
-	    continue;
-	  inpart = 0;
-	  pcnt = 0;
-	  for (p = line; *p; p++)
-	    {
-	      if (*p == ' ' || *p == '\t')
-		{
-		  *p = 0;
-		  if (inpart)
-		    {
-		      pcnt++;
-		      inpart = 0;
-		    }
-		  continue;
-		}
-	      if (!inpart)
-		{
-		  inpart = 1;
-		  if (pcnt == 3)
-		    break;
-		  part[pcnt] = p;
-		}
-	    }
-	  if (inpart)
-	    pcnt++;
-	  if (pcnt != 3)
-	    {
-	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
-	      continue;
-	    }
-	  part[3] = part[2];
-	  part[2] = strchr(part[1], ':');
-	  if (!part[2])
-	    part[2] = strchr(part[1], '.');
-	  if (!part[2])
-	    {
-	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
-	      continue;
-	    }
-	  *part[2]++ = 0;
-          mode = strtoul(part[3], part + 3, 8);
-	  if (mode > 07777 || part[3][0])
-	    {
-	      fprintf(stderr, "bad permissions line %s:%d\n", argv[i], lcnt);
-	      continue;
-	    }
-	  add_permlist(part[0], part[1], part[2], mode);
-	}
+        {
+          extline = 0;
+          lcnt++;
+          if (*line == 0 || *line == '#' || *line == '$')
+            continue;
+          inpart = 0;
+          pcnt = 0;
+          char *p;
+          for (p = line; *p; p++)
+            {
+              if (*p == ' ' || *p == '\t')
+                {
+                  *p = 0;
+                  if (inpart)
+                    {
+                      pcnt++;
+                      inpart = 0;
+                    }
+                  continue;
+                }
+              if (pcnt == 0 && !inpart && *p == '+')
+                {
+                  extline = 1;
+                  break;
+                }
+              if (!inpart)
+                {
+                  inpart = 1;
+                  if (pcnt == 3)
+                    break;
+                  part[pcnt] = p;
+                }
+            }
+          if (extline)
+            {
+              if (!last)
+                {
+                  BAD_LINE();
+                  continue;
+                }
+              BAD_LINE();
+              continue;
+            }
+          if (inpart)
+            pcnt++;
+          if (pcnt != 3)
+            {
+              BAD_LINE();
+              continue;
+            }
+          part[3] = part[2];
+          part[2] = strchr(part[1], ':');
+          if (!part[2])
+            part[2] = strchr(part[1], '.');
+          if (!part[2])
+            {
+              BAD_LINE();
+              continue;
+            }
+          *part[2]++ = 0;
+          mode = (mode_t)strtoul(part[3], part + 3, 8);
+          if (mode > 07777 || part[3][0])
+            {
+              BAD_LINE();
+              continue;
+            }
+          last = add_permlist(part[0], part[1], part[2], mode);
+        }
       fclose(fp);
     }
 
   euid = geteuid();
   for (e = permlist; e; e = e->next)
     {
-      if (use_checklist && !in_checklist(e->file))
-	continue;
-      if (lstat(e->file, &stb))
-	continue;
+      if (use_checklist && !in_checklist(e->file+rootl))
+        continue;
+
+      pwd = strcmp(e->owner, "unknown") ? getpwnam(e->owner) : NULL;
+      grp = strcmp(e->group, "unknown") ? getgrnam(e->group) : NULL;
+      uid = pwd ? pwd->pw_uid : 0;
+      gid = grp ? grp->gr_gid : 0;
+
+      bool traversed_insecure;
+      if (fd >= 0)
+        {
+          // close fd from previous loop iteration
+          close(fd);
+          fd = -1;
+        }
+
+      fd = safe_open(e->file, &stb, uid, &traversed_insecure);
+      if (fd < 0)
+        continue;
       if (S_ISLNK(stb.st_mode))
-	continue;
-      if ((!pwd || strcmp(pwd->pw_name, e->owner)) && (pwd = getpwnam(e->owner)) == 0)
-	{
-	  fprintf(stderr, "%s: unknown user %s\n", e->file, e->owner);
-	  continue;
-	}
-      if ((!grp || strcmp(grp->gr_name, e->group)) && (grp = getgrnam(e->group)) == 0)
-	{
-	  fprintf(stderr, "%s: unknown group %s\n", e->file, e->group);
-	  continue;
-	}
-      uid = pwd->pw_uid;
-      gid = grp->gr_gid;
-      if ((stb.st_mode & 07777) == e->mode && stb.st_uid == uid && stb.st_gid == gid)
-	continue;
+        continue;
+
+      if (!e->mode && !strcmp(e->owner, "unknown"))
+        {
+          fprintf(stderr, "%s: cannot verify ", e->file+rootl);
+          pwd = getpwuid(stb.st_uid);
+          if (pwd)
+            fprintf(stderr, "%s", pwd->pw_name);
+          else
+            fprintf(stderr, "%d", stb.st_uid);
+          grp = getgrgid(stb.st_gid);
+          if (grp)
+            fprintf(stderr, "%s", grp->gr_name);
+          else
+            fprintf(stderr, "%d", stb.st_gid);
+          fprintf(stderr, "%04o - not listed in /etc/permissions\n",
+                          (int)(stb.st_mode&07777));
+          continue;
+        }
+      if (!pwd)
+        {
+          fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", e->file+rootl, e->owner);
+          continue;
+        }
+      else if (!grp)
+        {
+          fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", e->file+rootl, e->group);
+          continue;
+        }
+
+      // fd is opened with O_PATH, file oeprations like cap_get_fd() and fchown() don't work with it.
+      //
+      // We also don't want to do a proper open() of the file, since that doesn't even work for sockets
+      // and might have side effects for pipes or devices.
+      //
+      // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
+      // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
+      char fd_path[100];
+      snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
+
+      int perm_ok = (stb.st_mode & 07777) == e->mode;
+      int owner_ok = stb.st_uid == uid && stb.st_gid == gid;
+
+      if (perm_ok && owner_ok)
+        continue;
 
       if (!told)
-	{
-	  told = 1;
-	  printf("Checking permissions and ownerships - using the permissions files\n");
-	  for (i = 1; i < argc; i++)
-	    printf("\t%s\n", argv[i]);
-	}
+        {
+          told = 1;
+          printf("Checking permissions and ownerships - using the permissions files\n");
+          for (i = 0; i < npermfiles; i++)
+            printf("\t%s\n", permfiles[i]);
+          if (rootl)
+            {
+              printf("Using root %s\n", root);
+            }
+        }
 
-      if (!set)
-        printf("%s should be %s:%s %04o.", e->file, e->owner, e->group, e->mode);
+      if (!do_set)
+        printf("%s should be %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
       else
-        printf("setting %s to %s:%s %04o.", e->file, e->owner, e->group, e->mode);
-      printf(" (wrong");
-      if (stb.st_uid != uid || stb.st_gid != gid)
-	{
-	  pwd = getpwuid(stb.st_uid);
-	  grp = getgrgid(stb.st_gid);
-	  if (pwd)
-	    printf(" owner/group %s", pwd->pw_name);
-	  else
-	    printf(" owner/group %d", stb.st_uid);
-	  if (grp)
-	    printf(":%s", grp->gr_name);
-	  else
-	    printf(":%d", stb.st_gid);
-	  pwd = 0;
-	  grp = 0;
-	}
-      if ((stb.st_mode & 07777) != e->mode)
-	printf(" permissions %04o", (int)(stb.st_mode & 07777));
+        printf("setting %s to %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
+
+      printf(". (wrong");
+      if (!owner_ok)
+        {
+          pwd = getpwuid(stb.st_uid);
+          grp = getgrgid(stb.st_gid);
+          if (pwd)
+            printf(" owner/group %s", pwd->pw_name);
+          else
+            printf(" owner/group %d", stb.st_uid);
+          if (grp)
+            printf(":%s", grp->gr_name);
+          else
+            printf(":%d", stb.st_gid);
+          pwd = 0;
+          grp = 0;
+        }
+
+      if (!perm_ok)
+        printf(" permissions %04o", (int)(stb.st_mode & 07777));
+
       putchar(')');
       putchar('\n');
 
-      if (!set)
-	continue;
+      if (!do_set)
+        continue;
 
+      // don't give high privileges to files controlled by non-root users
+      if (((e->mode & S_ISUID) || (e->mode & S_ISGID)) && !S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
+        {
+          fprintf(stderr, "%s: will only assign setXid bits to regular files or directories\n", e->file+rootl);
+          errors++;
+          continue;
+        }
+      if (traversed_insecure && ((e->mode & S_ISUID) || ((e->mode & S_ISGID) && S_ISREG(stb.st_mode))))
+        {
+          fprintf(stderr, "%s: will not give away setXid bits on an insecure path\n", e->file+rootl);
+          errors++;
+          continue;
+        }
+
+      if (euid == 0 && !owner_ok)
+        {
+         /* if we change owner or group of a setuid file the bit gets reset so
+            also set perms again */
+          if (e->mode & (S_ISUID | S_ISGID))
+              perm_ok = 0;
+          if (chown(fd_path, uid, gid))
+            {
+              fprintf(stderr, "%s: chown: %s\n", e->file+rootl, strerror(errno));
+              errors++;
+            }
+        }
+      if (!perm_ok && chmod(fd_path, e->mode))
+        {
+          fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
+          errors++;
+        }
+    }
+  // close fd from last loop iteration
+  if (fd >= 0)
+    {
+      close(fd);
       fd = -1;
-      if (S_ISDIR(stb.st_mode))
-	{
-	  fd = open(e->file, O_RDONLY|O_DIRECTORY|O_NONBLOCK|O_NOFOLLOW);
-	  if (fd == -1)
-	    {
-	      perror(e->file);
-	      errors++;
-	      continue;
-	    }
-	}
-      else if (S_ISREG(stb.st_mode))
-	{
-	  fd = open(e->file, O_RDONLY|O_NONBLOCK|O_NOFOLLOW);
-	  if (fd == -1)
-	    {
-	      perror(e->file);
-	      errors++;
-	      continue;
-	    }
-	  if (fstat(fd, &stb2))
-	    continue;
-	  if (stb.st_mode != stb2.st_mode || stb.st_nlink != stb2.st_nlink || stb.st_dev != stb2.st_dev || stb.st_ino != stb2.st_ino)
-	    {
-	      fprintf(stderr, "%s: too fluctuating\n", e->file);
-	      errors++;
-	      continue;
-	    }
-	  if (stb.st_nlink > 1 && !safepath(e->file, 0, 0))
-	    {
-	      fprintf(stderr, "%s: on an insecure path\n", e->file);
-	      errors++;
-	      continue;
-	    }
-	  else if (e->mode & 06000)
-	    {
-	      /* extra checks for s-bits */
-	      if (!safepath(e->file, (e->mode & 02000) == 0 ? uid : 0, (e->mode & 04000) == 0 ? gid : 0))
-		{
-		  fprintf(stderr, "%s: will not give away s-bits on an insecure path\n", e->file);
-		  errors++;
-		  continue;
-		}
-	    }
-	}
-      else if (strncmp(e->file, "/dev/", 4) != 0)
-	{
-	  fprintf(stderr, "%s: don't know what to do with that type of file\n", e->file);
-	  errors++;
-	  continue;
-	}
-      if (euid == 0 && (stb.st_uid != uid || stb.st_gid != gid))
-	{
-	  if (fd >= 0)
-	    r = fchown(fd, uid, gid);
-	  else
-	    r = chown(e->file, uid, gid);
-	  if (r)
-	    {
-	      fprintf(stderr, "%s: chown: %s\n", e->file, strerror(errno));
-	      errors++;
-	    }
-	  if (fd >= 0)
-	    r = fstat(fd, &stb);
-	  else
-	    r = lstat(e->file, &stb);
-	  if (r)
-	    {
-	      fprintf(stderr, "%s: too fluctuating\n", e->file);
-	      errors++;
-	      continue;
-	    }
-	}
-      if ((stb.st_mode & 07777) != e->mode)
-	{
-	  if (fd >= 0)
-	    r = fchmod(fd, e->mode);
-	  else
-	    r = chmod(e->file, e->mode);
-	  if (r)
-	    {
-	      fprintf(stderr, "%s: chmod: %s\n", e->file, strerror(errno));
-	      errors++;
-	    }
-	}
-      if (fd >= 0)
-	close(fd);
     }
   if (errors)
     {
