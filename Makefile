@@ -1,5 +1,9 @@
-CFLAGS=-W -Wall -g -O2
 CC=gcc
+CFLAGS=-g -O2 -std=c11 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
+ifdef CHKSTAT_TEST
+# for testing, add sanitizers:
+CFLAGS+=-fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=undefined
+endif
 DESTDIR=
 LDLIBS=-lcap
 prefix=/usr

@@ -283,7 +283,6 @@
 #
 # sendfax
 #
-# restrictive, only for "trusted" group users:
 /usr/lib/mgetty+sendfax/faxq-helper                     fax:root          0755
 /var/spool/fax/outgoing/                                fax:trusted       0755
 /var/spool/fax/outgoing/locks                           fax:trusted       0755
@@ -438,7 +437,7 @@
 
 # gvfs (bsc#1065864)
 /usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
- 
+
 # icinga2 (bsc#1069410)
 /run/icinga2/cmd					icinga:icingagmd 0750
 
