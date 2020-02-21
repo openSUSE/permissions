@@ -160,6 +160,11 @@ class ChkstatRegtest:
 			help = "By default the regtest tries to (re)build the chkstat binary. If this switch is set then whichever binary is currently found will be used."
 		)
 
+		self.m_parser.add_argument(
+			"--skip-proc", action = 'store_true',
+			help = "Run chkstat without a mounted /proc to test these special chkstat code paths that deal with that condition. This is only really useful in old code streams that attempt to mount their own /proc for backwards compatibility."
+		)
+
 		self.m_args = self.m_parser.parse_args()
 
 	def ensureForkedNamespace(self):
@@ -173,7 +178,7 @@ class ChkstatRegtest:
 			print("Couldn't find the 'unshare' program", file = sys.stderr)
 			sys.exit(1)
 
-		unshare_cmdline = [unshare, "-m", "-U"]
+		unshare_cmdline = [unshare, "-p", "-f", "-m", "-U"]
 
 		self.m_sub_id_supported = self.checkSubIDSupport()
 
@@ -402,6 +407,13 @@ class ChkstatRegtest:
 			shell = False
 		)
 
+	def mountProc(self, path):
+		subprocess.check_call(
+			["mount", "-t", "proc", "none", path],
+			close_fds = True,
+			shell = False
+		)
+
 	def bindMount(self, src, dst, recursive = True, read_only = False):
 		bind_mode = "--rbind" if recursive else "--bind"
 		options = "ro" if read_only else "rw"
@@ -471,7 +483,7 @@ class ChkstatRegtest:
 			except subprocess.CalledProcessError:
 				pass
 
-	def setupFakeRoot(self):
+	def setupFakeRoot(self, skip_proc):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
 		# mount namespace we don't leave behind garbage this way, we
@@ -483,7 +495,7 @@ class ChkstatRegtest:
 		# to own the root filesystem '/', thus let's chroot into /tmp,
 		# where we only bind mount the most important stuff from the
 		# root mount namespace
-		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var", "/proc"]
+		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var"]
 		# add any /lib32/64 symlinks whatever
 		bind_dirs.extend( glob.glob("/lib*") )
 		# /etc needs to be copied, we need to be able to write in
@@ -516,6 +528,13 @@ class ChkstatRegtest:
 				# case, not very helpful for evaluation
 				pass
 
+		# mount a new proc corresponding to our forked pid namespace
+		# unless this is disabled, to test chkstat behaviour without /proc
+		if not skip_proc:
+			new_proc = self.m_fake_root + "/proc"
+			os.mkdir(new_proc)
+			self.mountProc(new_proc)
+
 		# also bind-mount the permissions repo e.g. useful for
 		# debugging
 		permissions_repo_dst = self.m_fake_root + "/permissions"
@@ -538,7 +557,7 @@ class ChkstatRegtest:
 		os.umask(0o022)
 		# use a defined standard PATH list, include sbin
 		# to make sure we also find admin tools
-		os.environ["PATH"] =  "/bin:/sbin:/sbin:/usr/sbin"
+		os.environ["PATH"] =  "/bin:/sbin:/usr/bin:/usr/sbin"
 		os.chdir("/")
 
 		# setup a tmp directory just in case
@@ -586,8 +605,10 @@ class ChkstatRegtest:
 
 		# this causes a debug version with additional libasan routines
 		# to be built for testing
+		# asan requires /proc so don't use it if we don't mount it
 		make_env = os.environ.copy()
-		make_env["CHKSTAT_TEST"] = "1"
+		if not self.m_args.skip_proc:
+			make_env["CHKSTAT_TEST"] = "1"
 
 		try:
 			subprocess.check_call(
@@ -621,7 +642,7 @@ class ChkstatRegtest:
 
 		self.buildChkstat()
 
-		self.setupFakeRoot()
+		self.setupFakeRoot(self.m_args.skip_proc)
 		self.checkCapsSupport()
 
 		if self.m_args.enter_fakeroot:
@@ -1998,9 +2019,11 @@ class TestSymlinkBehaviour(TestBase):
 		# behaviour should be the same for both.
 		#
 		# in older chkstat versions symlinks have not been followed,
-		# in newer ones they are followed in a safe manner, but
+		# in newer ones they were followed in a safe manner, but
 		# in-between an inconsistency was present between absolute and
 		# relative symlinks.
+		# Current versions revert to the legacy behaviour of only following
+		# dir symlinks but not links in the final path element.
 		testroot = self.createAndGetTestDir(0o755)
 
 		testfile1 = os.path.join(testroot, "file1")
@@ -2030,8 +2053,66 @@ class TestSymlinkBehaviour(TestBase):
 		self.switchSystemProfile(testprofile)
 		self.applySystemProfile()
 
-		if self.assertMode(testlink1, 0o644) and \
-			self.assertMode(testlink2, 0o644):
+		if self.assertMode(testlink1, 0o600) and \
+			self.assertMode(testlink2, 0o600):
+			print("Modes of symlink targets have been ignored correctly")
+
+class TestSymlinkDirBehaviour(TestBase):
+
+	def __init__(self):
+
+		super().__init__("TestSymlinkDirBehaviour", "checks that intermediary trusted symlink components in paths are handled correctly")
+
+	def run(self):
+
+		# this test is about what happens when a directory
+		# is a valid, secure symlink. It should always be followed.
+		#
+		# two cases are considered:
+		# - an absolute symlink
+		# - a relative symlink
+		#
+		# behaviour should be the same for both.
+		#
+		# symlink handling is difficult:
+		#  - for relative links chkstat needs to keep proper track of the parent directory
+		#  - for absolute links, the configured root may not be escaped
+
+		testroot = self.createAndGetTestDir(0o755)
+
+		testfile1 = os.path.join(testroot, "file1")
+		testfile2 = os.path.join(testroot, "file2")
+
+		self.createTestFile(testfile1, 0o600)
+		self.createTestFile(testfile2, 0o600)
+
+		testlink1 = os.path.join(testroot, self.getName() + "_rel_link")
+		testlink2 = os.path.join(testroot, self.getName() + "_abs_link")
+
+		# absolute symlink
+		os.symlink("../../../../../" + testroot, testlink1)
+		# relative symlink
+		os.symlink("/../../../../../" + testroot, testlink2)
+
+		testprofile = "easy"
+
+		# the configured paths, where a dir is a link
+		testpath1 = os.path.join(testlink1, "file1")
+		testpath2 = os.path.join(testlink2, "file2")
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(testpath1, 0o644),
+				self.buildProfileLine(testpath2, 0o644),
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		self.applySystemProfile()
+
+		if self.assertMode(testfile1, 0o644) and \
+			self.assertMode(testfile2, 0o644):
 			print("Modes of symlink targets have been adjusted correctly")
 
 test = ChkstatRegtest()
@@ -2054,6 +2135,7 @@ res = test.run((
 		TestRejectUserSymlink,
 		TestPrivsForSpecialFiles,
 		TestPrivsOnInsecurePath,
-		TestSymlinkBehaviour
+		TestSymlinkBehaviour,
+		TestSymlinkDirBehaviour,
 	))
 sys.exit(res)

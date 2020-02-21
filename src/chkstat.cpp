@@ -21,7 +21,7 @@
 #ifndef _GNU_SOURCE
 #   define _GNU_SOURCE
 #endif
-#include <stdio.h>
+#include <cstdio>
 #include <pwd.h>
 #include <grp.h>
 #include <sys/types.h>
@@ -29,19 +29,20 @@
 #include <sys/vfs.h>
 #include <linux/magic.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/capability.h>
 #include <fcntl.h>
-#include <stdbool.h>
 #include <sys/param.h>
+#include <cassert>
 
 #define BAD_LINE() \
     fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
 
-struct perm {
+struct perm
+{
     struct perm *next;
     char *file;
     char *owner;
@@ -344,33 +345,12 @@ compare(const void* a, const void* b)
 }
 
 static void
-collect_permfiles()
+read_permissions_d(const char *directory)
 {
     size_t i;
     DIR* dir;
 
-    ensure_array((void**)&permfiles, &npermfiles);
-    // 1. central fixed permissions file
-    permfiles[npermfiles++] = strdup("/etc/permissions");
-
-    // 2. central easy, secure paranoid as those are defined by SUSE
-    for (i = 0; i < nlevel; ++i)
-    {
-        if (!strcmp(level[i], "easy")
-                || !strcmp(level[i], "secure")
-                || !strcmp(level[i], "paranoid"))
-        {
-            char fn[4096];
-            snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
-            if (access(fn, R_OK) == 0)
-            {
-                ensure_array((void**)&permfiles, &npermfiles);
-                permfiles[npermfiles++] = strdup(fn);
-            }
-        }
-    }
-    // 3. package specific permissions
-    dir = opendir("/etc/permissions.d");
+    dir = opendir(directory);
     if (dir)
     {
         char** files = NULL;
@@ -407,7 +387,7 @@ collect_permfiles()
                 if (i && !strcmp(files[i-1], files[i]))
                     continue;
 
-                snprintf(fn, sizeof(fn), "/etc/permissions.d/%s", files[i]);
+                snprintf(fn, sizeof(fn), "%s/%s", directory, files[i]);
                 if (access(fn, R_OK) == 0)
                 {
                     ensure_array((void**)&permfiles, &npermfiles);
@@ -416,7 +396,7 @@ collect_permfiles()
 
                 for (l = 0; l < nlevel; ++l)
                 {
-                    snprintf(fn, sizeof(fn), "/etc/permissions.d/%s.%s", files[i], level[l]);
+                    snprintf(fn, sizeof(fn), "%s/%s.%s", directory, files[i], level[l]);
 
                     if (access(fn, R_OK) == 0)
                     {
@@ -433,6 +413,54 @@ collect_permfiles()
         }
         free(files);
     }
+}
+
+static void
+collect_permfiles()
+{
+    size_t i;
+
+    // 1. central fixed permissions file
+    if (access("/usr/share/permissions/permissions", R_OK) == 0)
+    {
+        ensure_array((void**)&permfiles, &npermfiles);
+        permfiles[npermfiles++] = strdup("/usr/share/permissions/permissions");
+    }
+    else if (access("/etc/permissions", R_OK) == 0)
+    {
+        ensure_array((void**)&permfiles, &npermfiles);
+        permfiles[npermfiles++] = strdup("/etc/permissions");
+    }
+
+    // 2. central easy, secure paranoid as those are defined by SUSE
+    for (i = 0; i < nlevel; ++i)
+    {
+        if (!strcmp(level[i], "easy")
+                || !strcmp(level[i], "secure")
+                || !strcmp(level[i], "paranoid"))
+        {
+            char fn[4096];
+            snprintf(fn, sizeof(fn), "/usr/share/permissions/permissions.%s", level[i]);
+            if (access(fn, R_OK) == 0)
+            {
+                ensure_array((void**)&permfiles, &npermfiles);
+                permfiles[npermfiles++] = strdup(fn);
+            }
+            else
+            {
+                snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
+                if (access(fn, R_OK) == 0)
+                {
+                    ensure_array((void**)&permfiles, &npermfiles);
+                    permfiles[npermfiles++] = strdup(fn);
+                }
+            }
+        }
+    }
+    // 3. package specific permissions
+    read_permissions_d("/usr/share/permissions/permissions.d");
+    read_permissions_d("/etc/permissions.d");
+
     // 4. central permissions files with user defined level incl 'local'
     for (i = 0; i < nlevel; ++i)
     {
@@ -473,7 +501,8 @@ usage(int x)
     exit(x);
 }
 
-enum proc_mount_state {
+enum proc_mount_state
+{
     PROC_MOUNT_STATE_UNKNOWN,
     PROC_MOUNT_STATE_AVAIL,
     PROC_MOUNT_STATE_UNAVAIL,
@@ -514,6 +543,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
     char *path_rest;
     int lcnt;
     int pathfd = -1;
+    int parentfd = -1;
     struct stat root_st;
     bool is_final_path_element = false;
 
@@ -603,14 +633,17 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
         if (S_ISLNK(stb->st_mode))
         {
+            // If the path configured in the permissions configuration is a symlink, we don't follow it.
+            // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
+            if (is_final_path_element || ++lcnt >= 256)
+                goto fail;
+
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
             // of the link, but we're going the simple route for now.
             if (stb->st_uid && stb->st_uid != euid)
                 goto fail_insecure_path;
 
-            if (++lcnt >= 256)
-                goto fail;
             char linkbuf[PATH_MAX];
             ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
 
@@ -630,30 +663,35 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
                 close(pathfd);
                 pathfd = -1;
             }
+            else
+            {
+                // relative link: continue relative to the parent directory
+                close(pathfd);
+                if (parentfd == -1) // we encountered a link directly below /
+                    pathfd = -1;
+                else
+                    pathfd = dup(parentfd);
+            }
 
-            size_t len;
             // need a temporary buffer because path_rest points into pathbuf
             // and snprintf doesn't allow the same buffer as source and
             // destination
             char tmp[sizeof(pathbuf) - 1];
-
-            if (is_final_path_element)
-            {
-                len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
-            }
-            else
-            {
-                len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
-            }
-
+            size_t len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
             if (len >= sizeof(tmp))
                 goto fail;
 
             // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
             strcpy(pathbuf + 1, tmp);
             path_rest = pathbuf;
-
-            is_final_path_element = false;
+        }
+        else if (S_ISDIR(stb->st_mode))
+        {
+            if (parentfd >= 0)
+                close(parentfd);
+            // parentfd is only needed to find the parent of a symlink.
+            // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
+            parentfd = dup(pathfd);
         }
     }
 
@@ -662,6 +700,11 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
     {
         fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+rootl);
         goto fail;
+    }
+
+    if (parentfd >= 0)
+    {
+        close(parentfd);
     }
 
     return pathfd;
@@ -683,6 +726,10 @@ fail:
     if (pathfd >= 0)
     {
         close(pathfd);
+    }
+    if (parentfd >= 0)
+    {
+        close(parentfd);
     }
     return -1;
 }
