@@ -556,6 +556,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
   char *path_rest;
   int lcnt;
   int pathfd = -1;
+  int parentfd = -1;
   struct stat root_st;
   bool is_final_path_element = false;
 
@@ -564,7 +565,9 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
   lcnt = 0;
   if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + rootl) >= sizeof(pathbuf))
     goto fail;
+
   path_rest = pathbuf;
+
   while (!is_final_path_element)
     {
       *path_rest = '/';
@@ -634,38 +637,67 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
       if (S_ISLNK(stb->st_mode))
         {
+          // If the path configured in the permissions configuration is a symlink, we don't follow it.
+          // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
+          if (is_final_path_element || ++lcnt >= 256)
+            goto fail;
+
           // Don't follow symlinks owned by regular users.
           // In theory, we could also trust symlinks where the owner of the target matches the owner
           // of the link, but we're going the simple route for now.
           if (stb->st_uid && stb->st_uid != euid)
             goto fail_insecure_path;
 
-          if (++lcnt >= 256)
-            goto fail;
           char linkbuf[PATH_MAX];
           ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
+
           if (l <= 0 || (size_t)l >= sizeof(linkbuf) - 1)
             goto fail;
+
           while(l && linkbuf[l - 1] == '/')
-            l--;
+            {
+              l--;
+            }
+
           linkbuf[l] = 0;
+
           if (linkbuf[0] == '/')
             {
               // absolute link
               close(pathfd);
               pathfd = -1;
             }
-          size_t len;
-          char tmp[sizeof(pathbuf) - 1]; // need a temporary buffer because path_rest points into pathbuf and snprintf doesn't allow the same buffer as source and destination
-          if (is_final_path_element)
-            len = (size_t)snprintf(tmp, sizeof(tmp), "%s", linkbuf);
           else
-            len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
+            {
+              // relative link: continue relative to the parent directory
+              close(pathfd);
+              if (parentfd == -1) // we encountered a link directly below /
+                pathfd = -1;
+              else
+                pathfd = dup(parentfd);
+            }
+
+          // need a temporary buffer because path_rest points into pathbuf
+          // and snprintf doesn't allow the same buffer as source and
+          // destination
+          char tmp[sizeof(pathbuf) - 1];
+
+          size_t len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
+
           if (len >= sizeof(tmp))
             goto fail;
+
           // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
           strcpy(pathbuf + 1, tmp);
           path_rest = pathbuf;
+        }
+      else if (S_ISDIR(stb->st_mode))
+        {
+          if (parentfd >= 0)
+            close(parentfd);
+          // parentfd is only needed to find the parent of a symlink.
+          // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
+          parentfd = dup(pathfd);
         }
     }
 
@@ -673,6 +705,11 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
   if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH)) {
     fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+rootl);
     goto fail;
+  }
+
+  if (parentfd >= 0)
+  {
+      close(parentfd);
   }
 
   return pathfd;
@@ -693,7 +730,13 @@ fail_insecure_path:
 
 fail:
   if (pathfd >= 0)
-    close(pathfd);
+    {
+        close(pathfd);
+    }
+  if (parentfd >= 0)
+    {
+       close(parentfd);
+    }
   return -1;
 }
 
