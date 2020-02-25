@@ -611,6 +611,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
         {
           if (is_final_path_element)
             {
+              // do not backport behavior change
               //fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
               //goto fail;
             }
