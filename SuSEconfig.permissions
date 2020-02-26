@@ -1,0 +1,86 @@
+#! /bin/bash
+# This module checks and sets file permissions
+# Copyright (C) 1996-2007 SUSE Linux Products GmbH, Nuernberg, Germany.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# Author: Burchard Steinbild, 1996-97
+#         Bernhard Kaindl <bk@suse.de>, 1999
+#         Rüdiger Oertel <ro@suse.de>, 2000-01
+#         Ludwig Nussel  <lnussel@suse.de> 2007
+#
+
+. /lib/YaST/SuSEconfig.functions || exit 1
+
+for i in /etc/sysconfig/security /etc/sysconfig/suseconfig ; do
+  . $i || exit 1
+done
+
+if test -n "$ENABLE_SUSECONFIG" -a "$ENABLE_SUSECONFIG" = "no" ; then
+    echo "SuSEconfig is disabled in /etc/sysconfig/suseconfig"
+    exit 0
+fi
+
+mode=""
+case "$CHECK_PERMISSIONS" in
+    set) mode="-set" ;;
+    warn) ;;
+    no|"") exit 0 ;;
+    *) echo "invalid value '$CHECK_PERMISSIONS' for \$CHECK_PERMISSIONS" >&2 ;;
+esac
+
+
+
+# collect files that contain permission specifications
+#
+# 1. central fixed permissions file
+files="/etc/permissions"
+
+# 2. central easy, secure paranoid as those are defined by SUSE
+for level in $PERMISSION_SECURITY; do 
+    case "$level" in
+	easy|secure|paranoid)
+	    if [ -e /etc/permissions.$level ]; then
+		files="$files /etc/permissions.$level"
+	    fi
+	;;
+    esac
+done
+
+# 3. package specific permissions
+pkgfiles=(/etc/permissions.d/*)
+pkgfiles=(${pkgfiles[*]##*/})
+pkgfiles=(${pkgfiles[*]%%.*})
+pkgfiles=(`for i in ${pkgfiles[@]}; do echo $i; done | /usr/bin/sort -u`)
+
+for file in ${pkgfiles[@]}; do
+    file=/etc/permissions.d/$file
+    [ -e $file ] && files="$files $file"
+    for level in $PERMISSION_SECURITY; do 
+	[ -e $file.$level ] && files="$files $file.$level"
+    done
+done
+
+# 4. central permissions files with user defined level incl 'local'
+for level in $PERMISSION_SECURITY; do 
+    case "$level" in
+	easy|secure|paranoid) continue ;;
+    esac
+    if [ -e /etc/permissions.$level ]; then
+	files="$files /etc/permissions.$level"
+    fi
+done
+
+/usr/bin/chkstat $mode $files

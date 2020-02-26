@@ -1,0 +1,436 @@
+#
+# Copyright (c) 2001 SuSE GmbH Nuernberg, Germany.  All rights reserved.
+#
+# Author: Roman Drahtmueller <draht@suse.de>, 2001
+#
+# 
+# See /etc/permissions for general hints on how to use this file.
+#
+# /etc/permissions.easy is set up for the use in a standalone and single-user
+# installation to make things "work" out-of-the box.
+# Some of the settings might be considered somewhat lax from the security
+# standpoint. These aspects are handled differently in the permissions.secure
+# file.
+# 
+
+#
+# Directories
+#
+
+# lock file for emacs
+/var/lib/xemacs/lock                                    root:root         1777
+# for screen's session sockets:
+/var/run/uscreens                                       root:root         1777
+
+#
+# /etc
+#
+/etc/crontab                                            root:root          644
+/etc/exports                                            root:root          644
+/etc/fstab                                              root:root          644
+# we don't package it
+/etc/ftpaccess                                          root:root          644
+/etc/ftpusers                                           root:root          644
+/etc/inetd.conf                                         root:root          644
+/etc/inittab                                            root:root          644
+/etc/mtab                                               root:root          644
+/etc/rmtab                                              root:root          644
+/var/lib/nfs/rmtab                                      root:root          644
+/etc/syslog.conf                                        root:root          644
+
+#
+# suid system programs that need the suid bit to work:
+#
+/bin/su                                                 root:root         4755
+/usr/bin/at                                             root:trusted      4755
+/usr/bin/crontab                                        root:trusted      4755
+/usr/bin/gpasswd                                        root:shadow       4755
+/usr/bin/newgrp                                         root:root         4755
+/usr/bin/passwd                                         root:shadow       4755
+/usr/bin/chfn                                           root:shadow       4755
+/usr/bin/chage                                          root:shadow       4755
+/usr/bin/chsh                                           root:shadow       4755
+/usr/bin/expiry                                         root:shadow       4755
+/usr/bin/sudo                                           root:root         4755
+/usr/sbin/su-wrapper                                    root:root         4755
+# opie password system
+# #66303
+/usr/bin/opiepasswd                                     root:root         4755
+# "user" entries in /etc/fstab make mount work for non-root users:
+/usr/bin/ncpmount                                       root:trusted      4750
+/usr/bin/ncpumount                                      root:trusted      4750
+# #331020
+/sbin/mount.nfs                                         root:root         4755
+# mount/umount have had their problems already:
+/bin/mount                                              root:root         4755
+/bin/umount                                             root:root         4755
+/bin/eject                                              root:audio        4755
+#
+# #133657
+/usr/bin/fusermount                                     root:trusted      4755
+# #66203
+/usr/lib/majordomo/wrapper                              root:daemon       4755
+# glibc backwards compatibility
+/usr/lib/pt_chown                                       root:root         4755
+/usr/lib64/pt_chown                                     root:root         4755
+# needs setuid root when using shadow via NIS:
+# #216816
+/sbin/unix_chkpwd                                       root:shadow       4755
+/sbin/unix2_chkpwd                                      root:shadow       4755
+# qpopper
+/usr/sbin/popauth                                       pop:trusted       4755
+# from the squid package
+/usr/sbin/pam_auth                                      root:shadow       4755
+
+# still to be converted to utempter
+/usr/lib/vte/gnome-pty-helper                           root:tty          2755
+
+#
+# mixed section:
+#
+#########################################################################
+# rpm subsystem:
+/usr/src/packages/SOURCES/                              root:root         1777
+/usr/src/packages/BUILD/                                root:root         1777
+/usr/src/packages/RPMS/                                 root:root         1777
+/usr/src/packages/RPMS/alpha/                           root:root         1777
+/usr/src/packages/RPMS/alphaev56/                       root:root         1777
+/usr/src/packages/RPMS/alphaev67/                       root:root         1777
+/usr/src/packages/RPMS/alphaev6/                        root:root         1777
+/usr/src/packages/RPMS/arm4l/                           root:root         1777
+/usr/src/packages/RPMS/athlon/                          root:root         1777
+/usr/src/packages/RPMS/i386/                            root:root         1777
+/usr/src/packages/RPMS/i486/                            root:root         1777
+/usr/src/packages/RPMS/i586/                            root:root         1777
+/usr/src/packages/RPMS/i686/                            root:root         1777
+/usr/src/packages/RPMS/ia64/                            root:root         1777
+/usr/src/packages/RPMS/mips/                            root:root         1777
+/usr/src/packages/RPMS/ppc/                             root:root         1777
+/usr/src/packages/RPMS/ppc64/                           root:root         1777
+/usr/src/packages/RPMS/powerpc/                         root:root         1777
+/usr/src/packages/RPMS/powerpc64/                       root:root         1777
+/usr/src/packages/RPMS/s390/                            root:root         1777
+/usr/src/packages/RPMS/s390x/                           root:root         1777
+/usr/src/packages/RPMS/sparc/                           root:root         1777
+/usr/src/packages/RPMS/sparcv9/                         root:root         1777
+/usr/src/packages/RPMS/sparc64/                         root:root         1777
+/usr/src/packages/RPMS/x86_64/                          root:root         1777
+/usr/src/packages/RPMS/armv4l/                          root:root         1777
+/usr/src/packages/RPMS/hppa/                            root:root         1777
+/usr/src/packages/RPMS/hppa2.0/                         root:root         1777
+/usr/src/packages/RPMS/noarch/                          root:root         1777
+/usr/src/packages/SPECS/                                root:root         1777
+/usr/src/packages/SRPMS/                                root:root         1777
+#########################################################################
+# video
+/usr/bin/v4l-conf                                       root:video        4755
+# Itanium ia32 emulator
+/usr/lib/ia32el/suid_ia32x_loader                       root:root         4755
+# scotty:
+# #66211
+/usr/bin/ntping                                         root:trusted      4750
+# screen savers:
+/usr/bin/vlock                                          root:shadow       2755
+/usr/bin/Xorg                                           root:root         4711
+# turn off write and wall by disabling sgid tty:
+/usr/bin/wall                                           root:tty          2755
+/usr/bin/write                                          root:tty          2755
+# thttpd:
+/usr/bin/makeweb                                        root:www          2755
+# yaps, pager software, accesses /dev/ttyS?
+/usr/bin/yaps                                           root:uucp         2755
+# ncpfs tool
+/usr/bin/nwsfind                                        root:trusted      4750
+/usr/bin/ncplogin                                       root:trusted      4750
+/usr/bin/ncpmap                                         root:trusted      4750
+# lpdfilter:
+# checks itself that only lp and root can call it
+/usr/lib/lpdfilter/bin/runlpr                           root:root         4755
+# pcmcia:
+# Needs setuid to eject cards (#100120)
+/sbin/pccardctl                                         root:trusted      4755
+# gnokii nokia cellphone software
+# #66209
+/usr/sbin/mgnokiidev                                    root:uucp         4755
+# pcp, performance co-pilot
+# setuid root is used to write /var/log/pcp/NOTICES
+# #66205
+/usr/lib/pcp/pmpost                                     root:root         4755
+# mailman mailing list software
+# #66315
+/usr/lib/mailman/cgi-bin/admin                          root:mailman      2755
+/usr/lib/mailman/cgi-bin/admindb                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/edithtml                       root:mailman      2755
+/usr/lib/mailman/cgi-bin/listinfo                       root:mailman      2755
+/usr/lib/mailman/cgi-bin/options                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/private                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/roster                         root:mailman      2755
+/usr/lib/mailman/cgi-bin/subscribe                      root:mailman      2755
+/usr/lib/mailman/cgi-bin/confirm                        root:mailman      2755
+/usr/lib/mailman/cgi-bin/create                         root:mailman      2755
+/usr/lib/mailman/cgi-bin/editarch                       root:mailman      2755
+/usr/lib/mailman/cgi-bin/rmlist                         root:mailman      2755
+/usr/lib/mailman/mail/mailman                           root:mailman      2755
+
+# libgnomesu (#75823, #175616)
+/usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
+
+# control-center2 (#104993)
+/usr/sbin/change-passwd                                 root:root         4755
+
+#
+# cups (#66305,#406058)
+#
+/usr/bin/lppasswd                                       lp:lp             2755
+
+#
+# smb printing with kerberos authentication (#177114)
+#
+/usr/bin/get_printing_ticket                            root:lp           4750
+
+#
+# networking (need root for the privileged socket)
+#
+/bin/ping                                               root:root         4755
+/bin/ping6                                              root:root         4755
+/usr/sbin/traceroute6                                   root:root         4755
+# mtr is linked against ncurses. For dialout only.
+/usr/sbin/mtr                                           root:dialout      4750
+/usr/bin/rcp                                            root:root         4755
+/usr/bin/rlogin                                         root:root         4755
+/usr/bin/rsh                                            root:root         4755
+
+# heartbeat #66310
+# cl_status needs to be allowed to connect to the heartbeat API. If the setgid
+# bit is removed, one can manually add users to the haclient group instead.
+/usr/bin/cl_status                                      root:haclient     2555
+
+# exim
+/usr/sbin/exim                                          root:root         4755
+
+#
+# dialup networking programs
+#
+/usr/sbin/pppoe-wrapper                                 root:dialout      4750
+# i4l package (#100750):
+/sbin/isdnctrl                                          root:dialout      4750
+# #66111
+/usr/bin/vboxbeep                                       root:trusted      4755
+
+
+#
+# linux text console utilities
+#
+# setuid needed on the text console to set the terminal content on ctrl-o
+# #66112
+/usr/lib/mc/cons.saver                                  root:root         4755
+
+
+#
+# terminal emulators
+# This and future SuSE products have support for the utempter, a small helper
+# program that does the utmp/wtmp update work with the necessary rights.
+# The use of utempter obsoletes the need for sgid bits on terminal emulator
+# binaries. We mention screen here, but all other terminal emulators have
+# moved to /etc/permissions, with modes set to 0755.
+
+# needs setuid to access /dev/console
+# framebuffer terminal emulator (japanese)
+/usr/bin/jfbterm                                        root:tty          6755
+
+#
+# kde
+# (all of them are disabled in permissions.secure except for 
+# the helper programs)
+#
+# arts wrapper, normally suid root:
+/opt/kde3/bin/artswrapper                               root:root         4755
+# needs setuid root when using shadow via NIS:
+# #66218
+/opt/kde3/bin/kcheckpass                                root:shadow       4755
+/usr/lib/kde4/libexec/kcheckpass                        root:shadow       4755
+/usr/lib64/kde4/libexec/kcheckpass                      root:shadow       4755
+# This has a meaning... hmm...
+/opt/kde3/bin/kdesud                                    root:nogroup      2755
+/usr/lib/kde4/libexec/kdesud                            root:nogroup      2755
+/usr/lib64/kde4/libexec/kdesud                          root:nogroup      2755
+# used for getting proxy settings from dhcp
+/opt/kde3/bin/kpac_dhcp_helper                          root:root         4755
+# used to distract the oom killer
+# #203535
+/opt/kde3/bin/start_kdeinit                             root:root         4755
+# edits /etc/smb.conf
+# #66312
+/usr/bin/fileshareset                                   root:root         4755
+
+
+#
+# amanda
+#
+/usr/sbin/amcheck                                       root:disk         4750
+/usr/lib/amanda/calcsize                                root:disk         4750
+/usr/lib/amanda/rundump                                 root:disk         4750
+/usr/lib/amanda/planner                                 root:disk         4750
+/usr/lib/amanda/runtar                                  root:disk         4750
+/usr/lib/amanda/dumper                                  root:disk         4750
+/usr/lib/amanda/killpgrp                                root:disk         4750
+
+
+#
+# gnats
+#
+/usr/lib/gnats/gen-index                                gnats:root        4555
+/usr/lib/gnats/pr-edit                                  gnats:root        4555
+/usr/lib/gnats/queue-pr                                 gnats:root        4555
+
+
+#
+# news (inn)
+#
+# the inn start script changes it's uid to news:news. Later innstart and
+# innfeed are called by this user. Those programs do not need to be called by
+# anyone else, therefore the strange permissions 4554 are required for
+# operation. (#67032)
+#
+/usr/lib/news/bin/rnews                                 news:uucp         4550
+/usr/lib/news/bin/startinnfeed                          root:news         4554
+/usr/lib/news/bin/inndstart                             root:news         4554
+/usr/lib/news/bin/inews                                 news:news         2555
+
+
+#
+# fax
+#
+# faxq helper:
+/usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4711
+/var/spool/fax/outgoing                                 fax:root          1755
+/var/spool/fax/outgoing/locks                           fax:root          0777
+# TODO: package should set this permissions
+/var/spool/fax/archive                                  fax:uucp           700
+/var/spool/fax/bin                                      fax:uucp           755
+/var/spool/fax/client                                   fax:uucp           755
+/var/spool/fax/config                                   fax:uucp           755
+/var/spool/fax/dev                                      fax:uucp           755
+/var/spool/fax/docq                                     fax:uucp           700
+/var/spool/fax/doneq                                    fax:uucp           700
+/var/spool/fax/etc                                      fax:uucp           755
+/var/spool/fax/info                                     fax:uucp           755
+/var/spool/fax/log                                      fax:uucp           755
+/var/spool/fax/pollq                                    fax:uucp           700
+/var/spool/fax/recvq                                    fax:uucp           755
+/var/spool/fax/sendq                                    fax:uucp           700
+/var/spool/fax/status                                   fax:uucp           755
+/var/spool/fax/tmp                                      fax:uucp           700
+
+#
+# uucp
+#
+/var/spool/uucppublic                                   root:root         1777
+/usr/bin/uucp                                           uucp:uucp         6555
+/usr/bin/uuname                                         uucp:uucp         6555
+/usr/bin/uustat                                         uucp:uucp         6555
+/usr/bin/uux                                            uucp:uucp         6555
+/usr/lib/uucp/uucico                                    uucp:uucp         6555
+/usr/lib/uucp/uuxqt                                     uucp:uucp         6555
+
+# pcp (bnc#782967)
+/var/lib/pcp/tmp					root:root	  1777
+/var/lib/pcp/tmp/pmdabash				root:root	  1777
+/var/lib/pcp/tmp/mmv					root:root	  1777
+/var/lib/pcp/tmp/pmlogger				root:root	  1777
+/var/lib/pcp/tmp/pmie					root:root	  1777
+
+
+#
+# games of all kinds, toys
+#
+
+# bsd-games
+/usr/games/atc                                          games:games       2755
+/usr/games/battlestar                                   games:games       2755
+/usr/games/canfield                                     games:games       2755
+/usr/games/cribbage                                     games:games       2755
+/usr/games/phantasia                                    games:games       2755
+/usr/games/robots                                       games:games       2755
+/usr/games/sail                                         games:games       2755
+/usr/games/snake                                        games:games       2755
+/usr/games/tetris-bsd                                   games:games       2755
+
+# Maelstrom
+/usr/games/Maelstrom                                    games:games       2755
+
+# pachi
+/usr/games/pachi                                        games:games       2755
+/usr/games/martian                                      games:games       2755
+
+# nethack
+/usr/lib/nethack/nethack.tty                            games:games       2755
+
+# chromium,
+/usr/games/chromium                                     games:games       2755
+
+# xscrabble
+/usr/games/xscrab                                       games:games       2755
+
+# trackballs
+/usr/games/trackballs                                   games:games       2755
+
+# ltris
+/usr/games/ltris                                        games:games       2755
+
+# xlogical
+/usr/games/xlogical                                     games:games       2755
+
+# lbreakout
+/usr/games/lbreakout2                                   games:games       2755
+
+# xgalaga
+/usr/bin/xgalaga                                        games:games       2755
+
+# rocksndiamonds
+/usr/games/rocksndiamonds                               games:games       2755
+
+# gnome-games
+/usr/bin/glines                                         games:games       2755
+/usr/bin/gnibbles                                       games:games       2755
+/usr/bin/gnobots2                                       games:games       2755
+/usr/bin/gnometris                                      games:games       2755
+/usr/bin/gnomine                                        games:games       2755
+/usr/bin/gnotravex                                      games:games       2755
+/usr/bin/gnotski                                        games:games       2755
+/usr/bin/gtali                                          games:games       2755
+/usr/bin/mahjongg                                       games:games       2755
+/usr/bin/same-gnome                                     games:games       2755
+
+# zypp (#385207)
+/usr/sbin/zypp-refresh-wrapper                          root:root         4755
+
+# PolicyKit (#295341)
+/usr/lib/PolicyKit/polkit-set-default-helper            polkituser:root   4755
+/usr/lib/PolicyKit/polkit-read-auth-helper              root:polkituser   2755
+/usr/lib/PolicyKit/polkit-revoke-helper                 root:polkituser   2755
+/usr/lib/PolicyKit/polkit-explicit-grant-helper         root:polkituser   2755
+/usr/lib/PolicyKit/polkit-grant-helper                  root:polkituser   2755
+/usr/lib/PolicyKit/polkit-grant-helper-pam              root:polkituser   4750
+
+# dbus-1 (#333361)
+/lib/dbus-1/dbus-daemon-launch-helper                   root:messagebus   4750
+/lib64/dbus-1/dbus-daemon-launch-helper                 root:messagebus   4750
+
+# policycoreutils (#440596)
+/usr/bin/newrole                                        root:root         4755
+
+# VirtualBox (#429725)
+/usr/lib/virtualbox/VirtualBox                          root:vboxusers    4750
+/usr/lib/virtualbox/VirtualBox3                         root:vboxusers    4750
+/usr/lib/virtualbox/VBoxBFE                             root:vboxusers    4750
+/usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    4750
+/usr/lib/virtualbox/VBoxSDL                             root:vboxusers    4750
+
+# binary only nicimud (bnc#591372)
+/var/opt/novell/nici/nicimud                            root:root         4755
+/var/opt/novell/nici/nicimud64                          root:root         4755
+
+# hawk (bnc#665045)
+/usr/sbin/hawk_chkpwd                                   root:haclient     4750
+/usr/sbin/hawk_invoke                                   root:haclient     4750
