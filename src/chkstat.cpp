@@ -179,7 +179,7 @@ readline(FILE *fp, char *buf, size_t len)
     if (l + 1 < len)
         return 1;
     fprintf(stderr, "warning: buffer overrun in line starting with '%s'\n", buf);
-    char c;
+    int c;
     while ((c = getc(fp)) != EOF && c != '\n')
         ;
     buf[0] = 0;
