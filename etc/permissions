@@ -210,3 +210,6 @@
 /usr/src/packages/RPMS/x86_64/                          root:root         0755
 /usr/src/packages/SPECS/                                root:root         0755
 /usr/src/packages/SRPMS/                                root:root         0755
+
+# ceph log directory (bsc#1150366)
+/var/log/ceph/                                          ceph:ceph         3770
