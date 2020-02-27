@@ -728,7 +728,7 @@ fail:
 int
 main(int argc, char **argv)
 {
-  char *opt, *str;
+  char *opt;
   int told = 0;
   int use_checklist = 0;
   int systemmode = 0;
