@@ -445,3 +445,6 @@
 
 # spice-gtk (bsc#1101420)
 /usr/bin/spice-client-glib-usb-acl-helper               root:kvm        0750
+
+# Workload Memory Protection (bsc#1161335)
+/usr/lib/sapwmp/sapwmp-capture                           root:sapsys    0750
