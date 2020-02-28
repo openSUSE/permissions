@@ -5,6 +5,7 @@
 
 import argparse
 import errno
+import fnmatch
 import glob
 import grp
 import io
@@ -444,7 +445,8 @@ class ChkstatRegtest:
 		)
 
 	def unmount(self, mountpoint):
-		subprocess.check_call(
+		# ignoring exit, because recursive bind mounts may not be unmountable due to missing permissions
+		subprocess.call(
 			[ "umount", "-R", mountpoint ],
 			close_fds = True,
 			shell = False
@@ -483,6 +485,12 @@ class ChkstatRegtest:
 			except subprocess.CalledProcessError:
 				pass
 
+	@staticmethod
+	def globWithExceptions(pattern, *exceptions):
+		"""Returns all paths that match the glob 'pattern' but none of the globs in 'exceptions'."""
+		isException = lambda fname: any(fnmatch.fnmatch(fname, exc) for exc in exceptions)
+		return (f for f in glob.glob(pattern) if not isException(f))
+
 	def setupFakeRoot(self, skip_proc):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
@@ -495,12 +503,16 @@ class ChkstatRegtest:
 		# to own the root filesystem '/', thus let's chroot into /tmp,
 		# where we only bind mount the most important stuff from the
 		# root mount namespace
-		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var"]
+		bind_dirs = ["/bin", "/sbin", "/sys", "/dev", "/var"]
 		# add any /lib32/64 symlinks whatever
 		bind_dirs.extend( glob.glob("/lib*") )
-		# /etc needs to be copied, we need to be able to write in
-		# there, to construct fake permissions config files
-		copy_dirs = ("/etc",)
+		# bind-mount everything in /usr except /usr/share/permissions
+		bind_dirs += self.globWithExceptions("/usr/*", "/usr/share")
+		bind_dirs += self.globWithExceptions("/usr/share/*",  "/usr/share/permissions")
+		# mount everything in /etc except /etc/permissions* and /etc/sysconfig/security
+		# so we can construct fake permissions config files
+		bind_dirs += self.globWithExceptions("/etc/*", "/etc/permissions*", "/etc/sysconfig")
+		bind_dirs += self.globWithExceptions("/etc/sysconfig/*", "/etc/sysconfig/security")
 
 		for src in bind_dirs:
 
@@ -511,22 +523,12 @@ class ChkstatRegtest:
 			elif os.path.isdir(src):
 				os.makedirs(dst)
 				self.bindMount(src, dst)
+			elif os.path.isfile(src):
+				os.makedirs(os.path.dirname(dst), exist_ok=True)
+				os.mknod(dst, mode = stat.S_IFREG | 0o600)
+				self.bindMount(src, dst)
 			else:
 				raise Exception("bad mount src " + src)
-
-		for src in copy_dirs:
-			dst_dir = self.m_fake_root + src
-			try:
-				# symlinks here means "copy links as is"
-				shutil.copytree(src, dst_dir, symlinks = True)
-			except shutil.Error:
-				# copying /etc only works partially since
-				# we're not really root.
-				# this error contains a list of errors in
-				# args[0] consisting of (src, dst, error)
-				# tuples, but "error" is only a string in this
-				# case, not very helpful for evaluation
-				pass
 
 		# mount a new proc corresponding to our forked pid namespace
 		# unless this is disabled, to test chkstat behaviour without /proc
@@ -580,9 +582,7 @@ class ChkstatRegtest:
 		color_printer.reset()
 
 	def printException(self, e):
-		_, _, tb = sys.exc_info()
-		fn, ln, _, _ = frame = traceback.extract_tb(tb)[-1]
-		print("Exception in {}:{}:".format(fn, ln), str(e), file = sys.stderr)
+		traceback.print_exc(limit=-3)
 
 
 	def buildChkstat(self):
@@ -721,8 +721,10 @@ class TestBase:
 
 		self.m_sysconfig = "/etc/sysconfig"
 		self.m_sysconfig_security = self.m_sysconfig + "/security"
-		self.m_permissions_dir = "/etc/permissions.d"
-		self.m_permissions_base = "/etc/permissions"
+		self.m_legacy_permissions_dir = "/etc/permissions.d"
+		self.m_permissions_dir = "/usr/share/permissions/permissions.d"
+		self.m_legacy_permissions_base = "/etc/permissions"
+		self.m_permissions_base = "/usr/share/permissions/permissions"
 		self.m_profiles = ("easy", "secure", "paranoid")
 		self.m_local_profile = "local"
 		self.m_chkstat_bin = "/usr/local/bin/chkstat"
@@ -740,6 +742,8 @@ class TestBase:
 	def getProfilePath(self, profile):
 		if not profile:
 			return self.m_permissions_base
+		if profile == self.m_local_profile:
+			return '.'.join((self.m_legacy_permissions_base, profile))
 		return '.'.join((self.m_permissions_base, profile))
 
 	def getPackageProfilePath(self, package, profile):
@@ -802,16 +806,18 @@ class TestBase:
 		candidates = [
 			self.m_sysconfig_security,
 			self.m_permissions_base,
+			self.m_legacy_permissions_base,
+			self.getProfilePath(self.m_local_profile),
 		]
 
-		candidates.append( self.getProfilePath(self.m_local_profile) )
+		candidates.extend( glob.glob(self.m_legacy_permissions_dir + "/*") )
 		candidates.extend( glob.glob(self.m_permissions_dir + "/*") )
-		candidates.extend( [self.getProfilePath(profile) for profile in self.m_profiles] )
+		candidates.extend( self.getProfilePath(profile) for profile in self.m_profiles )
 
 		for cand in candidates:
 			try:
 				os.unlink(cand)
-			except:
+			except FileNotFoundError:
 				pass
 
 		# chkstat expects the base files to exist, otherwise warnings
@@ -832,7 +838,9 @@ class TestBase:
 
 		for profile, lines in entries.items():
 
-			with open(self.getProfilePath(profile), 'a') as profile_file:
+			path = self.getProfilePath(profile)
+			os.makedirs(os.path.dirname(path), exist_ok = True)
+			with open(path, 'a') as profile_file:
 				for line in lines:
 					profile_file.write(line + "\n")
 
@@ -1738,11 +1746,11 @@ class TestRejectInsecurePath(TestBase):
 		testpath = os.path.join( testroot, "middle" )
 		self.createTestDir( testpath, 0o755)
 		# this will make the path seemingly owned by "nobody"
-		self.m_main_test_instance.bindMount("/usr/share", testpath)
+		self.m_main_test_instance.bindMount("/var", testpath)
 		bind_mountpoints.append(testpath)
 		# now get our own tmp directory into the game again, seemingly
 		# owned by "root"
-		testpath = os.path.join( testpath, "man" )
+		testpath = os.path.join( testpath, "spool" )
 		self.m_main_test_instance.bindMount("/tmp", testpath)
 		bind_mountpoints.append(testpath)
 		testpath = os.path.join( testpath, "somefile" )
