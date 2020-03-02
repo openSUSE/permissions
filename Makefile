@@ -36,7 +36,7 @@ install: all
 
 
 clean:
-	/bin/rm chkstat
+	/bin/rm -f chkstat
 
 package:
 	@obs/mkpackage
