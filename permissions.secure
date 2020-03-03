@@ -471,7 +471,7 @@
 /usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
 
 # icinga2 (bsc#1069410)
-/run/icinga2/cmd					icinga:icingagmd 2750
+/run/icinga2/cmd/					icinga:icingacmd 2750
 
 # fping (bsc#1047921)
 /usr/sbin/fping						root:root	0755
