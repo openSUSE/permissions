@@ -823,7 +823,7 @@ class TestBase:
 		for cand in candidates:
 			try:
 				os.unlink(cand)
-			except:
+			except FileNotFoundError:
 				pass
 
 		# chkstat expects the base files to exist, otherwise warnings
