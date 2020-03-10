@@ -486,6 +486,9 @@ class ChkstatRegtest:
 	def getChkstatPath(self):
 		return "/usr/local/bin/chkstat"
 
+	def getChkstatConfigRoot(self):
+		return "/usr/local"
+
 	def setupFakeRoot(self, skip_proc):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
@@ -498,12 +501,9 @@ class ChkstatRegtest:
 		# to own the root filesystem '/', thus let's chroot into /tmp,
 		# where we only bind mount the most important stuff from the
 		# root mount namespace
-		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var"]
+		bind_dirs = ["/bin", "/sbin", "/usr", "/sys", "/dev", "/var", "/etc"]
 		# add any /lib32/64 symlinks whatever
 		bind_dirs.extend( glob.glob("/lib*") )
-		# /etc needs to be copied, we need to be able to write in
-		# there, to construct fake permissions config files
-		copy_dirs = ("/etc",)
 
 		for src in bind_dirs:
 
@@ -516,20 +516,6 @@ class ChkstatRegtest:
 				self.bindMount(src, dst)
 			else:
 				raise Exception("bad mount src " + src)
-
-		for src in copy_dirs:
-			dst_dir = self.m_fake_root + src
-			try:
-				# symlinks here means "copy links as is"
-				shutil.copytree(src, dst_dir, symlinks = True)
-			except shutil.Error:
-				# copying /etc only works partially since
-				# we're not really root.
-				# this error contains a list of errors in
-				# args[0] consisting of (src, dst, error)
-				# tuples, but "error" is only a string in this
-				# case, not very helpful for evaluation
-				pass
 
 		# mount a new proc corresponding to our forked pid namespace
 		# unless this is disabled, to test chkstat behaviour without /proc
@@ -747,6 +733,11 @@ class TestBase:
 			return self.s_permissions_base
 		return '.'.join((self.s_permissions_base, profile))
 
+	def getUserProfilePath(self, profile):
+		if not profile:
+			return self.s_user_permissions_base
+		return '.'.join((self.s_user_permissions_base, profile))
+
 	def getPackageProfilePath(self, package, profile):
 		base = os.path.sep.join((self.s_permissions_dir, package))
 
@@ -791,15 +782,23 @@ class TestBase:
 	def prepare(self):
 		if not TestBase.global_init_performed:
 
-			TestBase.s_sysconfig = "/etc/sysconfig"
+			config_root = self.m_main_test_instance.getChkstatConfigRoot()
+			TestBase.s_config_root = config_root
+			TestBase.s_sysconfig = config_root + "/etc/sysconfig"
 			TestBase.s_sysconfig_security = self.s_sysconfig + "/security"
-			TestBase.s_permissions_dir = "/etc/permissions.d"
-			TestBase.s_permissions_base = "/etc/permissions"
+			TestBase.s_permissions_dir = config_root + "/etc/permissions.d"
+			TestBase.s_profile_root = config_root + "/usr/share/permissions"
+			TestBase.s_permissions_base = TestBase.s_profile_root + "/permissions"
+			TestBase.s_user_permissions_base = config_root + "/etc/permissions"
 			TestBase.s_chkstat_bin = self.m_main_test_instance.getChkstatPath()
+			# make a convenience symlink to make it feel more
+			# natural in /usr/local
+			os.symlink(config_root + "/usr/share", config_root + "/share")
 
-			# make sure certain dirs exist
+			# make sure base dirs exist
 			os.makedirs(self.s_sysconfig, 0o755, exist_ok = True)
 			os.makedirs(self.s_permissions_dir, 0o755, exist_ok = True)
+			os.makedirs(self.s_profile_root, 0o755, exist_ok = True)
 			TestBase.global_init_performed = True
 
 		self.resetConfigs()
@@ -816,7 +815,7 @@ class TestBase:
 			self.s_permissions_base,
 		]
 
-		candidates.append( self.getProfilePath(self.m_local_profile) )
+		candidates.append( self.getUserProfilePath(self.m_local_profile) )
 		candidates.extend( glob.glob(self.s_permissions_dir + "/*") )
 		candidates.extend( [self.getProfilePath(profile) for profile in self.m_profiles] )
 
@@ -842,9 +841,16 @@ class TestBase:
 		}
 		"""
 
+		def getAgnosticProfilePath(profile):
+
+			if profile == self.m_local_profile:
+				return self.getUserProfilePath(profile)
+			else:
+				return self.getProfilePath(profile)
+
 		for profile, lines in entries.items():
 
-			with open(self.getProfilePath(profile), 'a') as profile_file:
+			with open(getAgnosticProfilePath(profile), 'a') as profile_file:
 				for line in lines:
 					profile_file.write(line + "\n")
 
@@ -1035,7 +1041,7 @@ class TestBase:
 		if isinstance(args, str):
 			args = [args]
 
-		cmdline = [self.s_chkstat_bin] + args
+		cmdline = [self.s_chkstat_bin, "--config-root", self.s_config_root] + args
 
 		print('#', ' '.join(cmdline))
 
@@ -1291,9 +1297,9 @@ class TestLocalPermissions(TestBase):
 
 		# this should take precendence over all other entries
 		line = self.buildProfileLine(testdir, local_perms[0])
-		global_entries["local"] = [ line ]
+		global_entries[self.m_local_profile] = [ line ]
 		line = self.buildProfileLine(testfile, local_perms[1])
-		pkg_entries["local"] = [ line ]
+		pkg_entries[self.m_local_profile] = [ line ]
 
 		self.addProfileEntries(global_entries)
 		self.addPackageProfileEntries(package, pkg_entries)
