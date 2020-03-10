@@ -37,6 +37,8 @@
 #include <fcntl.h>
 #include <sys/param.h>
 #include <cassert>
+#include <limits.h>
+#include <string>
 
 #define BAD_LINE() \
     fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
@@ -65,6 +67,7 @@ int have_fscaps = -1;
 char** permfiles = NULL;
 size_t npermfiles = 0;
 char* force_level;
+std::string config_root;
 
 struct perm*
 add_permlist(char *file, const char *p_owner, const char *p_group, mode_t mode)
@@ -420,16 +423,22 @@ collect_permfiles()
 {
     size_t i;
 
+    const auto usr_root = config_root + "/usr/share/permissions";
+    const auto etc_root = config_root + "/etc";
+
+    const auto central_usr_perms = usr_root + "/permissions";
+    const auto central_etc_perms = etc_root + "/permissions";
+
     // 1. central fixed permissions file
-    if (access("/usr/share/permissions/permissions", R_OK) == 0)
+    if (access(central_usr_perms.c_str(), R_OK) == 0)
     {
         ensure_array((void**)&permfiles, &npermfiles);
-        permfiles[npermfiles++] = strdup("/usr/share/permissions/permissions");
+        permfiles[npermfiles++] = strdup(central_usr_perms.c_str());
     }
-    else if (access("/etc/permissions", R_OK) == 0)
+    else if (access(central_etc_perms.c_str(), R_OK) == 0)
     {
         ensure_array((void**)&permfiles, &npermfiles);
-        permfiles[npermfiles++] = strdup("/etc/permissions");
+        permfiles[npermfiles++] = strdup(central_etc_perms.c_str());
     }
 
     // 2. central easy, secure paranoid as those are defined by SUSE
@@ -439,41 +448,37 @@ collect_permfiles()
                 || !strcmp(level[i], "secure")
                 || !strcmp(level[i], "paranoid"))
         {
-            char fn[4096];
-            snprintf(fn, sizeof(fn), "/usr/share/permissions/permissions.%s", level[i]);
-            if (access(fn, R_OK) == 0)
+            auto base = std::string("/permissions.") + level[i];
+            for( const auto &dir: { usr_root, etc_root } )
             {
-                ensure_array((void**)&permfiles, &npermfiles);
-                permfiles[npermfiles++] = strdup(fn);
-            }
-            else
-            {
-                snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
-                if (access(fn, R_OK) == 0)
+                std::string profile = dir + base;
+
+                if (access(profile.c_str(), R_OK) == 0)
                 {
                     ensure_array((void**)&permfiles, &npermfiles);
-                    permfiles[npermfiles++] = strdup(fn);
+                    permfiles[npermfiles++] = strdup(profile.c_str());
+                    break;
                 }
             }
         }
     }
+
     // 3. package specific permissions
-    read_permissions_d("/usr/share/permissions/permissions.d");
-    read_permissions_d("/etc/permissions.d");
+    read_permissions_d((usr_root + "/permissions.d").c_str());
+    read_permissions_d((etc_root + "/permissions.d").c_str());
 
     // 4. central permissions files with user defined level incl 'local'
     for (i = 0; i < nlevel; ++i)
     {
-        char fn[4096];
-
         if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid"))
             continue;
 
-        snprintf(fn, sizeof(fn), "/etc/permissions.%s", level[i]);
-        if (access(fn, R_OK) == 0)
+        std::string profile = etc_root + "/permissions." + level[i];
+
+        if (access(profile.c_str(), R_OK) == 0)
         {
             ensure_array((void**)&permfiles, &npermfiles);
-            permfiles[npermfiles++] = strdup(fn);
+            permfiles[npermfiles++] = strdup(profile.c_str());
         }
     }
 }
@@ -497,6 +502,7 @@ usage(int x)
            "  --examine FILE        apply to specified file only\n"
            "  --files FILELIST      read list of files to apply from FILELIST\n"
            "  --root DIR            check files relative to DIR\n"
+           "  --config-root DIR     lookup config files relative to DIR\n"
     );
     exit(x);
 }
@@ -918,6 +924,33 @@ main(int argc, char **argv)
             argv++;
             continue;
         }
+        if (!strcmp(opt, "-config-root"))
+        {
+            argc--;
+            argv++;
+            if (argc == 1)
+            {
+                fprintf(stderr, "config-root: argument required\n");
+                exit(1);
+            }
+            config_root = argv[1];
+            if (config_root.empty() || config_root[0] != '/')
+            {
+                fprintf(stderr, "config-root: must begin with '/'\n");
+                exit(1);
+            }
+            // considering NAME_MAX characters left is somewhat arbitrary, but
+            // staying within these limits should at least allow us to not
+            // encounter ENAMETOOLONG in typical setups
+            else if(config_root.length() >= (PATH_MAX - NAME_MAX - 1))
+            {
+                fprintf(stderr, "config-root: prefix is too long\n");
+                exit(1);
+            }
+            argc--;
+            argv++;
+            continue;
+        }
         if (*opt == '-')
             usage(!strcmp(opt, "-h") || !strcmp(opt, "-help") ? 0 : 1);
         break;
@@ -925,13 +958,13 @@ main(int argc, char **argv)
 
     if (systemmode)
     {
-        const char file[] = "/etc/sysconfig/security";
-        parse_sysconf(file);
+        const std::string file = config_root + "/etc/sysconfig/security";
+        parse_sysconf(file.c_str());
         if(do_set == -1)
         {
             if (default_set < 0)
             {
-                fprintf(stderr, "permissions handling disabled in %s\n", file);
+                fprintf(stderr, "permissions handling disabled in %s\n", file.c_str());
                 exit(0);
             }
             if (suseconfig && default_set)
