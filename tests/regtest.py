@@ -540,7 +540,8 @@ class ChkstatRegtest:
 
 		# also bind-mount the permissions repo e.g. useful for
 		# debugging
-		permissions_repo_dst = self.m_fake_root + "/permissions"
+		self.mountTmpFS( self.m_fake_root + "/usr/src" )
+		permissions_repo_dst = self.m_fake_root + "/usr/src/permissions"
 		os.makedirs(permissions_repo_dst)
 		self.bindMount(
 			self.m_permissions_repo, permissions_repo_dst,
