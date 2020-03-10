@@ -554,6 +554,12 @@ class ChkstatRegtest:
 		# the fake root FS
 		shutil.copy(self.m_chkstat_orig, local_bin)
 
+		# make a writeable home available for the user namespace root
+		# user
+		root_home = self.m_fake_root + "/root"
+		os.makedirs(root_home)
+		self.mountTmpFS(root_home)
+
 		# finally enter the fake root
 		os.chroot(self.m_fake_root)
 		# use a defined standard umask
@@ -561,6 +567,7 @@ class ChkstatRegtest:
 		# use a defined standard PATH list, include sbin
 		# to make sure we also find admin tools
 		os.environ["PATH"] = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin"
+		os.environ["HOME"] = "/root"
 		os.chdir("/")
 
 		# setup a tmp directory just in case
