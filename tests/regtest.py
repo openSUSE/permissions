@@ -113,7 +113,7 @@ class ChkstatRegtest:
 
 		perm_root = os.path.realpath(__file__).split(os.path.sep)[:-2]
 		self.m_permissions_repo = os.path.sep.join(perm_root)
-		self.m_chkstat_bin = os.path.sep.join([self.m_permissions_repo, "src/chkstat"])
+		self.m_chkstat_orig = os.path.sep.join([self.m_permissions_repo, "src/chkstat"])
 
 	def printDebug(self, *args, **kwargs):
 
@@ -483,6 +483,9 @@ class ChkstatRegtest:
 			except subprocess.CalledProcessError:
 				pass
 
+	def getChkstatPath(self):
+		return "/usr/local/bin/chkstat"
+
 	def setupFakeRoot(self, skip_proc):
 
 		# simply operate directly in /tmp in a tmpfs, since we're in a
@@ -544,12 +547,11 @@ class ChkstatRegtest:
 		)
 
 		self.mountTmpFS(self.m_fake_root + "/usr/local")
-		local_bin = self.m_fake_root + "/usr/local/bin"
-		os.makedirs(local_bin, exist_ok = True)
-		local_chkstat = os.path.join(local_bin, "chkstat")
+		local_bin = self.m_fake_root + self.getChkstatPath()
+		os.makedirs(os.path.dirname(local_bin), exist_ok = True)
 		# copy the current chkstat into a suitable location of
 		# the fake root FS
-		shutil.copy(self.m_chkstat_bin, local_chkstat)
+		shutil.copy(self.m_chkstat_orig, local_bin)
 
 		# finally enter the fake root
 		os.chroot(self.m_fake_root)
@@ -557,7 +559,7 @@ class ChkstatRegtest:
 		os.umask(0o022)
 		# use a defined standard PATH list, include sbin
 		# to make sure we also find admin tools
-		os.environ["PATH"] =  "/bin:/sbin:/usr/bin:/usr/sbin"
+		os.environ["PATH"] = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin"
 		os.chdir("/")
 
 		# setup a tmp directory just in case
@@ -588,9 +590,9 @@ class ChkstatRegtest:
 	def buildChkstat(self):
 
 		if self.m_args.skip_make:
-			if not os.path.exists(self.m_chkstat_bin):
+			if not os.path.exists(self.m_chkstat_orig):
 				print("Couldn't find compiled chkstat binary in",
-					self.m_chkstat_bin, file = sys.stderr)
+					self.m_chkstat_orig, file = sys.stderr)
 				sys.exit(2)
 
 			return
@@ -719,13 +721,8 @@ class TestBase:
 
 	def __init__(self, name, desc):
 
-		self.m_sysconfig = "/etc/sysconfig"
-		self.m_sysconfig_security = self.m_sysconfig + "/security"
-		self.m_permissions_dir = "/etc/permissions.d"
-		self.m_permissions_base = "/etc/permissions"
 		self.m_profiles = ("easy", "secure", "paranoid")
 		self.m_local_profile = "local"
-		self.m_chkstat_bin = "/usr/local/bin/chkstat"
 
 		self.m_test_name = name
 		self.m_test_desc = desc
@@ -739,11 +736,11 @@ class TestBase:
 
 	def getProfilePath(self, profile):
 		if not profile:
-			return self.m_permissions_base
-		return '.'.join((self.m_permissions_base, profile))
+			return self.s_permissions_base
+		return '.'.join((self.s_permissions_base, profile))
 
 	def getPackageProfilePath(self, package, profile):
-		base = os.path.sep.join((self.m_permissions_dir, package))
+		base = os.path.sep.join((self.s_permissions_dir, package))
 
 		if not profile:
 			return base
@@ -784,11 +781,18 @@ class TestBase:
 		return self.m_test_desc
 
 	def prepare(self):
-		if not self.global_init_performed:
+		if not TestBase.global_init_performed:
+
+			TestBase.s_sysconfig = "/etc/sysconfig"
+			TestBase.s_sysconfig_security = self.s_sysconfig + "/security"
+			TestBase.s_permissions_dir = "/etc/permissions.d"
+			TestBase.s_permissions_base = "/etc/permissions"
+			TestBase.s_chkstat_bin = self.m_main_test_instance.getChkstatPath()
+
 			# make sure certain dirs exist
-			os.makedirs(self.m_sysconfig, 0o755, exist_ok = True)
-			os.makedirs(self.m_permissions_dir, 0o755, exist_ok = True)
-			self.global_init_performed = True
+			os.makedirs(self.s_sysconfig, 0o755, exist_ok = True)
+			os.makedirs(self.s_permissions_dir, 0o755, exist_ok = True)
+			TestBase.global_init_performed = True
 
 		self.resetConfigs()
 
@@ -800,12 +804,12 @@ class TestBase:
 	def resetConfigs(self):
 
 		candidates = [
-			self.m_sysconfig_security,
-			self.m_permissions_base,
+			self.s_sysconfig_security,
+			self.s_permissions_base,
 		]
 
 		candidates.append( self.getProfilePath(self.m_local_profile) )
-		candidates.extend( glob.glob(self.m_permissions_dir + "/*") )
+		candidates.extend( glob.glob(self.s_permissions_dir + "/*") )
 		candidates.extend( [self.getProfilePath(profile) for profile in self.m_profiles] )
 
 		for cand in candidates:
@@ -816,8 +820,8 @@ class TestBase:
 
 		# chkstat expects the base files to exist, otherwise warnings
 		# are emitted
-		self.createTestFile(self.m_permissions_base, 0o644)
-		self.createTestFile(self.m_sysconfig_security, 0o644)
+		self.createTestFile(self.s_permissions_base, 0o644)
+		self.createTestFile(self.s_sysconfig_security, 0o644)
 
 	def addProfileEntries(self, entries):
 		"""Adds entries to /etc/permissions.* according to the
@@ -872,7 +876,7 @@ class TestBase:
 			"PERMISSION_FSCAPS": fscaps_val
 		}
 
-		with open(self.m_sysconfig_security, 'w') as sec_file:
+		with open(self.s_sysconfig_security, 'w') as sec_file:
 
 			for key, val in items.items():
 				if not val:
@@ -1023,7 +1027,7 @@ class TestBase:
 		if isinstance(args, str):
 			args = [args]
 
-		cmdline = [self.m_chkstat_bin] + args
+		cmdline = [self.s_chkstat_bin] + args
 
 		print('#', ' '.join(cmdline))
 
