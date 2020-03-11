@@ -729,17 +729,19 @@ class TestBase:
 		self.m_main_test_instance = instance
 
 	def getProfilePath(self, profile):
+		base = TestBase.config_root + "/usr/share/permissions/permissions"
 		if not profile:
-			return self.s_permissions_base
-		return '.'.join((self.s_permissions_base, profile))
+			return base
+		return '.'.join((base, profile))
 
 	def getUserProfilePath(self, profile):
+		base = TestBase.config_root + "/etc/permissions"
 		if not profile:
-			return self.s_user_permissions_base
-		return '.'.join((self.s_user_permissions_base, profile))
+			return base
+		return '.'.join((base, profile))
 
 	def getPackageProfilePath(self, package, profile):
-		base = os.path.sep.join((self.s_permissions_dir, package))
+		base = TestBase.config_root + "/etc/permissions.d/" + package
 
 		if not profile:
 			return base
@@ -782,23 +784,19 @@ class TestBase:
 	def prepare(self):
 		if not TestBase.global_init_performed:
 
-			config_root = self.m_main_test_instance.getChkstatConfigRoot()
-			TestBase.s_config_root = config_root
-			TestBase.s_sysconfig = config_root + "/etc/sysconfig"
-			TestBase.s_sysconfig_security = self.s_sysconfig + "/security"
-			TestBase.s_permissions_dir = config_root + "/etc/permissions.d"
-			TestBase.s_profile_root = config_root + "/usr/share/permissions"
-			TestBase.s_permissions_base = TestBase.s_profile_root + "/permissions"
-			TestBase.s_user_permissions_base = config_root + "/etc/permissions"
-			TestBase.s_chkstat_bin = self.m_main_test_instance.getChkstatPath()
+			TestBase.config_root = self.m_main_test_instance.getChkstatConfigRoot()
+			TestBase.chkstat = self.m_main_test_instance.getChkstatPath()
+
+			config_root = TestBase.config_root
+
 			# make a convenience symlink to make it feel more
 			# natural in /usr/local
 			os.symlink(config_root + "/usr/share", config_root + "/share")
 
 			# make sure base dirs exist
-			os.makedirs(self.s_sysconfig, 0o755, exist_ok = True)
-			os.makedirs(self.s_permissions_dir, 0o755, exist_ok = True)
-			os.makedirs(self.s_profile_root, 0o755, exist_ok = True)
+			os.makedirs(config_root + "/etc/sysconfig", 0o755, exist_ok = True)
+			os.makedirs(config_root + "/etc/permissions.d", 0o755, exist_ok = True)
+			os.makedirs(config_root + "/usr/share/permissions", 0o755, exist_ok = True)
 			TestBase.global_init_performed = True
 
 		self.resetConfigs()
@@ -810,13 +808,17 @@ class TestBase:
 
 	def resetConfigs(self):
 
+		config_root = TestBase.config_root
+		sysconfig = config_root + "/etc/sysconfig/security"
+		central_perms = config_root + "/usr/share/permissions/permissions"
+
 		candidates = [
-			self.s_sysconfig_security,
-			self.s_permissions_base,
+			sysconfig,
+			central_perms,
 		]
 
 		candidates.append( self.getUserProfilePath(self.m_local_profile) )
-		candidates.extend( glob.glob(self.s_permissions_dir + "/*") )
+		candidates.extend( glob.glob(config_root + "/etc/permissions.d/*") )
 		candidates.extend( [self.getProfilePath(profile) for profile in self.m_profiles] )
 
 		for cand in candidates:
@@ -827,8 +829,8 @@ class TestBase:
 
 		# chkstat expects the base files to exist, otherwise warnings
 		# are emitted
-		self.createTestFile(self.s_permissions_base, 0o644)
-		self.createTestFile(self.s_sysconfig_security, 0o644)
+		self.createTestFile(central_perms, 0o644)
+		self.createTestFile(sysconfig, 0o644)
 
 	def addProfileEntries(self, entries):
 		"""Adds entries to /etc/permissions.* according to the
@@ -890,7 +892,7 @@ class TestBase:
 			"PERMISSION_FSCAPS": fscaps_val
 		}
 
-		with open(self.s_sysconfig_security, 'w') as sec_file:
+		with open(TestBase.config_root + "/etc/sysconfig/security", 'w') as sec_file:
 
 			for key, val in items.items():
 				if not val:
@@ -1041,7 +1043,7 @@ class TestBase:
 		if isinstance(args, str):
 			args = [args]
 
-		cmdline = [self.s_chkstat_bin, "--config-root", self.s_config_root] + args
+		cmdline = [self.chkstat, "--config-root", TestBase.config_root] + args
 
 		print('#', ' '.join(cmdline))
 
