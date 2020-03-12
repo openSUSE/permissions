@@ -436,3 +436,7 @@
 # mariadb auth_pam_tool (bsc#1160285)
 /usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool    root:root         4755
 /usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool  root:root         4755
+
+# roccat-tools (bsc#1150336)
+# unsafe multi-user scenario that we currently accept since it's a rare use case
+/var/lib/roccat                                          root:roccat       2770
