@@ -477,3 +477,6 @@
 
 # Workload Memory Protection (bsc#1161335)
 /usr/lib/sapwmp/sapwmp-capture                           root:sapsys    0750
+
+# s390-tools log directory for ts-shell (bsc#1167163)
+/var/log/ts-shell                                       root:ts-shell     0770
