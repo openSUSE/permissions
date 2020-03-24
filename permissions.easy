@@ -468,3 +468,6 @@
 # 389-ds (bsc#1111564)
 /usr/sbin/ns-slapd					root:dirsrv	0750
  +capabilities cap_net_bind_service=ep
+
+# s390-tools log directory for ts-shell (bsc#1167163)
+/var/log/ts-shell/                                      root:ts-shell   2770
