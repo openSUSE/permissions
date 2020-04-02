@@ -41,6 +41,10 @@ install: all
 		do install -m 644 $$i $(DESTDIR)$(permissionsdir); done
 	@install -m 644 etc/permissions.local $(DESTDIR)$(sysconfdir)
 
+src/chkstat: src/*.h src/*.cpp | /usr/include/tclap
+
+/usr/include/tclap:
+	@echo "error: The tclap command line parsing library is required for building. Try 'zypper in tclap'."; exit 1; :
 
 clean:
 	/bin/rm -f src/chkstat
