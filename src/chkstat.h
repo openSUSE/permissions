@@ -57,6 +57,12 @@ protected: // functions
      **/
     bool validateArguments();
 
+    /**
+     * \brief
+     *      Process the already validated command line arguments
+     **/
+    bool processArguments();
+
     bool isInChecklist(const std::string &path) const
     {
         return m_checklist.find(path) != m_checklist.end();

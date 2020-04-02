@@ -43,8 +43,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string>
+#include <fstream>
+#include <iostream>
 #include <sstream>
+#include <string>
 #include <utility>
 
 #define BAD_LINE() \
@@ -797,11 +799,47 @@ bool Chkstat::validateArguments()
     return ret;
 }
 
+bool Chkstat::processArguments()
+{
+    for (const auto &path: m_examine_paths.getValue())
+    {
+        m_checklist.insert(path);
+    }
+
+    for (const auto &path: m_file_lists.getValue())
+    {
+        std::ifstream fs(path);
+
+        if( !fs )
+        {
+            std::cerr << m_file_lists.getName() << ": " << path << ": " << strerror(errno) << std::endl;
+            return false;
+        }
+
+        std::string line;
+
+        while (std::getline(fs, line))
+        {
+            if (line.empty())
+                continue;
+            m_checklist.insert(line);
+        }
+    }
+
+    if (m_root_path.isSet())
+    {
+        const auto &rp = m_root_path.getValue();
+        root = rp.c_str();
+        rootl = rp.length();
+    }
+
+    return true;
+}
+
 int Chkstat::run()
 {
     char *str;
     bool use_fscaps = true;
-    char line[512];
     char *part[4];
     int pcnt, lcnt;
     size_t i;
@@ -822,33 +860,9 @@ int Chkstat::run()
         return 2;
     }
 
-    for (const auto &path: m_examine_paths.getValue())
+    if (!processArguments())
     {
-        m_checklist.insert(path);
-    }
-
-    for (const auto &path: m_file_lists.getValue())
-    {
-        FILE *fp = fopen(path.c_str(), "r");
-        if (fp == 0)
-        {
-            fprintf(stderr, "files: %s: %s\n", path.c_str(), strerror(errno));
-            return 1;
-        }
-        while (readline(fp, line, sizeof(line)))
-        {
-            if (!*line)
-                continue;
-            m_checklist.insert(line);
-        }
-        fclose(fp);
-    }
-
-    if (m_root_path.isSet())
-    {
-        const auto &rp = m_root_path.getValue();
-        root = rp.c_str();
-        rootl = rp.length();
+        return 1;
     }
 
     if (m_config_root_path.isSet())
@@ -932,6 +946,7 @@ int Chkstat::run()
         lcnt = 0;
         struct perm* last = NULL;
         int extline;
+        char line[512];
         while (readline(fp, line, sizeof(line)))
         {
             extline = 0;
