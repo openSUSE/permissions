@@ -61,8 +61,6 @@ struct perm
 };
 
 struct perm *permlist;
-char **checklist;
-size_t nchecklist;
 uid_t euid;
 const char *root;
 size_t rootl;
@@ -74,28 +72,27 @@ size_t npermfiles = 0;
 std::string config_root;
 
 struct perm*
-add_permlist(char *file, const char *p_owner, const char *p_group, mode_t mode)
+add_permlist(const char *p_file, const char *p_owner, const char *p_group, mode_t mode)
 {
     struct perm *ec, **epp;
+    char *file = nullptr;
 
     char *owner = strdup(p_owner);
     char *group = strdup(p_group);
     if (rootl)
     {
-        char *nfile;
-        nfile = (char*)malloc(strlen(file) + rootl + (*file != '/' ? 2 : 1));
-        if (nfile)
+        file = (char*)malloc(strlen(p_file) + rootl + (*p_file != '/' ? 2 : 1));
+        if (file)
         {
-            strcpy(nfile, root);
+            strcpy(file, root);
             if (*file != '/')
-                strcat(nfile, "/");
-            strcat(nfile, file);
+                strcat(file, "/");
+            strcat(file, p_file);
         }
-        file = nfile;
     }
     else
     {
-        file = strdup(file);
+        file = strdup(p_file);
     }
 
     if (!owner || !group || !file)
@@ -132,44 +129,6 @@ add_permlist(char *file, const char *p_owner, const char *p_group, mode_t mode)
     ec->next = 0;
     *epp = ec;
     return ec;
-}
-
-int
-in_checklist(const char *e)
-{
-    size_t i;
-    for (i = 0; i < nchecklist; i++)
-    {
-        if (!strcmp(e, checklist[i]))
-        {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-void
-add_checklist(const char *e)
-{
-    if (in_checklist(e))
-        return;
-
-    char *copy = strdup(e);
-    if (copy == 0)
-    {
-        perror("checklist entry alloc");
-        exit(1);
-    }
-    if ((nchecklist & 63) == 0)
-    {
-        checklist = (char**)realloc(checklist, sizeof(char *) * (nchecklist + 64));
-        if (checklist == 0)
-        {
-            perror("checklist alloc");
-            exit(1);
-        }
-    }
-    checklist[nchecklist++] = copy;
 }
 
 int
@@ -841,7 +800,6 @@ bool Chkstat::validateArguments()
 int Chkstat::run()
 {
     char *str;
-    bool use_checklist = false;
     bool use_fscaps = true;
     char line[512];
     char *part[4];
@@ -866,8 +824,7 @@ int Chkstat::run()
 
     for (const auto &path: m_examine_paths.getValue())
     {
-        add_checklist(path.c_str());
-        use_checklist = true;
+        m_checklist.insert(path);
     }
 
     for (const auto &path: m_file_lists.getValue())
@@ -882,10 +839,9 @@ int Chkstat::run()
         {
             if (!*line)
                 continue;
-            add_checklist(line);
+            m_checklist.insert(line);
         }
         fclose(fp);
-        use_checklist = true;
     }
 
     if (m_root_path.isSet())
@@ -930,8 +886,7 @@ int Chkstat::run()
 
         for (const auto &path: m_input_args.getValue())
         {
-            add_checklist(path.c_str());
-            use_checklist = true;
+            m_checklist.insert(path);
             continue;
         }
         collect_permfiles();
@@ -961,8 +916,10 @@ int Chkstat::run()
     }
 
     // add fake list entries for all files to check
-    for (i = 0; i < nchecklist; i++)
-        add_permlist(checklist[i], "unknown", "unknown", 0);
+    for( const auto &path: m_checklist )
+    {
+        add_permlist(path.c_str(), "unknown", "unknown", 0);
+    }
 
     for (i = 0; i < npermfiles; i++)
     {
@@ -1063,7 +1020,9 @@ int Chkstat::run()
     euid = geteuid();
     for (e = permlist; e; e = e->next)
     {
-        if (use_checklist && !in_checklist(e->file+rootl))
+        // if only specific files should be check then filter out non-matching
+        // paths
+        if (!m_checklist.empty() && !isInChecklist(e->file+rootl))
             continue;
 
         pwd = strcmp(e->owner, "unknown") ? getpwnam(e->owner) : NULL;

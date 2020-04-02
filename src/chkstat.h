@@ -6,6 +6,7 @@
 
 // C++
 #include <string>
+#include <set>
 
 /**
  * \brief
@@ -56,6 +57,11 @@ protected: // functions
      **/
     bool validateArguments();
 
+    bool isInChecklist(const std::string &path) const
+    {
+        return m_checklist.find(path) != m_checklist.end();
+    }
+
 protected: // data
 
     const int m_argc = 0;
@@ -85,6 +91,8 @@ protected: // data
     //! positional input arguments: either the files to check for --system
     //! mode or the profiles to parse for non-system mode.
     TCLAP::UnlabeledMultiArg<std::string> m_input_args;
+
+    std::set<std::string> m_checklist;
 };
 
 #endif // inc. guard
