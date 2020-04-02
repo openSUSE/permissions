@@ -21,7 +21,6 @@
 #ifndef _GNU_SOURCE
 #   define _GNU_SOURCE
 #endif
-#include <cstdio>
 #include <pwd.h>
 #include <grp.h>
 #include <sys/types.h>
@@ -29,16 +28,24 @@
 #include <sys/vfs.h>
 #include <linux/magic.h>
 #include <unistd.h>
-#include <cstdlib>
-#include <cstring>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/capability.h>
 #include <fcntl.h>
 #include <sys/param.h>
-#include <cassert>
 #include <limits.h>
+
+// local headers
+#include "chkstat.h"
+
+// C++
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
+#include <sstream>
+#include <utility>
 
 #define BAD_LINE() \
     fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
@@ -57,16 +64,13 @@ struct perm *permlist;
 char **checklist;
 size_t nchecklist;
 uid_t euid;
-char *root;
+const char *root;
 size_t rootl;
 size_t nlevel;
 const char** level;
-int do_set = -1;
 int default_set = 1;
-int have_fscaps = -1;
 char** permfiles = NULL;
 size_t npermfiles = 0;
-char* force_level;
 std::string config_root;
 
 struct perm*
@@ -131,7 +135,7 @@ add_permlist(char *file, const char *p_owner, const char *p_group, mode_t mode)
 }
 
 int
-in_checklist(char *e)
+in_checklist(const char *e)
 {
     size_t i;
     for (i = 0; i < nchecklist; i++)
@@ -145,12 +149,13 @@ in_checklist(char *e)
 }
 
 void
-add_checklist(char *e)
+add_checklist(const char *e)
 {
     if (in_checklist(e))
         return;
-    e = strdup(e);
-    if (e == 0)
+
+    char *copy = strdup(e);
+    if (copy == 0)
     {
         perror("checklist entry alloc");
         exit(1);
@@ -164,7 +169,7 @@ add_checklist(char *e)
             exit(1);
         }
     }
-    checklist[nchecklist++] = e;
+    checklist[nchecklist++] = copy;
 }
 
 int
@@ -237,7 +242,7 @@ static inline int isquote(char c)
 }
 
 int
-parse_sysconf(const char* file)
+parse_sysconf(const char* file, bool parse_levels, bool *fscaps_configured)
 {
     FILE* fp;
     char line[PATH_MAX];
@@ -261,7 +266,7 @@ parse_sysconf(const char* file)
 
         if (!strncmp(p, "PERMISSION_SECURITY=", 20))
         {
-            if (force_level)
+            if (!parse_levels)
                 continue;
 
             p+=20;
@@ -307,7 +312,7 @@ parse_sysconf(const char* file)
             }
         }
 #define FSCAPSENABLE "PERMISSION_FSCAPS="
-        else if (have_fscaps == -1 && !strncmp(p, FSCAPSENABLE, strlen(FSCAPSENABLE)))
+        else if (!strncmp(p, FSCAPSENABLE, strlen(FSCAPSENABLE)))
         {
             p+=strlen(FSCAPSENABLE);
             if (isquote(*p))
@@ -320,7 +325,7 @@ parse_sysconf(const char* file)
                 p+=3;
                 if (isquote(*p) || !*p)
                 {
-                    have_fscaps=1;
+                    *fscaps_configured=true;
                 }
             }
             else if (!strncmp(p, "no", 2))
@@ -328,12 +333,8 @@ parse_sysconf(const char* file)
                 p+=2;
                 if (isquote(*p) || !*p)
                 {
-                    have_fscaps=0;
+                    *fscaps_configured=false;
                 }
-            }
-            else
-            {
-                have_fscaps=1; /* default */
             }
         }
     }
@@ -492,15 +493,6 @@ usage(int x)
            "b) chkstat --system [OPTIONS] <files>...\n"
            "\n"
            "Options:\n"
-           "  --set                 apply changes\n"
-           "  --warn                only tell which changes are needed\n"
-           "  --noheader            don't print intro message\n"
-           "  --fscaps              force use of fscaps\n"
-           "  --no-fscaps           disable use of fscaps\n"
-           "  --system              system mode, act according to /etc/sysconfig/security\n"
-           "  --level LEVEL         force use LEVEL (only with --system)\n"
-           "  --examine FILE        apply to specified file only\n"
-           "  --files FILELIST      read list of files to apply from FILELIST\n"
            "  --root DIR            check files relative to DIR\n"
            "  --config-root DIR     lookup config files relative to DIR\n"
     );
@@ -764,15 +756,93 @@ out:
     return val;
 }
 
-int
-main(int argc, char **argv)
+Chkstat::Chkstat(int argc, const char **argv) :
+    m_argc(argc),
+    m_argv(argv),
+    m_parser("Tool to check and set file permissions"),
+    m_system_mode("", "system", "system mode, act according to /etc/sysconfig/security", m_parser),
+    m_force_fscaps("", "fscaps", "force use of file system capabilities", m_parser),
+    m_disable_fscaps("", "no-fscaps", "disable use of file system capabilities", m_parser),
+    m_apply_changes("s", "set", "actually apply changes (--system mode may imply this depending on file based configuration)", m_parser),
+    m_only_warn("", "warn", "only inform about which changes would be performed but don't actually apply them (which is the default, except in --system mode)", m_parser),
+    m_no_header("n", "noheader", "don't print intro message", m_parser),
+    m_examine_paths("e", "examine", "operate only on the specified path(s)", false, "PATH", m_parser),
+    m_force_level_list("", "level", "force application of the specified space-separated list of security levels (only supported in --system mode)", false, "", "e.g. \"local paranoid\"", m_parser),
+    m_file_lists("f", "files", "read newline separated list of files to check (see --examine) from the specified path", false, "PATH", m_parser),
+    m_root_path("r", "root", "check files relative to the given root directory", false, "", "PATH", m_parser),
+    m_config_root_path("", "config-root", "lookup configuration files relative to the given root directory", false, "", "PATH", m_parser),
+    m_input_args("args", "in --system mode a list of paths to check, otherwise a list of profiles to parse", false, "PATH", m_parser)
 {
-    char *opt, *str;
-    int told = 0;
-    int use_checklist = 0;
-    int systemmode = 0;
-    int suseconfig = 0;
-    FILE *fp;
+}
+
+bool Chkstat::validateArguments()
+{
+    // exits on error/usage
+    m_parser.parse(m_argc, m_argv);
+
+    bool ret = true;
+
+    const auto xor_args = {
+        std::make_pair(&m_system_mode, static_cast<TCLAP::SwitchArg*>(&m_apply_changes)),
+        {&m_force_fscaps, &m_disable_fscaps},
+        {&m_apply_changes, &m_only_warn}
+    };
+
+    for (const auto &args: xor_args)
+    {
+        const auto &arg1 = *args.first;
+        const auto &arg2 = *args.second;
+
+        if (arg1.isSet() && arg2.isSet())
+        {
+            std::cerr << arg1.getName() << " and " << arg2.getName()
+                << " cannot be set at the same time\n";
+            ret = false;
+        }
+    }
+
+    if (!m_system_mode.isSet() && m_input_args.getValue().empty())
+    {
+        std::cerr << "one or more permission file paths to use are required\n";
+        ret = false;
+    }
+
+    for (const auto arg: { &m_root_path, &m_config_root_path })
+    {
+        if (!arg->isSet())
+            continue;
+
+        const auto &path = arg->getValue();
+
+        if (path.empty() || path[0] != '/')
+        {
+            std::cerr << arg->getName() << " must begin with '/'\n";
+            ret = false;
+        }
+    }
+
+    if (m_config_root_path.isSet())
+    {
+        const auto &path = m_config_root_path.getValue();
+
+        // considering NAME_MAX characters left is somewhat arbitrary, but
+        // staying within these limits should at least allow us to not
+        // encounter ENAMETOOLONG in typical setups
+        if (path.length() >= (PATH_MAX - NAME_MAX -1))
+        {
+            std::cerr << m_config_root_path.getName() << ": prefix is too long\n";
+            ret = false;
+        }
+    }
+
+    return ret;
+}
+
+int Chkstat::run()
+{
+    char *str;
+    bool use_checklist = false;
+    bool use_fscaps = true;
     char line[512];
     char *part[4];
     int pcnt, lcnt;
@@ -789,232 +859,106 @@ main(int argc, char **argv)
     int errors = 0;
     cap_t caps = NULL;
 
-    while (argc > 1)
+    if (!validateArguments())
     {
-        opt = argv[1];
-
-        if (!strcmp(opt, "--"))
-            break;
-        if (*opt == '-' && opt[1] == '-')
-            opt++;
-
-        if (!strcmp(opt, "-system"))
-        {
-            argc--;
-            argv++;
-            systemmode = 1;
-            continue;
-        }
-        // hidden option for use by suseconfig only
-        if (!strcmp(opt, "-suseconfig"))
-        {
-            argc--;
-            argv++;
-            suseconfig = 1;
-            systemmode = 1;
-            continue;
-        }
-        if (!strcmp(opt, "-fscaps"))
-        {
-            argc--;
-            argv++;
-            have_fscaps = 1;
-            continue;
-        }
-        if (!strcmp(opt, "-no-fscaps"))
-        {
-            argc--;
-            argv++;
-            have_fscaps = 0;
-            continue;
-        }
-        if (!strcmp(opt, "-s") || !strcmp(opt, "-set"))
-        {
-            do_set=1;
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-warn"))
-        {
-            do_set=0;
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-n") || !strcmp(opt, "-noheader"))
-        {
-            told = 1;
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-e") || !strcmp(opt, "-examine"))
-        {
-            argc--;
-            argv++;
-            if (argc == 1)
-            {
-                fprintf(stderr, "examine: argument required\n");
-                exit(1);
-            }
-            add_checklist(argv[1]);
-            use_checklist = 1;
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-level"))
-        {
-            argc--;
-            argv++;
-            if (argc == 1)
-            {
-                fprintf(stderr, "level: argument required\n");
-                exit(1);
-            }
-            force_level = argv[1];
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-f") || !strcmp(opt, "-files"))
-        {
-            argc--;
-            argv++;
-            if (argc == 1)
-            {
-                fprintf(stderr, "files: argument required\n");
-                exit(1);
-            }
-            if ((fp = fopen(argv[1], "r")) == 0)
-            {
-                fprintf(stderr, "files: %s: %s\n", argv[1], strerror(errno));
-                exit(1);
-            }
-            while (readline(fp, line, sizeof(line)))
-            {
-                if (!*line)
-                    continue;
-                add_checklist(line);
-            }
-            fclose(fp);
-            use_checklist = 1;
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-r") || !strcmp(opt, "-root"))
-        {
-            argc--;
-            argv++;
-            if (argc == 1)
-            {
-                fprintf(stderr, "root: argument required\n");
-                exit(1);
-            }
-            root = argv[1];
-            rootl = strlen(root);
-            if (*root != '/')
-            {
-                fprintf(stderr, "root: must begin with '/'\n");
-                exit(1);
-            }
-            argc--;
-            argv++;
-            continue;
-        }
-        if (!strcmp(opt, "-config-root"))
-        {
-            argc--;
-            argv++;
-            if (argc == 1)
-            {
-                fprintf(stderr, "config-root: argument required\n");
-                exit(1);
-            }
-            config_root = argv[1];
-            if (config_root.empty() || config_root[0] != '/')
-            {
-                fprintf(stderr, "config-root: must begin with '/'\n");
-                exit(1);
-            }
-            // considering NAME_MAX characters left is somewhat arbitrary, but
-            // staying within these limits should at least allow us to not
-            // encounter ENAMETOOLONG in typical setups
-            else if(config_root.length() >= (PATH_MAX - NAME_MAX - 1))
-            {
-                fprintf(stderr, "config-root: prefix is too long\n");
-                exit(1);
-            }
-            argc--;
-            argv++;
-            continue;
-        }
-        if (*opt == '-')
-            usage(!strcmp(opt, "-h") || !strcmp(opt, "-help") ? 0 : 1);
-        break;
+        return 2;
     }
 
-    if (systemmode)
+    for (const auto &path: m_examine_paths.getValue())
+    {
+        add_checklist(path.c_str());
+        use_checklist = true;
+    }
+
+    for (const auto &path: m_file_lists.getValue())
+    {
+        FILE *fp = fopen(path.c_str(), "r");
+        if (fp == 0)
+        {
+            fprintf(stderr, "files: %s: %s\n", path.c_str(), strerror(errno));
+            return 1;
+        }
+        while (readline(fp, line, sizeof(line)))
+        {
+            if (!*line)
+                continue;
+            add_checklist(line);
+        }
+        fclose(fp);
+        use_checklist = true;
+    }
+
+    if (m_root_path.isSet())
+    {
+        const auto &rp = m_root_path.getValue();
+        root = rp.c_str();
+        rootl = rp.length();
+    }
+
+    if (m_config_root_path.isSet())
+    {
+        config_root = m_config_root_path.getValue();
+    }
+
+    if (m_system_mode.isSet())
     {
         const std::string file = config_root + "/etc/sysconfig/security";
-        parse_sysconf(file.c_str());
-        if(do_set == -1)
+        // use_fscaps will only be changed if explicitly configured
+        parse_sysconf(file.c_str(), !m_force_level_list.isSet(), &use_fscaps);
+        if (!m_apply_changes.isSet() && !m_only_warn.isSet())
         {
             if (default_set < 0)
             {
                 fprintf(stderr, "permissions handling disabled in %s\n", file.c_str());
                 exit(0);
             }
-            if (suseconfig && default_set)
-            {
-                char* module = getenv("ONLY_MODULE");
-                if (!module || strcmp(module, "permissions"))
-                {
-                    puts("no permissions will be changed if not called explicitly");
-                    default_set = 0;
-                }
-            }
-            do_set = default_set;
+            m_apply_changes.setValue(default_set);
         }
-        if (force_level)
+        if (m_force_level_list.isSet())
         {
-            char *p = strtok(force_level, " ");
-            do
+            std::istringstream ss(m_force_level_list.getValue());
+            std::string word;
+            while (std::getline(ss, word))
             {
-                add_level(p);
+                add_level(word.c_str());
             }
-            while ((p = strtok(NULL, " ")));
         }
 
         if (!nlevel)
             add_level("secure");
         add_level("local"); // always add local
 
-        for (i = 1; i < (size_t)argc; i++)
+        for (const auto &path: m_input_args.getValue())
         {
-            add_checklist(argv[i]);
-            use_checklist = 1;
+            add_checklist(path.c_str());
+            use_checklist = true;
             continue;
         }
         collect_permfiles();
     }
-    else if (argc <= 1)
-        usage(1);
     else
     {
-        npermfiles = (size_t)argc-1;
-        permfiles = &argv[1];
+        for (const auto &path: m_input_args.getValue())
+        {
+            ensure_array((void**)&permfiles, &npermfiles);
+            permfiles[npermfiles++] = strdup(path.c_str());
+        }
     }
 
-    if (have_fscaps == 1 && !check_fscaps_enabled())
+    // apply possible command line overrides to force en-/disable fscaps
+    if (m_force_fscaps.isSet())
+    {
+        use_fscaps = true;
+    }
+    else if (m_disable_fscaps.isSet())
+    {
+        use_fscaps = false;
+    }
+
+    if (use_fscaps && !check_fscaps_enabled())
     {
         fprintf(stderr, "Warning: running kernel does not support fscaps\n");
     }
-
-    if  (do_set == -1)
-        do_set = 0;
 
     // add fake list entries for all files to check
     for (i = 0; i < nchecklist; i++)
@@ -1022,7 +966,8 @@ main(int argc, char **argv)
 
     for (i = 0; i < npermfiles; i++)
     {
-        if ((fp = fopen(permfiles[i], "r")) == 0)
+        FILE *fp = fopen(permfiles[i], "r");
+        if (fp == 0)
         {
             perror(permfiles[i]);
             exit(1);
@@ -1073,7 +1018,7 @@ main(int argc, char **argv)
                 }
                 if (!strncmp(p, "+capabilities ", 14))
                 {
-                    if (have_fscaps != 1)
+                    if (!use_fscaps)
                         continue;
                     p += 14;
                     caps = cap_from_text(p);
@@ -1225,9 +1170,8 @@ main(int argc, char **argv)
         if (perm_ok && owner_ok && caps_ok)
             continue;
 
-        if (!told)
+        if (!m_no_header.isSet())
         {
-            told = 1;
             printf("Checking permissions and ownerships - using the permissions files\n");
             for (i = 0; i < npermfiles; i++)
                 printf("\t%s\n", permfiles[i]);
@@ -1235,16 +1179,18 @@ main(int argc, char **argv)
             {
                 printf("Using root %s\n", root);
             }
+
+            m_no_header.setValue(true);
         }
 
-        if (do_set && fd_path != fd_path_buf)
+        if (m_apply_changes.isSet() && fd_path != fd_path_buf)
         {
             fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
             errors++;
-            do_set = false;
+            m_apply_changes.setValue(false);
         }
 
-        if (!do_set)
+        if (!m_apply_changes.isSet())
             printf("%s should be %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
         else
             printf("setting %s to %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
@@ -1293,7 +1239,7 @@ main(int argc, char **argv)
         putchar(')');
         putchar('\n');
 
-        if (!do_set)
+        if (!m_apply_changes.isSet())
             continue;
 
         // don't give high privileges to files controlled by non-root users
@@ -1369,17 +1315,22 @@ main(int argc, char **argv)
     if (errors)
     {
         fprintf(stderr, "ERROR: not all operations were successful.\n");
-        exit(1);
+        return 1;
     }
-    if (permfiles != argv + 1)
+
+    for (i = 0; i < npermfiles; i++)
     {
-        for (i = 0; i < npermfiles; i++)
-        {
-            free(permfiles[i]);
-        }
-        free(permfiles);
+        free(permfiles[i]);
     }
-    exit(0);
+    free(permfiles);
+
+    return 0;
+}
+
+int main(int argc, const char **argv)
+{
+    Chkstat chkstat(argc, argv);
+    return chkstat.run();
 }
 
 // vim: et ts=4 sts=4 sw=4 :
