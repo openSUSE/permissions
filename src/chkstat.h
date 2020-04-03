@@ -70,6 +70,8 @@ protected: // functions
 
     bool parseSysconfig();
 
+    bool checkFsCapsSupport() const;
+
 protected: // data
 
     const int m_argc = 0;

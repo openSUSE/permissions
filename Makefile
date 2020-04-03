@@ -23,9 +23,6 @@ man5dir=$(mandir)/man5
 zypp_plugins=$(prefix)/lib/zypp/plugins
 zypp_commit_plugins=$(zypp_plugins)/commit
 
-FSCAPS_DEFAULT_ENABLED = 1
-CPPFLAGS += -DFSCAPS_DEFAULT_ENABLED=$(FSCAPS_DEFAULT_ENABLED)
-
 all: src/chkstat
 	@if grep -o -P '\t' src/chkstat.cpp ; then echo "error: chkstat.c mixes tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
 
