@@ -84,6 +84,7 @@ protected: // functions
     // functions
     void read_permissions_d(const char *);
     void collect_permfiles(const std::string &);
+    int safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure);
 
 protected: // data
 
@@ -128,6 +129,9 @@ protected: // data
 
     //! permission profile names in the order they should be applied
     std::vector<std::string> m_profiles;
+
+    //! the effective user ID we're running as
+    const uid_t m_euid;
 };
 
 #endif // inc. guard
