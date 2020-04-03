@@ -67,8 +67,6 @@ struct perm *permlist;
 uid_t euid;
 const char *root;
 size_t rootl;
-size_t nlevel;
-const char** level;
 char** permfiles = NULL;
 size_t npermfiles = 0;
 
@@ -154,19 +152,6 @@ readline(FILE *fp, char *buf, size_t len)
     return 1;
 }
 
-int
-in_level(const char *e)
-{
-    size_t i;
-    for (i = 0; i < nlevel; i++)
-    {
-        if (!strcmp(e, level[i]))
-            return 1;
-
-    }
-    return 0;
-}
-
 void
 ensure_array(void** array, size_t* size)
 {
@@ -181,29 +166,14 @@ ensure_array(void** array, size_t* size)
     }
 }
 
-void
-add_level(const char *e)
-{
-    if (in_level(e))
-        return;
-    e = strdup(e);
-    if (e == 0)
-    {
-        perror("level entry alloc");
-        exit(1);
-    }
-    ensure_array((void**)&level, &nlevel);
-    level[nlevel++] = e;
-}
-
 static int
 compare(const void* a, const void* b)
 {
     return strcmp(*(char* const*)a, *(char* const*)b);
 }
 
-static void
-read_permissions_d(const char *directory)
+void
+Chkstat::read_permissions_d(const char *directory)
 {
     size_t i;
     DIR* dir;
@@ -240,7 +210,6 @@ read_permissions_d(const char *directory)
             for (i = 0; i < nfiles; ++i)
             {
                 char fn[4096];
-                size_t l;
                 // skip duplicates
                 if (i && !strcmp(files[i-1], files[i]))
                     continue;
@@ -252,9 +221,9 @@ read_permissions_d(const char *directory)
                     permfiles[npermfiles++] = strdup(fn);
                 }
 
-                for (l = 0; l < nlevel; ++l)
+                for (const auto &profile: m_profiles)
                 {
-                    snprintf(fn, sizeof(fn), "%s/%s.%s", directory, files[i], level[l]);
+                    snprintf(fn, sizeof(fn), "%s/%s.%s", directory, files[i], profile.c_str());
 
                     if (access(fn, R_OK) == 0)
                     {
@@ -273,11 +242,9 @@ read_permissions_d(const char *directory)
     }
 }
 
-static void
-collect_permfiles(const std::string &config_root)
+void
+Chkstat::collect_permfiles(const std::string &config_root)
 {
-    size_t i;
-
     const auto usr_root = config_root + "/usr/share/permissions";
     const auto etc_root = config_root + "/etc";
 
@@ -297,23 +264,22 @@ collect_permfiles(const std::string &config_root)
     }
 
     // 2. central easy, secure paranoid as those are defined by SUSE
-    for (i = 0; i < nlevel; ++i)
+    for (const auto &profile: m_profiles)
     {
-        if (!strcmp(level[i], "easy")
-                || !strcmp(level[i], "secure")
-                || !strcmp(level[i], "paranoid"))
-        {
-            auto base = std::string("/permissions.") + level[i];
-            for( const auto &dir: { usr_root, etc_root } )
-            {
-                std::string profile = dir + base;
+        if (!matchesAny(profile, PREDEFINED_PROFILES))
+            continue;
 
-                if (access(profile.c_str(), R_OK) == 0)
-                {
-                    ensure_array((void**)&permfiles, &npermfiles);
-                    permfiles[npermfiles++] = strdup(profile.c_str());
-                    break;
-                }
+        auto base = std::string("/permissions.") + profile;
+
+        for( const auto &dir: { usr_root, etc_root } )
+        {
+            std::string profile_path = dir + base;
+
+            if (access(profile_path.c_str(), R_OK) == 0)
+            {
+                ensure_array((void**)&permfiles, &npermfiles);
+                permfiles[npermfiles++] = strdup(profile_path.c_str());
+                break;
             }
         }
     }
@@ -323,17 +289,17 @@ collect_permfiles(const std::string &config_root)
     read_permissions_d((etc_root + "/permissions.d").c_str());
 
     // 4. central permissions files with user defined level incl 'local'
-    for (i = 0; i < nlevel; ++i)
+    for (const auto &profile: m_profiles)
     {
-        if (!strcmp(level[i], "easy") || !strcmp(level[i], "secure") || !strcmp(level[i], "paranoid"))
+        if (matchesAny(profile, PREDEFINED_PROFILES))
             continue;
 
-        std::string profile = etc_root + "/permissions." + level[i];
+        std::string profile_path = etc_root + "/permissions." + profile;
 
-        if (access(profile.c_str(), R_OK) == 0)
+        if (access(profile_path.c_str(), R_OK) == 0)
         {
             ensure_array((void**)&permfiles, &npermfiles);
-            permfiles[npermfiles++] = strdup(profile.c_str());
+            permfiles[npermfiles++] = strdup(profile_path.c_str());
         }
     }
 }
@@ -756,13 +722,13 @@ bool Chkstat::parseSysconfig()
 
             // parse the space separated, ordered list of profiles to apply
             std::istringstream ss(value);
-            std::string word;
+            std::string profile;
 
-            while (std::getline(ss, word, ' '))
+            while (std::getline(ss, profile, ' '))
             {
-                if( word != "local" && !word.empty() )
+                if( profile != "local" && !profile.empty() )
                 {
-                    add_level(word.c_str());
+                    addProfile(profile);
                 }
             }
         }
@@ -836,6 +802,19 @@ bool Chkstat::checkFsCapsSupport() const
     return val == 1;
 }
 
+void Chkstat::addProfile(const std::string &name)
+{
+    for (const auto &profile: m_profiles)
+    {
+        if (profile == name)
+            // already exists
+            return;
+    }
+
+    m_profiles.push_back(name);
+}
+
+
 int Chkstat::run()
 {
     char *str;
@@ -873,13 +852,14 @@ int Chkstat::run()
             std::string word;
             while (std::getline(ss, word))
             {
-                add_level(word.c_str());
+                addProfile(word);
             }
         }
 
-        if (!nlevel)
-            add_level("secure");
-        add_level("local"); // always add local
+        if (m_profiles.empty())
+            addProfile("secure");
+         // always add the local profile
+        addProfile("local");
 
         for (const auto &path: m_input_args.getValue())
         {

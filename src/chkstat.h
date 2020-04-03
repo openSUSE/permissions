@@ -7,6 +7,7 @@
 // C++
 #include <string>
 #include <set>
+#include <vector>
 
 /**
  * \brief
@@ -72,6 +73,18 @@ protected: // functions
 
     bool checkFsCapsSupport() const;
 
+    /**
+     * \brief
+     *      Adds the given profile (suffix) to the list of profiles to be
+     *      processed
+     **/
+    void addProfile(const std::string &name);
+
+    // intermediate member functions in the process of refactoring global
+    // functions
+    void read_permissions_d(const char *);
+    void collect_permfiles(const std::string &);
+
 protected: // data
 
     const int m_argc = 0;
@@ -109,6 +122,12 @@ protected: // data
     //! whether to touch file based capabilities. influenced by command line
     //! and sysconfig configuration file
     bool m_use_fscaps = true;
+
+    //! the default, predefined profile names shipped with permissions
+    static constexpr const char * const PREDEFINED_PROFILES[] = {"easy", "secure", "paranoid"};
+
+    //! permission profile names in the order they should be applied
+    std::vector<std::string> m_profiles;
 };
 
 #endif // inc. guard
