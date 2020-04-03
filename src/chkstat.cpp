@@ -587,29 +587,6 @@ fail:
 }
 
 
-/* check /sys/kernel/fscaps, 2.6.39 */
-static int
-check_fscaps_enabled()
-{
-    FILE* fp;
-    char line[128];
-    int val = FSCAPS_DEFAULT_ENABLED;
-
-    if ((fp = fopen("/sys/kernel/fscaps", "r")) == 0)
-    {
-        goto out;
-    }
-
-    if (readline(fp, line, sizeof(line)))
-    {
-        val = atoi(line);
-    }
-
-    fclose(fp);
-out:
-    return val;
-}
-
 Chkstat::Chkstat(int argc, const char **argv) :
     m_argc(argc),
     m_argv(argv),
@@ -837,6 +814,28 @@ bool Chkstat::parseSysconfig()
     return true;
 }
 
+bool Chkstat::checkFsCapsSupport() const
+{
+    /* check kernel capability support /sys/kernel/fscaps, 2.6.39 */
+    std::ifstream fs("/sys/kernel/fscaps");
+
+    if (!fs)
+    {
+        // if the file doesn't exist then there's probably no support for it
+        return false;
+    }
+
+    size_t val = 0;
+    fs >> val;
+
+    if (fs.fail())
+    {
+        return false;
+    }
+
+    return val == 1;
+}
+
 int Chkstat::run()
 {
     char *str;
@@ -908,9 +907,9 @@ int Chkstat::run()
         m_use_fscaps = false;
     }
 
-    if (m_use_fscaps && !check_fscaps_enabled())
+    if (m_use_fscaps && !checkFsCapsSupport())
     {
-        fprintf(stderr, "Warning: running kernel does not support fscaps\n");
+        std::cerr << "Warning: running kernel does not support fscaps" << std::endl;
     }
 
     // add fake list entries for all files to check
