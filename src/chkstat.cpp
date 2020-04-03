@@ -64,7 +64,6 @@ struct perm
 };
 
 struct perm *permlist;
-uid_t euid;
 const char *root;
 size_t rootl;
 char** permfiles = NULL;
@@ -355,7 +354,7 @@ check_have_proc(void)
 #define PROC_FD_PATH_SIZE (sizeof("/proc/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
 
 int
-safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
+Chkstat::safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
     char pathbuf[PATH_MAX];
     char *path_rest;
@@ -427,7 +426,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
 
         /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
         /* for euid != 0 it is also ok if the owner is euid */
-        if (stb->st_uid && stb->st_uid != euid && !is_final_path_element)
+        if (stb->st_uid && stb->st_uid != m_euid && !is_final_path_element)
         {
             *traversed_insecure = true;
         }
@@ -438,7 +437,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
         }
 
         // if parent directory is not owned by root, the file owner must match the owner of parent
-        if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
+        if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != m_euid)
         {
             if (is_final_path_element)
             {
@@ -459,7 +458,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
             // of the link, but we're going the simple route for now.
-            if (stb->st_uid && stb->st_uid != euid)
+            if (stb->st_uid && stb->st_uid != m_euid)
                 goto fail_insecure_path;
 
             char linkbuf[PATH_MAX];
@@ -568,7 +567,8 @@ Chkstat::Chkstat(int argc, const char **argv) :
     m_file_lists("f", "files", "read newline separated list of files to check (see --examine) from the specified path", false, "PATH", m_parser),
     m_root_path("r", "root", "check files relative to the given root directory", false, "", "PATH", m_parser),
     m_config_root_path("", "config-root", "lookup configuration files relative to the given root directory", false, "", "PATH", m_parser),
-    m_input_args("args", "in --system mode a list of paths to check, otherwise a list of profiles to parse", false, "PATH", m_parser)
+    m_input_args("args", "in --system mode a list of paths to check, otherwise a list of profiles to parse", false, "PATH", m_parser),
+    m_euid(geteuid())
 {
 }
 
@@ -995,7 +995,6 @@ int Chkstat::run()
         fclose(fp);
     }
 
-    euid = geteuid();
     for (e = permlist; e; e = e->next)
     {
         // if only specific files should be check then filter out non-matching
@@ -1193,7 +1192,7 @@ int Chkstat::run()
             continue;
         }
 
-        if (euid == 0 && !owner_ok)
+        if (m_euid == 0 && !owner_ok)
         {
             /* if we change owner or group of a setuid file the bit gets reset so
                also set perms again */
