@@ -37,6 +37,7 @@
 
 // local headers
 #include "chkstat.h"
+#include "utility.h"
 
 // C++
 #include <cassert>
@@ -68,10 +69,8 @@ const char *root;
 size_t rootl;
 size_t nlevel;
 const char** level;
-int default_set = 1;
 char** permfiles = NULL;
 size_t npermfiles = 0;
-std::string config_root;
 
 struct perm*
 add_permlist(const char *p_file, const char *p_owner, const char *p_group, mode_t mode)
@@ -197,112 +196,6 @@ add_level(const char *e)
     level[nlevel++] = e;
 }
 
-static inline int isquote(char c)
-{
-    return (c == '"' || c == '\'');
-}
-
-int
-parse_sysconf(const char* file, bool parse_levels, bool *fscaps_configured)
-{
-    FILE* fp;
-    char line[PATH_MAX];
-    char* p;
-
-    if ((fp = fopen(file, "r")) == 0)
-    {
-        fprintf(stderr, "error opening: %s: %s\n", file, strerror(errno));
-        return 0;
-    }
-
-    while (readline(fp, line, sizeof(line)))
-    {
-        if (!*line)
-            continue;
-
-        for (p = line; *p == ' '; ++p);
-
-        if (!*p || *p == '#')
-            continue;
-
-        if (!strncmp(p, "PERMISSION_SECURITY=", 20))
-        {
-            if (!parse_levels)
-                continue;
-
-            p+=20;
-            if (isquote(*p))
-                ++p;
-            p = strtok(p, " ");
-            if (p && !isquote(*p))
-            {
-                do
-                {
-                    if (isquote(p[strlen(p)-1]))
-                    {
-                        p[strlen(p)-1] = '\0';
-                    }
-                    if (*p && strcmp(p, "local"))
-                        add_level(p);
-                }
-                while ((p = strtok(NULL, " ")));
-            }
-        }
-        else if (!strncmp(p, "CHECK_PERMISSIONS=", 18))
-        {
-            p+=18;
-            if (isquote(*p))
-                ++p;
-            if (!strncmp(p, "set", 3))
-            {
-                p+=3;
-                if (isquote(*p) || !*p)
-                    default_set=1;
-            }
-            else if ((!strncmp(p, "no", 2) && (!p[3] || isquote(p[3]))) || !*p || isquote(*p))
-            {
-                p+=2;
-                if (isquote(*p) || !*p)
-                {
-                    default_set = -1;
-                }
-            }
-            else
-            {
-                //fprintf(stderr, "invalid value for CHECK_PERMISSIONS (must be 'set', 'warn' or 'no')\n");
-            }
-        }
-#define FSCAPSENABLE "PERMISSION_FSCAPS="
-        else if (!strncmp(p, FSCAPSENABLE, strlen(FSCAPSENABLE)))
-        {
-            p+=strlen(FSCAPSENABLE);
-            if (isquote(*p))
-            {
-                ++p;
-            }
-
-            if (!strncmp(p, "yes", 3))
-            {
-                p+=3;
-                if (isquote(*p) || !*p)
-                {
-                    *fscaps_configured=true;
-                }
-            }
-            else if (!strncmp(p, "no", 2))
-            {
-                p+=2;
-                if (isquote(*p) || !*p)
-                {
-                    *fscaps_configured=false;
-                }
-            }
-        }
-    }
-    fclose(fp);
-    return 0;
-}
-
 static int
 compare(const void* a, const void* b)
 {
@@ -381,7 +274,7 @@ read_permissions_d(const char *directory)
 }
 
 static void
-collect_permfiles()
+collect_permfiles(const std::string &config_root)
 {
     size_t i;
 
@@ -836,10 +729,117 @@ bool Chkstat::processArguments()
     return true;
 }
 
+static inline std::string& stripQuotes(std::string &s)
+{
+    return strip(s, [](char c) { return c == '"' || c == '\''; });
+}
+
+bool Chkstat::parseSysconfig()
+{
+    const auto file = m_config_root_path.getValue() + "/etc/sysconfig/security";
+    std::ifstream fs(file);
+
+    if (!fs)
+    {
+        std::cerr << "error opening " << file << ": " << strerror(errno) << std::endl;
+        return false;
+    }
+
+    std::string line;
+    std::string key;
+    std::string value;
+    size_t linenr = 0;
+    bool check_permissions = true;
+
+    while (std::getline(fs, line))
+    {
+        linenr++;
+        strip(line);
+
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        const auto sep = line.find_first_of('=');
+        if (sep == line.npos)
+        {
+            // syntax error?
+            std::cerr << file << ":" << linenr << ": parse error in '" << line << "'" << std::endl;
+            continue;
+        }
+
+        key = line.substr(0, sep);
+        value = line.substr(sep + 1);
+        value = stripQuotes(value);
+
+        if (key == "PERMISSION_SECURITY")
+        {
+            if (m_force_level_list.isSet())
+                // explicit levels are specified on the command line
+                continue;
+
+            // parse the space separated, ordered list of profiles to apply
+            std::istringstream ss(value);
+            std::string word;
+
+            while (std::getline(ss, word, ' '))
+            {
+                if( word != "local" && !word.empty() )
+                {
+                    add_level(word.c_str());
+                }
+            }
+        }
+        // this setting was last part of the config file template in SLE-11
+        // but we still support it in the code. The logic behind it is quite
+        // complex since it is crossed with the command line settings
+        else if (key == "CHECK_PERMISSIONS")
+        {
+            if (value == "set")
+            {
+                check_permissions = true;
+            }
+            else if (value == "no" || value.empty())
+            {
+                check_permissions = false;
+            }
+            else if (value != "warn")
+            {
+                std::cerr << file << ":" << linenr << ": invalid value for " << key << " (expected 'set', 'no' or 'warn'). Falling back to default value." << std::endl;
+            }
+        }
+        else if (key == "PERMISSION_FSCAPS")
+        {
+            if (value == "yes")
+            {
+                m_use_fscaps = true;
+            }
+            else if (value == "no")
+            {
+                m_use_fscaps = false;
+            }
+        }
+    }
+
+    // apply the complex CHECK_PERMISSONS logic
+    if (!m_apply_changes.isSet() && !m_only_warn.isSet())
+    {
+        if (check_permissions)
+        {
+            m_apply_changes.setValue(true);
+        }
+        else
+        {
+            std::cerr << "permissions handling disabled in " << file << std::endl;
+            exit(0);
+        }
+    }
+
+    return true;
+}
+
 int Chkstat::run()
 {
     char *str;
-    bool use_fscaps = true;
     char *part[4];
     int pcnt, lcnt;
     size_t i;
@@ -865,25 +865,9 @@ int Chkstat::run()
         return 1;
     }
 
-    if (m_config_root_path.isSet())
-    {
-        config_root = m_config_root_path.getValue();
-    }
-
     if (m_system_mode.isSet())
     {
-        const std::string file = config_root + "/etc/sysconfig/security";
-        // use_fscaps will only be changed if explicitly configured
-        parse_sysconf(file.c_str(), !m_force_level_list.isSet(), &use_fscaps);
-        if (!m_apply_changes.isSet() && !m_only_warn.isSet())
-        {
-            if (default_set < 0)
-            {
-                fprintf(stderr, "permissions handling disabled in %s\n", file.c_str());
-                exit(0);
-            }
-            m_apply_changes.setValue(default_set);
-        }
+        parseSysconfig();
         if (m_force_level_list.isSet())
         {
             std::istringstream ss(m_force_level_list.getValue());
@@ -903,7 +887,7 @@ int Chkstat::run()
             m_checklist.insert(path);
             continue;
         }
-        collect_permfiles();
+        collect_permfiles(m_config_root_path.getValue());
     }
     else
     {
@@ -917,14 +901,14 @@ int Chkstat::run()
     // apply possible command line overrides to force en-/disable fscaps
     if (m_force_fscaps.isSet())
     {
-        use_fscaps = true;
+        m_use_fscaps = true;
     }
     else if (m_disable_fscaps.isSet())
     {
-        use_fscaps = false;
+        m_use_fscaps = false;
     }
 
-    if (use_fscaps && !check_fscaps_enabled())
+    if (m_use_fscaps && !check_fscaps_enabled())
     {
         fprintf(stderr, "Warning: running kernel does not support fscaps\n");
     }
@@ -990,7 +974,7 @@ int Chkstat::run()
                 }
                 if (!strncmp(p, "+capabilities ", 14))
                 {
-                    if (!use_fscaps)
+                    if (!m_use_fscaps)
                         continue;
                     p += 14;
                     caps = cap_from_text(p);

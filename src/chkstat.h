@@ -68,6 +68,8 @@ protected: // functions
         return m_checklist.find(path) != m_checklist.end();
     }
 
+    bool parseSysconfig();
+
 protected: // data
 
     const int m_argc = 0;
@@ -92,13 +94,19 @@ protected: // data
     TCLAP::MultiArg<std::string> m_file_lists;
 
     TCLAP::ValueArg<std::string> m_root_path;
+    //! alternate config root directory relative to which config files are
+    //! looked up
     TCLAP::ValueArg<std::string> m_config_root_path;
 
     //! positional input arguments: either the files to check for --system
     //! mode or the profiles to parse for non-system mode.
     TCLAP::UnlabeledMultiArg<std::string> m_input_args;
 
+    //! optional explicit set of files to check
     std::set<std::string> m_checklist;
+    //! whether to touch file based capabilities. influenced by command line
+    //! and sysconfig configuration file
+    bool m_use_fscaps = true;
 };
 
 #endif // inc. guard
