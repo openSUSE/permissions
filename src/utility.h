@@ -55,6 +55,19 @@ inline bool hasPrefix(const std::string &s, const std::string prefix)
     return s.substr(0, prefix.length()) == prefix;
 }
 
+//! returns whether the given iterable sequence contains the given element \c val
+template <typename T, typename SEQ>
+bool matchesAny(const T &val, const SEQ &seq)
+{
+    for (const auto &e: seq)
+    {
+        if (val == e)
+            return true;
+    }
+
+    return false;
+}
+
 #endif // inc. guard
 
 // vim: et ts=4 sts=4 sw=4 :
