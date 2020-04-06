@@ -4,6 +4,7 @@
 // C++
 #include <cctype>
 #include <string>
+#include <string_view>
 
 // isspace has overloads which gives trouble with template argument deduction,
 // therefore provide a wrapper
@@ -50,9 +51,18 @@ std::string& strip(std::string &s, UNARY f = chkspace)
 }
 
 //! checks whether the given string has the given prefix
-inline bool hasPrefix(const std::string &s, const std::string prefix)
+inline bool hasPrefix(const std::string &s, const std::string &prefix)
 {
     return s.substr(0, prefix.length()) == prefix;
+}
+
+//! checks whether the given string has the given suffix
+inline bool hasSuffix(const std::string_view &s, const std::string &suffix)
+{
+    if (suffix.length() > s.length())
+        return false;
+
+    return s.substr(s.length() - suffix.length()) == suffix;
 }
 
 //! returns whether the given iterable sequence contains the given element \c val
@@ -66,6 +76,15 @@ bool matchesAny(const T &val, const SEQ &seq)
     }
 
     return false;
+}
+
+//! performs a file existence test for the given path
+bool existsFile(const std::string &path);
+
+template <typename T1, typename T2>
+void appendContainer(T1 &container, const T2 &sequence)
+{
+    container.insert(container.end(), sequence.begin(), sequence.end());
 }
 
 #endif // inc. guard

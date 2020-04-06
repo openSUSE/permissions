@@ -23,8 +23,10 @@ man5dir=$(mandir)/man5
 zypp_plugins=$(prefix)/lib/zypp/plugins
 zypp_commit_plugins=$(zypp_plugins)/commit
 
+OBJS = src/chkstat.o src/utility.o
+
 all: src/chkstat
-	@if grep -o -P '\t' src/chkstat.cpp ; then echo "error: chkstat.c mixes tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
+	@if grep -n -o -P '\t' src/*.cpp src/*.h; then echo "error: source has mixed tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
 
 install: all
 	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(permissionsdir) $(zypp_commit_plugins); \
@@ -38,12 +40,19 @@ install: all
 		do install -m 644 $$i $(DESTDIR)$(permissionsdir); done
 	@install -m 644 etc/permissions.local $(DESTDIR)$(sysconfdir)
 
-src/chkstat: src/*.h src/*.cpp | /usr/include/tclap
+%.o: src/%.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+src/chkstat.o: src/*.h
+src/utility.o: src/utility.h
+
+src/chkstat: $(OBJS) | /usr/include/tclap
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) src/*.o -osrc/chkstat
 
 /usr/include/tclap:
 	@echo "error: The tclap command line parsing library is required for building. Try 'zypper in tclap'."; exit 1; :
 
 clean:
-	/bin/rm -f src/chkstat
+	/bin/rm -f src/chkstat src/*.o
 
 .PHONY: all clean
