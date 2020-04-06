@@ -5,8 +5,9 @@
 #include <tclap/CmdLine.h>
 
 // C++
-#include <string>
 #include <set>
+#include <string>
+#include <string_view>
 #include <vector>
 
 /**
@@ -80,10 +81,23 @@ protected: // functions
      **/
     void addProfile(const std::string &name);
 
+    /**
+     * \brief
+     *      Collects all configured profiles
+     *  \details
+     *      Collects all profiles configured in m_profiles from /usr and /etc
+     *      system directories and stores their paths in m_profile_paths.
+     **/
+    void collectProfiles();
+
+    /**
+     * \brief
+     *      Collects configured per-package profiles from the given directory
+     **/
+    void collectPackageProfiles(const std::string &dir);
+
     // intermediate member functions in the process of refactoring global
     // functions
-    void read_permissions_d(const char *);
-    void collect_permfiles(const std::string &);
     int safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure);
 
 protected: // data
@@ -129,6 +143,9 @@ protected: // data
 
     //! permission profile names in the order they should be applied
     std::vector<std::string> m_profiles;
+
+    //! permission profile paths in the order they should be applied
+    std::vector<std::string> m_profile_paths;
 
     //! the effective user ID we're running as
     const uid_t m_euid;

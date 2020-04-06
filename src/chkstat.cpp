@@ -46,12 +46,14 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #define BAD_LINE() \
-    fprintf(stderr, "bad permissions line %s:%d\n", permfiles[i], lcnt)
+    fprintf(stderr, "bad permissions line %s:%d\n", profile_path.c_str(), lcnt)
 
 struct perm
 {
@@ -66,8 +68,6 @@ struct perm
 struct perm *permlist;
 const char *root;
 size_t rootl;
-char** permfiles = NULL;
-size_t npermfiles = 0;
 
 struct perm*
 add_permlist(const char *p_file, const char *p_owner, const char *p_group, mode_t mode)
@@ -150,159 +150,6 @@ readline(FILE *fp, char *buf, size_t len)
     buf[0] = 0;
     return 1;
 }
-
-void
-ensure_array(void** array, size_t* size)
-{
-    if ((*size & 63) == 0)
-    {
-        *array = realloc(*array, sizeof(char *) * (*size + 64));
-        if (*array == NULL)
-        {
-            perror("array alloc");
-            exit(1);
-        }
-    }
-}
-
-static int
-compare(const void* a, const void* b)
-{
-    return strcmp(*(char* const*)a, *(char* const*)b);
-}
-
-void
-Chkstat::read_permissions_d(const char *directory)
-{
-    size_t i;
-    DIR* dir;
-
-    dir = opendir(directory);
-    if (dir)
-    {
-        char** files = NULL;
-        size_t nfiles = 0;
-        struct dirent* d;
-        while ((d = readdir(dir)))
-        {
-            char* p;
-            if (!strcmp("..", d->d_name) || !strcmp(".", d->d_name))
-                continue;
-
-            /* filter out backup files */
-            if ((strlen(d->d_name)>2) && (d->d_name[strlen(d->d_name)-1] == '~'))
-                continue;
-            if (strstr(d->d_name,".rpmnew") || strstr(d->d_name,".rpmsave"))
-                continue;
-
-            ensure_array((void**)&files, &nfiles);
-            if ((p = strchr(d->d_name, '.')))
-            {
-                *p = '\0';
-            }
-            files[nfiles++] = strdup(d->d_name);
-        }
-        closedir(dir);
-        if (nfiles)
-        {
-            qsort(files, nfiles, sizeof(char*), compare);
-            for (i = 0; i < nfiles; ++i)
-            {
-                char fn[4096];
-                // skip duplicates
-                if (i && !strcmp(files[i-1], files[i]))
-                    continue;
-
-                snprintf(fn, sizeof(fn), "%s/%s", directory, files[i]);
-                if (access(fn, R_OK) == 0)
-                {
-                    ensure_array((void**)&permfiles, &npermfiles);
-                    permfiles[npermfiles++] = strdup(fn);
-                }
-
-                for (const auto &profile: m_profiles)
-                {
-                    snprintf(fn, sizeof(fn), "%s/%s.%s", directory, files[i], profile.c_str());
-
-                    if (access(fn, R_OK) == 0)
-                    {
-                        ensure_array((void**)&permfiles, &npermfiles);
-                        permfiles[npermfiles++] = strdup(fn);
-                    }
-                }
-
-            }
-            for (i = 0; i < nfiles; ++i)
-            {
-                free(files[i]);
-            }
-        }
-        free(files);
-    }
-}
-
-void
-Chkstat::collect_permfiles(const std::string &config_root)
-{
-    const auto usr_root = config_root + "/usr/share/permissions";
-    const auto etc_root = config_root + "/etc";
-
-    const auto central_usr_perms = usr_root + "/permissions";
-    const auto central_etc_perms = etc_root + "/permissions";
-
-    // 1. central fixed permissions file
-    if (access(central_usr_perms.c_str(), R_OK) == 0)
-    {
-        ensure_array((void**)&permfiles, &npermfiles);
-        permfiles[npermfiles++] = strdup(central_usr_perms.c_str());
-    }
-    else if (access(central_etc_perms.c_str(), R_OK) == 0)
-    {
-        ensure_array((void**)&permfiles, &npermfiles);
-        permfiles[npermfiles++] = strdup(central_etc_perms.c_str());
-    }
-
-    // 2. central easy, secure paranoid as those are defined by SUSE
-    for (const auto &profile: m_profiles)
-    {
-        if (!matchesAny(profile, PREDEFINED_PROFILES))
-            continue;
-
-        auto base = std::string("/permissions.") + profile;
-
-        for( const auto &dir: { usr_root, etc_root } )
-        {
-            std::string profile_path = dir + base;
-
-            if (access(profile_path.c_str(), R_OK) == 0)
-            {
-                ensure_array((void**)&permfiles, &npermfiles);
-                permfiles[npermfiles++] = strdup(profile_path.c_str());
-                break;
-            }
-        }
-    }
-
-    // 3. package specific permissions
-    read_permissions_d((usr_root + "/permissions.d").c_str());
-    read_permissions_d((etc_root + "/permissions.d").c_str());
-
-    // 4. central permissions files with user defined level incl 'local'
-    for (const auto &profile: m_profiles)
-    {
-        if (matchesAny(profile, PREDEFINED_PROFILES))
-            continue;
-
-        std::string profile_path = etc_root + "/permissions." + profile;
-
-        if (access(profile_path.c_str(), R_OK) == 0)
-        {
-            ensure_array((void**)&permfiles, &npermfiles);
-            permfiles[npermfiles++] = strdup(profile_path.c_str());
-        }
-    }
-}
-
 
 void
 usage(int x)
@@ -814,13 +661,158 @@ void Chkstat::addProfile(const std::string &name)
     m_profiles.push_back(name);
 }
 
+void Chkstat::collectProfiles()
+{
+    /*
+     * Since configuration files are in the process of separated between stock
+     * configuration files in /usr and editable configuration files in /etc we
+     * employ a backward compatibility logic here that prefers files in /usr
+     * but also recognized files in /etc.
+     */
+    const auto &config_root = m_config_root_path.getValue();
+
+    const auto usr_root = config_root + "/usr/share/permissions";
+    const auto etc_root = config_root + "/etc";
+
+    // 1. central fixed permissions file
+    for (const auto &dir: {usr_root, etc_root})
+    {
+        const auto common_profile = dir + "/permissions";
+        if (existsFile(common_profile))
+        {
+            m_profile_paths.push_back(common_profile);
+            // only use the first one found
+            break;
+        }
+    }
+
+    // 2. central easy, secure paranoid as those are defined by SUSE
+    for (const auto &profile: m_profiles)
+    {
+        if (!matchesAny(profile, PREDEFINED_PROFILES))
+            continue;
+
+        const auto base = std::string("/permissions.") + profile;
+
+        for (const auto &dir: {usr_root, etc_root})
+        {
+            std::string profile_path = dir + base;
+
+            if (existsFile(profile_path))
+            {
+                m_profile_paths.push_back(profile_path);
+                // only use the first one found
+                break;
+            }
+        }
+    }
+
+    // 3. package specific permissions
+    // these files are owned by the individual packages
+    // therefore while files are being moved from /etc to /usr we need to
+    // consider both locations, not only the first matching one like above.
+    for (const auto &dir: {usr_root, etc_root})
+    {
+        collectPackageProfiles(dir + "/permissions.d");
+    }
+
+    // 4. central permissions files with user defined level incl. 'local'
+    for (const auto &profile: m_profiles)
+    {
+        if (matchesAny(profile, PREDEFINED_PROFILES))
+            continue;
+
+        const auto profile_path = etc_root + "/permissions." + profile;
+
+        if (existsFile(profile_path))
+        {
+            m_profile_paths.push_back(profile_path);
+        }
+    }
+}
+
+void Chkstat::collectPackageProfiles(const std::string &dir)
+{
+    auto dir_handle = opendir(dir.c_str());
+
+    if (!dir_handle)
+    {
+        // anything interesting here? probably ENOENT.
+        return;
+    }
+
+    struct dirent* entry = nullptr;
+    // first collect a sorted set of base files, skipping unwanted files like
+    // backup files or specific profile files. Therefore filter out duplicates
+    // using the sorted set.
+    std::set<std::string> files;
+
+    // TODO: error situations in readdir() are currently not recognized.
+    // Consequences?
+    while ((entry = readdir(dir_handle)))
+    {
+        std::string_view name(entry->d_name);
+
+        if (name == "." || name == "..")
+            continue;
+
+        bool found_suffix = false;
+
+        /* filter out backup files */
+        for (const auto &suffix: {"~", ".rpmnew", ".rpmsave"})
+        {
+            if (hasSuffix(name, suffix))
+            {
+                found_suffix = true;
+                break;
+            }
+        }
+
+        if (found_suffix)
+            continue;
+
+        files.insert(std::string(name));
+    }
+
+    (void)closedir(dir_handle);
+
+    // now add the sorted set of files to the profile paths to process later
+    // on
+    for (const auto &file: files)
+    {
+        const auto seppos = file.find_first_of('.');
+
+        if (seppos != file.npos)
+            // we're only interested in base profiles
+            continue;
+
+        const auto path = dir + "/" + file;
+
+        m_profile_paths.push_back(path);
+
+        /*
+         * this is a bit of strange logic here, because we need to add the per
+         * package profile files in the order as the profiles appear in
+         * m_profiles.
+         */
+        for (const auto &profile: m_profiles)
+        {
+            const auto profile_basename = file + "." + profile;
+
+            if (files.find(profile_basename) != files.end())
+            {
+                m_profile_paths.push_back(path + "." + profile);
+            }
+        }
+    }
+}
+
 
 int Chkstat::run()
 {
     char *str;
     char *part[4];
     int pcnt, lcnt;
-    size_t i;
     int inpart;
     mode_t mode;
     struct perm *e;
@@ -866,15 +858,13 @@ int Chkstat::run()
             m_checklist.insert(path);
             continue;
         }
-        collect_permfiles(m_config_root_path.getValue());
+
+        collectProfiles();
     }
     else
     {
-        for (const auto &path: m_input_args.getValue())
-        {
-            ensure_array((void**)&permfiles, &npermfiles);
-            permfiles[npermfiles++] = strdup(path.c_str());
-        }
+        // only process the profiles specified on the command line
+        appendContainer(m_profile_paths, m_input_args.getValue());
     }
 
     // apply possible command line overrides to force en-/disable fscaps
@@ -898,12 +888,12 @@ int Chkstat::run()
         add_permlist(path.c_str(), "unknown", "unknown", 0);
     }
 
-    for (i = 0; i < npermfiles; i++)
+    for (const auto &profile_path: m_profile_paths)
     {
-        FILE *fp = fopen(permfiles[i], "r");
+        FILE *fp = fopen(profile_path.c_str(), "r");
         if (fp == 0)
         {
-            perror(permfiles[i]);
+            perror(profile_path.c_str());
             exit(1);
         }
         lcnt = 0;
@@ -1109,8 +1099,8 @@ int Chkstat::run()
         if (!m_no_header.isSet())
         {
             printf("Checking permissions and ownerships - using the permissions files\n");
-            for (i = 0; i < npermfiles; i++)
-                printf("\t%s\n", permfiles[i]);
+            for (const auto &profile_path: m_profile_paths)
+                printf("\t%s\n", profile_path.c_str());
             if (rootl)
             {
                 printf("Using root %s\n", root);
@@ -1253,12 +1243,6 @@ int Chkstat::run()
         fprintf(stderr, "ERROR: not all operations were successful.\n");
         return 1;
     }
-
-    for (i = 0; i < npermfiles; i++)
-    {
-        free(permfiles[i]);
-    }
-    free(permfiles);
 
     return 0;
 }
