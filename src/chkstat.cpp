@@ -23,14 +23,12 @@
 #endif
 #include <pwd.h>
 #include <grp.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <linux/magic.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
-#include <sys/capability.h>
 #include <fcntl.h>
 #include <sys/param.h>
 #include <limits.h>
@@ -55,79 +53,8 @@
 #define BAD_LINE() \
     fprintf(stderr, "bad permissions line %s:%d\n", profile_path.c_str(), lcnt)
 
-struct perm
-{
-    struct perm *next;
-    char *file;
-    char *owner;
-    char *group;
-    mode_t mode;
-    cap_t caps;
-};
-
-struct perm *permlist;
 const char *root;
 size_t rootl;
-
-struct perm*
-add_permlist(const char *p_file, const char *p_owner, const char *p_group, mode_t mode)
-{
-    struct perm *ec, **epp;
-    char *file = nullptr;
-
-    char *owner = strdup(p_owner);
-    char *group = strdup(p_group);
-    if (rootl)
-    {
-        file = (char*)malloc(strlen(p_file) + rootl + (*p_file != '/' ? 2 : 1));
-        if (file)
-        {
-            strcpy(file, root);
-            if (*file != '/')
-                strcat(file, "/");
-            strcat(file, p_file);
-        }
-    }
-    else
-    {
-        file = strdup(p_file);
-    }
-
-    if (!owner || !group || !file)
-    {
-        perror("permlist entry alloc");
-        exit(1);
-    }
-
-    for (epp = &permlist; (ec = *epp) != 0; )
-    {
-        if (!strcmp(ec->file, file))
-        {
-            *epp = ec->next;
-            free(ec->file);
-            free(ec->owner);
-            free(ec->group);
-            free(ec);
-        }
-        else
-            epp = &ec->next;
-    }
-
-    ec = (perm*)malloc(sizeof(struct perm));
-    if (ec == 0)
-    {
-        perror("permlist entry alloc");
-        exit(1);
-    }
-    ec->file = file;
-    ec->owner = owner;
-    ec->group = group;
-    ec->mode = mode;
-    ec->caps = NULL;
-    ec->next = 0;
-    *epp = ec;
-    return ec;
-}
 
 int
 readline(FILE *fp, char *buf, size_t len)
@@ -187,7 +114,7 @@ check_have_proc(void)
 #define PROC_FD_PATH_SIZE (sizeof("/proc/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
 
 int
-Chkstat::safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
+Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
 {
     char pathbuf[PATH_MAX];
     char *path_rest;
@@ -793,6 +720,36 @@ void Chkstat::collectPackageProfiles(const std::string &dir)
     }
 }
 
+ProfileEntry&
+Chkstat::addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode)
+{
+    std::string path = file;
+
+    if (rootl)
+    {
+        path = root;
+        if (*path.rbegin() != '/')
+        {
+            path += '/';
+        }
+
+        path += file;
+    }
+
+    // this overwrites an possibly already existing entry
+    // this is intended behaviour, hence the order in which profiles are
+    // applied is important
+    auto &entry = m_profile_entries[path];
+
+    entry.file = path;
+    entry.owner = owner;
+    entry.group = group;
+    entry.mode = mode;
+    entry.caps = nullptr;
+
+    return entry;
+}
+
 
 int Chkstat::run()
 {
@@ -801,7 +758,6 @@ int Chkstat::run()
     int pcnt, lcnt;
     int inpart;
     mode_t mode;
-    struct perm *e;
     struct stat stb;
     struct passwd *pwd = 0;
     struct group *grp = 0;
@@ -871,7 +827,7 @@ int Chkstat::run()
     // add fake list entries for all files to check
     for( const auto &path: m_checklist )
     {
-        add_permlist(path.c_str(), "unknown", "unknown", 0);
+        addProfileEntry(path.c_str(), "unknown", "unknown", 0);
     }
 
     for (const auto &profile_path: m_profile_paths)
@@ -883,7 +839,7 @@ int Chkstat::run()
             exit(1);
         }
         lcnt = 0;
-        struct perm* last = NULL;
+        ProfileEntry *entry = nullptr;
         int extline;
         char line[512];
         while (readline(fp, line, sizeof(line)))
@@ -922,7 +878,7 @@ int Chkstat::run()
             }
             if (extline)
             {
-                if (!last)
+                if (!entry)
                 {
                     BAD_LINE();
                     continue;
@@ -935,8 +891,8 @@ int Chkstat::run()
                     caps = cap_from_text(p);
                     if (caps)
                     {
-                        cap_free(last->caps);
-                        last->caps = caps;
+                        cap_free(entry->caps);
+                        entry->caps = caps;
                     }
                     continue;
                 }
@@ -966,20 +922,26 @@ int Chkstat::run()
                 BAD_LINE();
                 continue;
             }
-            last = add_permlist(part[0], part[1], part[2], mode);
+            auto &ref = addProfileEntry(part[0], part[1], part[2], mode);
+            entry = &ref;
         }
         fclose(fp);
     }
 
-    for (e = permlist; e; e = e->next)
+    for (auto &pair: m_profile_entries)
     {
+        // these needs to be non-const currently, because further below the
+        // capability logic is modifying entry properties on the fly.
+        auto &entry = pair.second;
+        const auto norm_path = entry.file.substr(rootl);
+
         // if only specific files should be check then filter out non-matching
         // paths
-        if (!m_checklist.empty() && !isInChecklist(e->file+rootl))
+        if (!m_checklist.empty() && !isInChecklist(norm_path))
             continue;
 
-        pwd = strcmp(e->owner, "unknown") ? getpwnam(e->owner) : NULL;
-        grp = strcmp(e->group, "unknown") ? getgrnam(e->group) : NULL;
+        pwd = entry.owner == "unknown" ? nullptr : getpwnam(entry.owner.c_str());
+        grp = entry.group == "unknown" ? nullptr : getgrnam(entry.group.c_str());
         uid = pwd ? pwd->pw_uid : 0;
         gid = grp ? grp->gr_gid : 0;
 
@@ -991,15 +953,15 @@ int Chkstat::run()
             fd = -1;
         }
 
-        fd = safe_open(e->file, &stb, uid, &traversed_insecure);
+        fd = safe_open(entry.file.c_str(), &stb, uid, &traversed_insecure);
         if (fd < 0)
             continue;
         if (S_ISLNK(stb.st_mode))
             continue;
 
-        if (!e->mode && !strcmp(e->owner, "unknown"))
+        if (!entry.mode && entry.owner == "unknown")
         {
-            fprintf(stderr, "%s: cannot verify ", e->file+rootl);
+            fprintf(stderr, "%s: cannot verify ", norm_path.c_str());
             pwd = getpwuid(stb.st_uid);
             if (pwd)
                 fprintf(stderr, "%s:", pwd->pw_name);
@@ -1016,12 +978,12 @@ int Chkstat::run()
         }
         if (!pwd)
         {
-            fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", e->file+rootl, e->owner);
+            fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", norm_path.c_str(), entry.owner.c_str());
             continue;
         }
         else if (!grp)
         {
-            fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", e->file+rootl, e->group);
+            fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", norm_path.c_str(), entry.group.c_str());
             continue;
         }
 
@@ -1033,7 +995,7 @@ int Chkstat::run()
         // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
         // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
         char fd_path_buf[PROC_FD_PATH_SIZE];
-        char *fd_path;
+        const char *fd_path;
         if (check_have_proc())
         {
             snprintf(fd_path_buf, sizeof(fd_path_buf), "/proc/self/fd/%d", fd);
@@ -1042,7 +1004,7 @@ int Chkstat::run()
         else
             // fall back to plain path-access for read-only operation. (this much is fine)
             // below we make sure that in this case we report errors instead of trying to fix policy violations insecurely
-            fd_path = e->file;
+            fd_path = entry.file.c_str();
 
         caps = cap_get_file(fd_path);
         if (!caps)
@@ -1050,33 +1012,33 @@ int Chkstat::run()
             // we get EBADF for files that don't support capabilities, e.g. sockets or FIFOs
             if (errno == EBADF)
             {
-                if (e->caps)
+                if (entry.caps)
                 {
-                    fprintf(stderr, "%s: cannot assign capabilities for this kind of file\n", e->file+rootl);
-                    cap_free(e->caps);
+                    fprintf(stderr, "%s: cannot assign capabilities for this kind of file\n", norm_path.c_str());
+                    cap_free(entry.caps);
                     errors++;
                 }
-                e->caps = NULL;
+                entry.caps = NULL;
             }
             if (errno == EOPNOTSUPP)
             {
-                if (e->caps)
-                    cap_free(e->caps);
-                e->caps = NULL;
+                if (entry.caps)
+                    cap_free(entry.caps);
+                entry.caps = NULL;
             }
         }
-        if (e->caps)
+        if (entry.caps)
         {
-            e->mode &= 0777;
+            entry.mode &= 0777;
         }
 
-        int perm_ok = (stb.st_mode & 07777) == e->mode;
+        int perm_ok = (stb.st_mode & 07777) == entry.mode;
         int owner_ok = stb.st_uid == uid && stb.st_gid == gid;
         int caps_ok = 0;
 
-        if (!caps && !e->caps)
+        if (!caps && !entry.caps)
             caps_ok = 1;
-        else if (caps && e->caps && !cap_compare(e->caps, caps))
+        else if (caps && entry.caps && !cap_compare(entry.caps, caps))
             caps_ok = 1;
 
         if (perm_ok && owner_ok && caps_ok)
@@ -1103,13 +1065,13 @@ int Chkstat::run()
         }
 
         if (!m_apply_changes.isSet())
-            printf("%s should be %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
+            printf("%s should be %s:%s %04o", norm_path.c_str(), entry.owner.c_str(), entry.group.c_str(), entry.mode);
         else
-            printf("setting %s to %s:%s %04o", e->file+rootl, e->owner, e->group, e->mode);
+            printf("setting %s to %s:%s %04o", norm_path.c_str(), entry.owner.c_str(), entry.group.c_str(), entry.mode);
 
-        if (!caps_ok && e->caps)
+        if (!caps_ok && entry.caps)
         {
-            str = cap_to_text(e->caps, NULL);
+            str = cap_to_text(entry.caps, NULL);
             printf(" \"%s\"", str);
             cap_free(str);
         }
@@ -1155,15 +1117,15 @@ int Chkstat::run()
             continue;
 
         // don't give high privileges to files controlled by non-root users
-        if ((e->caps || (e->mode & S_ISUID) || (e->mode & S_ISGID)) && !S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
+        if ((entry.caps || (entry.mode & S_ISUID) || (entry.mode & S_ISGID)) && !S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
         {
-            fprintf(stderr, "%s: will only assign capabilities or setXid bits to regular files or directories\n", e->file+rootl);
+            fprintf(stderr, "%s: will only assign capabilities or setXid bits to regular files or directories\n", norm_path.c_str());
             errors++;
             continue;
         }
-        if (traversed_insecure && (e->caps || (e->mode & S_ISUID) || ((e->mode & S_ISGID) && S_ISREG(stb.st_mode))))
+        if (traversed_insecure && (entry.caps || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && S_ISREG(stb.st_mode))))
         {
-            fprintf(stderr, "%s: will not give away capabilities or setXid bits on an insecure path\n", e->file+rootl);
+            fprintf(stderr, "%s: will not give away capabilities or setXid bits on an insecure path\n", norm_path.c_str());
             errors++;
             continue;
         }
@@ -1172,22 +1134,22 @@ int Chkstat::run()
         {
             /* if we change owner or group of a setuid file the bit gets reset so
                also set perms again */
-            if (e->mode & (S_ISUID | S_ISGID))
+            if (entry.mode & (S_ISUID | S_ISGID))
                 perm_ok = 0;
             if (chown(fd_path, uid, gid))
             {
-                fprintf(stderr, "%s: chown: %s\n", e->file+rootl, strerror(errno));
+                fprintf(stderr, "%s: chown: %s\n", norm_path.c_str(), strerror(errno));
                 errors++;
             }
         }
-        if (!perm_ok && chmod(fd_path, e->mode))
+        if (!perm_ok && chmod(fd_path, entry.mode))
         {
-            fprintf(stderr, "%s: chmod: %s\n", e->file+rootl, strerror(errno));
+            fprintf(stderr, "%s: chmod: %s\n", norm_path.c_str(), strerror(errno));
             errors++;
         }
         // chown and - depending on the file system - chmod clear existing capabilities
         // so apply the intended caps even if they were correct previously
-        if (e->caps || !caps_ok)
+        if (entry.caps || !caps_ok)
         {
             if (S_ISREG(stb.st_mode))
             {
@@ -1196,15 +1158,15 @@ int Chkstat::run()
                 int cap_fd = open(fd_path, O_NOATIME | O_CLOEXEC | O_RDONLY);
                 if (cap_fd == -1)
                 {
-                    fprintf(stderr, "%s: open() for changing capabilities: %s\n", e->file+rootl, strerror(errno));
+                    fprintf(stderr, "%s: open() for changing capabilities: %s\n", norm_path.c_str(), strerror(errno));
                     errors++;
                 }
-                else if (cap_set_fd(cap_fd, e->caps))
+                else if (cap_set_fd(cap_fd, entry.caps))
                 {
                     // ignore ENODATA when clearing caps - it just means there were no caps to remove
-                    if (errno != ENODATA || e->caps)
+                    if (errno != ENODATA || entry.caps)
                     {
-                        fprintf(stderr, "%s: cap_set_fd: %s\n", e->file+rootl, strerror(errno));
+                        fprintf(stderr, "%s: cap_set_fd: %s\n", norm_path.c_str(), strerror(errno));
                         errors++;
                     }
                 }
@@ -1213,7 +1175,7 @@ int Chkstat::run()
             }
             else
             {
-                fprintf(stderr, "%s: cannot set capabilities: not a regular file\n", e->file+rootl);
+                fprintf(stderr, "%s: cannot set capabilities: not a regular file\n", norm_path.c_str());
                 errors++;
             }
         }

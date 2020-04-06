@@ -1,10 +1,15 @@
 #ifndef CHKSTAT_H
 #define CHKSTAT_H
 
+// POSIX / Linux
+#include <sys/capability.h>
+#include <sys/types.h>
+
 // third party
 #include <tclap/CmdLine.h>
 
 // C++
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -36,6 +41,23 @@ public:
         // this is used for isSet(), _value only for getValue(), so
         // sync both.
         _alreadySet = val;
+    }
+};
+
+struct ProfileEntry
+{
+    std::string file;
+    std::string owner;
+    std::string group;
+    mode_t mode;
+    cap_t caps = nullptr;
+
+    ~ProfileEntry()
+    {
+        if (caps)
+        {
+            cap_free(caps);
+        }
     }
 };
 
@@ -96,9 +118,17 @@ protected: // functions
      **/
     void collectPackageProfiles(const std::string &dir);
 
+    /**
+     * \brief
+     *      Adds a ProfileEntry to m_profile_entries for the given set of
+     *      parameters
+     **/
+    ProfileEntry&
+    addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode);
+
     // intermediate member functions in the process of refactoring global
     // functions
-    int safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure);
+    int safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure);
 
 protected: // data
 
@@ -146,6 +176,10 @@ protected: // data
 
     //! permission profile paths in the order they should be applied
     std::vector<std::string> m_profile_paths;
+
+    //! a mapping of file paths to ProfileEntry, denotes the entry to apply
+    //! for each path
+    std::map<std::string, ProfileEntry> m_profile_entries;
 
     //! the effective user ID we're running as
     const uid_t m_euid;
