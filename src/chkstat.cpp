@@ -151,20 +151,6 @@ readline(FILE *fp, char *buf, size_t len)
     return 1;
 }
 
-void
-usage(int x)
-{
-    printf("Usage:\n"
-           "a) chkstat [OPTIONS] <permission-files>...\n"
-           "b) chkstat --system [OPTIONS] <files>...\n"
-           "\n"
-           "Options:\n"
-           "  --root DIR            check files relative to DIR\n"
-           "  --config-root DIR     lookup config files relative to DIR\n"
-    );
-    exit(x);
-}
-
 enum proc_mount_state
 {
     PROC_MOUNT_STATE_UNKNOWN,
