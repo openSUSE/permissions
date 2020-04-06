@@ -141,6 +141,11 @@ class ChkstatRegtest:
 		)
 
 		self.m_parser.add_argument(
+			"--after-test-enter-shell", action = 'store_true',
+			help = "Enter the fake root after the test(s) finished executing."
+		)
+
+		self.m_parser.add_argument(
 			"--list-tests", action = 'store_true',
 			help = "Just list the available tests"
 		)
@@ -693,6 +698,10 @@ class ChkstatRegtest:
 		if self.m_args.test and tests_run == 0:
 			print("No such test", self.m_args.test)
 			tests_failed += 1
+
+		if self.m_args.after_test_enter_shell:
+			print("Entering shell after test execution")
+			self.enterShell()
 
 		print("\n")
 		print(str(tests_run).rjust(2), "tests run")
