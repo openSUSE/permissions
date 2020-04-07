@@ -50,9 +50,6 @@
 #include <string_view>
 #include <utility>
 
-const char *root;
-size_t rootl;
-
 enum proc_mount_state
 {
     PROC_MOUNT_STATE_UNKNOWN,
@@ -98,11 +95,12 @@ Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *t
     int parentfd = -1;
     struct stat root_st;
     bool is_final_path_element = false;
+    const auto &altroot = m_root_path.getValue();
 
     *traversed_insecure = false;
 
     lcnt = 0;
-    if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + rootl) >= sizeof(pathbuf))
+    if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + altroot.length()) >= sizeof(pathbuf))
         goto fail;
 
     path_rest = pathbuf;
@@ -114,17 +112,18 @@ Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *t
 
         if (pathfd == -1)
         {
-            pathfd = open(rootl ? root : "/", O_PATH | O_CLOEXEC);
+            const auto root = altroot.empty() ? std::string("/") : altroot;
+            pathfd = open(root.c_str(), O_PATH | O_CLOEXEC);
 
             if (pathfd == -1)
             {
-                fprintf(stderr, "failed to open root directory %s: %s\n", root, strerror(errno));
+                fprintf(stderr, "failed to open root directory %s: %s\n", root.c_str(), strerror(errno));
                 goto fail;
             }
 
             if (fstat(pathfd, &root_st))
             {
-                fprintf(stderr, "failed to stat root directory %s: %s\n", root, strerror(errno));
+                fprintf(stderr, "failed to stat root directory %s: %s\n", root.c_str(), strerror(errno));
                 goto fail;
             }
             // stb and pathfd must be in sync for the root-escape check below
@@ -145,7 +144,7 @@ Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *t
             continue;
 
         // never move up from the configured root directory (using the stat result from the previous loop iteration)
-        if (strcmp(cursor, "..") == 0 && rootl && stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)
+        if (strcmp(cursor, "..") == 0 && !altroot.empty() && stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)
             continue;
 
         // cursor is an empty string for trailing slashes, open again with different open_flags.
@@ -176,7 +175,7 @@ Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *t
         {
             if (is_final_path_element)
             {
-                fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+rootl);
+                fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+altroot.length());
                 goto fail;
             }
             else
@@ -250,7 +249,7 @@ Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *t
     // world-writable file: error out due to unknown file integrity
     if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH))
     {
-        fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+rootl);
+        fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+altroot.length());
         goto fail;
     }
 
@@ -271,7 +270,7 @@ fail_insecure_path:
         {
             linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
         }
-        fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+rootl, linkpath);
+        fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+altroot.length(), linkpath);
     }
 
 fail:
@@ -395,13 +394,6 @@ bool Chkstat::processArguments()
                 continue;
             m_checklist.insert(line);
         }
-    }
-
-    if (m_root_path.isSet())
-    {
-        const auto &rp = m_root_path.getValue();
-        root = rp.c_str();
-        rootl = rp.length();
     }
 
     return true;
@@ -700,9 +692,9 @@ Chkstat::addProfileEntry(const std::string &file, const std::string &owner, cons
 {
     std::string path = file;
 
-    if (rootl)
+    if (!m_root_path.getValue().empty())
     {
-        path = root;
+        path = m_root_path.getValue();
         if (*path.rbegin() != '/')
         {
             path += '/';
@@ -936,7 +928,7 @@ int Chkstat::run()
         // these needs to be non-const currently, because further below the
         // capability logic is modifying entry properties on the fly.
         auto &entry = pair.second;
-        const auto norm_path = entry.file.substr(rootl);
+        const auto norm_path = entry.file.substr(m_root_path.getValue().length());
 
         // if only specific files should be check then filter out non-matching
         // paths
@@ -1049,12 +1041,16 @@ int Chkstat::run()
 
         if (!m_no_header.isSet())
         {
-            printf("Checking permissions and ownerships - using the permissions files\n");
+            std::cout << "Checking permissions and ownerships - using the permissions files" << std::endl;
+
             for (const auto &profile_path: m_profile_paths)
-                printf("\t%s\n", profile_path.c_str());
-            if (rootl)
             {
-                printf("Using root %s\n", root);
+                std::cout << "\t" << profile_path << "\n";
+            }
+
+            if (!m_root_path.getValue().empty())
+            {
+                std::cout << "Using root " << m_root_path.getValue() << "\n";
             }
 
             m_no_header.setValue(true);
