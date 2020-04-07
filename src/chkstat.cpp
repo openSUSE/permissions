@@ -50,33 +50,8 @@
 #include <string_view>
 #include <utility>
 
-#define BAD_LINE() \
-    fprintf(stderr, "bad permissions line %s:%d\n", profile_path.c_str(), lcnt)
-
 const char *root;
 size_t rootl;
-
-int
-readline(FILE *fp, char *buf, size_t len)
-{
-    size_t l;
-    if (!fgets(buf, (int)len, fp))
-        return 0;
-    l = strlen(buf);
-    if (l && buf[l - 1] == '\n')
-    {
-        l--;
-        buf[l] = 0;
-    }
-    if (l + 1 < len)
-        return 1;
-    fprintf(stderr, "warning: buffer overrun in line starting with '%s'\n", buf);
-    int c;
-    while ((c = getc(fp)) != EOF && c != '\n')
-        ;
-    buf[0] = 0;
-    return 1;
-}
 
 enum proc_mount_state
 {
@@ -750,14 +725,135 @@ Chkstat::addProfileEntry(const std::string &file, const std::string &owner, cons
     return entry;
 }
 
+static inline void badProfileLine(const std::string &file, const size_t line, const std::string &context)
+{
+    std::cerr << file << ":" << line << ": syntax error in permissions profile (" << context << ")" << std::endl;
+}
+
+bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry *entry)
+{
+        if (!entry)
+        {
+            return false;
+        }
+        else if (hasPrefix(line, "+capabilities "))
+        {
+            if (!m_use_fscaps)
+                // ignore the content
+                return true;
+
+            auto cap_text = line.substr(line.find_first_of(' '));
+            if (cap_text.empty())
+                // ignore empty capability specification
+                return true;
+
+            auto caps = cap_from_text(cap_text.c_str());
+            if (caps)
+            {
+                entry->setCaps(caps);
+                return true;
+            }
+        }
+
+        return false;
+}
+
+void Chkstat::parseProfile(const std::string &path)
+{
+    std::ifstream fs(path);
+
+    if (!fs)
+    {
+        std::cerr << path << ": " << strerror(errno) << std::endl;
+        exit(1);
+    }
+
+    size_t linenr = 0;
+    ProfileEntry *last_entry = nullptr;
+    std::string line;
+    std::vector<std::string> parts;
+    mode_t mode_int;
+
+    // we're parsing lines of the following format here:
+    //
+    // # comment
+    // <path> <user>:<group> <mode>
+    // [+capabilities cap_net_raw=ep]
+
+    while (std::getline(fs, line))
+    {
+        linenr++;
+        line = strip(line);
+
+        // don't know exactly why the dollar is also ignored, probably some
+        // dark legacy.
+        if (line.empty() || line[0] == '#' || line[0] == '$')
+            continue;
+
+        // an extra capability line that belongs to the context of the last
+        // profile entry seen.
+        if (line[0] == '+')
+        {
+            const auto good = parseExtraProfileLine(line, last_entry);
+
+            if (!good)
+            {
+                badProfileLine(path, linenr, "lone capaility line, bad capability spec or bad +keyword");
+            }
+
+            continue;
+        }
+
+        splitWords(line, parts);
+
+        if (parts.size() != 3)
+        {
+            badProfileLine(path, linenr, "invalid number of whitespace separated words");
+            continue;
+        }
+
+        const auto &ownership = parts[1];
+        std::string user, group;
+
+        // split up user and group from {user}:{group} string. Two different
+        // separator types are allowed like with `chmod`
+        for (const auto sep: { ':', '.' })
+        {
+            const auto seppos = ownership.find_first_of(sep);
+            if (seppos == ownership.npos)
+                continue;
+
+            user = ownership.substr(0, seppos);
+            group = ownership.substr(seppos + 1);
+
+            break;
+        }
+
+        if (user.empty() || group.empty())
+        {
+            badProfileLine(path, linenr, "bad user:group specification");
+            continue;
+        }
+
+        const auto &location = parts[0];
+        const auto &mode = parts[2];
+
+        char *end = nullptr;
+        mode_int = static_cast<mode_t>(std::strtoul(mode.c_str(), &end, 8));
+        if (mode_int > 07777 || (end && *end != '\0'))
+        {
+            badProfileLine(path, linenr, "bad mode specification");
+            continue;
+        }
+
+        auto &entry = addProfileEntry(location, user, group, mode_int);
+        last_entry = &entry;
+    }
+}
 
 int Chkstat::run()
 {
     char *str;
-    char *part[4];
-    int pcnt, lcnt;
-    int inpart;
-    mode_t mode;
     struct stat stb;
     struct passwd *pwd = 0;
     struct group *grp = 0;
@@ -832,100 +928,7 @@ int Chkstat::run()
 
     for (const auto &profile_path: m_profile_paths)
     {
-        FILE *fp = fopen(profile_path.c_str(), "r");
-        if (fp == 0)
-        {
-            perror(profile_path.c_str());
-            exit(1);
-        }
-        lcnt = 0;
-        ProfileEntry *entry = nullptr;
-        int extline;
-        char line[512];
-        while (readline(fp, line, sizeof(line)))
-        {
-            extline = 0;
-            lcnt++;
-            if (*line == 0 || *line == '#' || *line == '$')
-                continue;
-            inpart = 0;
-            pcnt = 0;
-            char *p;
-            for (p = line; *p; p++)
-            {
-                if (*p == ' ' || *p == '\t')
-                {
-                    *p = 0;
-                    if (inpart)
-                    {
-                        pcnt++;
-                        inpart = 0;
-                    }
-                    continue;
-                }
-                if (pcnt == 0 && !inpart && *p == '+')
-                {
-                    extline = 1;
-                    break;
-                }
-                if (!inpart)
-                {
-                    inpart = 1;
-                    if (pcnt == 3)
-                        break;
-                    part[pcnt] = p;
-                }
-            }
-            if (extline)
-            {
-                if (!entry)
-                {
-                    BAD_LINE();
-                    continue;
-                }
-                if (!strncmp(p, "+capabilities ", 14))
-                {
-                    if (!m_use_fscaps)
-                        continue;
-                    p += 14;
-                    caps = cap_from_text(p);
-                    if (caps)
-                    {
-                        cap_free(entry->caps);
-                        entry->caps = caps;
-                    }
-                    continue;
-                }
-                BAD_LINE();
-                continue;
-            }
-            if (inpart)
-                pcnt++;
-            if (pcnt != 3)
-            {
-                BAD_LINE();
-                continue;
-            }
-            part[3] = part[2];
-            part[2] = strchr(part[1], ':');
-            if (!part[2])
-                part[2] = strchr(part[1], '.');
-            if (!part[2])
-            {
-                BAD_LINE();
-                continue;
-            }
-            *part[2]++ = 0;
-            mode = (mode_t)strtoul(part[3], part + 3, 8);
-            if (mode > 07777 || part[3][0])
-            {
-                BAD_LINE();
-                continue;
-            }
-            auto &ref = addProfileEntry(part[0], part[1], part[2], mode);
-            entry = &ref;
-        }
-        fclose(fp);
+        parseProfile(profile_path);
     }
 
     for (auto &pair: m_profile_entries)

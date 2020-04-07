@@ -5,6 +5,7 @@
 #include <cctype>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // isspace has overloads which gives trouble with template argument deduction,
 // therefore provide a wrapper
@@ -86,6 +87,10 @@ void appendContainer(T1 &container, const T2 &sequence)
 {
     container.insert(container.end(), sequence.begin(), sequence.end());
 }
+
+//! splits up the \c input string into whitespace separated words and stores
+//! them in \c words
+void splitWords(const std::string &input, std::vector<std::string> &words);
 
 #endif // inc. guard
 
