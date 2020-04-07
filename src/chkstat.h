@@ -54,10 +54,23 @@ struct ProfileEntry
 
     ~ProfileEntry()
     {
+        freeCaps();
+    }
+
+    void freeCaps()
+    {
         if (caps)
         {
             cap_free(caps);
         }
+
+        caps = nullptr;
+    }
+
+    void setCaps(cap_t new_caps)
+    {
+        freeCaps();
+        caps = new_caps;
     }
 };
 
@@ -117,6 +130,26 @@ protected: // functions
      *      Collects configured per-package profiles from the given directory
      **/
     void collectPackageProfiles(const std::string &dir);
+
+    /**
+     * \brief
+     *      Parses the given profile file and stores the according entries in
+     *      m_profile_entries
+     **/
+    void parseProfile(const std::string &path);
+
+    /**
+     * \brief
+     *      Parses extra "+capabilities" lines in permission profiles
+     * \param[in] line 
+     *      The input line from a profile file that starts with "+"
+     * \param[inout] entry
+     *      The last ProfileEntry that was previously parsed from the profile
+     *      file. Can be nullptr for corrupt files.
+     * \return
+     *      Whether the line could successfully be parsed
+     **/
+    bool parseExtraProfileLine(const std::string &line, ProfileEntry *entry);
 
     /**
      * \brief
