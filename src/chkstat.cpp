@@ -343,12 +343,18 @@ bool Chkstat::validateArguments()
         if (!arg->isSet())
             continue;
 
-        const auto &path = arg->getValue();
+        auto &path = arg->getValue();
 
         if (path.empty() || path[0] != '/')
         {
             std::cerr << arg->getName() << " must begin with '/'\n";
             ret = false;
+        }
+
+        while (*path.rbegin() == '/')
+        {
+            // remove trailing slashes to normalize arguments
+            path.pop_back();
         }
     }
 
@@ -694,13 +700,7 @@ Chkstat::addProfileEntry(const std::string &file, const std::string &owner, cons
 
     if (!m_root_path.getValue().empty())
     {
-        path = m_root_path.getValue();
-        if (*path.rbegin() != '/')
-        {
-            path += '/';
-        }
-
-        path += file;
+        path = m_root_path.getValue() + '/' + file;
     }
 
     // this overwrites an possibly already existing entry
@@ -871,22 +871,24 @@ int Chkstat::run()
         if (m_force_level_list.isSet())
         {
             std::istringstream ss(m_force_level_list.getValue());
-            std::string word;
-            while (std::getline(ss, word))
+            std::string line;
+            while (std::getline(ss, line))
             {
-                addProfile(word);
+                addProfile(line);
             }
         }
 
         if (m_profiles.empty())
+        {
             addProfile("secure");
-         // always add the local profile
+        }
+
+        // always add the local profile
         addProfile("local");
 
         for (const auto &path: m_input_args.getValue())
         {
             m_checklist.insert(path);
-            continue;
         }
 
         collectProfiles();
@@ -912,15 +914,34 @@ int Chkstat::run()
         std::cerr << "Warning: running kernel does not support fscaps" << std::endl;
     }
 
-    // add fake list entries for all files to check
-    for( const auto &path: m_checklist )
-    {
-        addProfileEntry(path.c_str(), "unknown", "unknown", 0);
-    }
-
     for (const auto &profile_path: m_profile_paths)
     {
         parseProfile(profile_path);
+    }
+
+    // check whether explicitly listed files are actually configured in
+    // profiles
+    for( const auto &path: m_checklist )
+    {
+        // TODO: both here and in needToCheck() the command line arguments are
+        // not checked for trailing slashes. For directories the profile
+        // entries require trailing slashes but if a user enters an explicit
+        // path to a directory without the trailing slash then it won't be
+        // recognized. This was this way in the original code already.
+
+        auto full_path = path;
+
+        // we need to add a potential alternative root directory, since
+        // addProfileEntry stores entries using the full path.
+        if (!m_root_path.getValue().empty())
+        {
+            full_path = m_root_path.getValue() + '/' + path;
+        }
+
+        if (m_profile_entries.find(full_path) == m_profile_entries.end())
+        {
+            std::cerr << path << ": no configuration entry in active permission profiles found. Cannot check this path." << std::endl;
+        }
     }
 
     for (auto &pair: m_profile_entries)
@@ -930,13 +951,11 @@ int Chkstat::run()
         auto &entry = pair.second;
         const auto norm_path = entry.file.substr(m_root_path.getValue().length());
 
-        // if only specific files should be check then filter out non-matching
-        // paths
-        if (!m_checklist.empty() && !isInChecklist(norm_path))
+        if (!needToCheck(norm_path))
             continue;
 
-        pwd = entry.owner == "unknown" ? nullptr : getpwnam(entry.owner.c_str());
-        grp = entry.group == "unknown" ? nullptr : getgrnam(entry.group.c_str());
+        pwd = getpwnam(entry.owner.c_str());
+        grp = getgrnam(entry.group.c_str());
         uid = pwd ? pwd->pw_uid : 0;
         gid = grp ? grp->gr_gid : 0;
 
@@ -954,23 +973,6 @@ int Chkstat::run()
         if (S_ISLNK(stb.st_mode))
             continue;
 
-        if (!entry.mode && entry.owner == "unknown")
-        {
-            fprintf(stderr, "%s: cannot verify ", norm_path.c_str());
-            pwd = getpwuid(stb.st_uid);
-            if (pwd)
-                fprintf(stderr, "%s:", pwd->pw_name);
-            else
-                fprintf(stderr, "%d:", stb.st_uid);
-            grp = getgrgid(stb.st_gid);
-            if (grp)
-                fprintf(stderr, "%s", grp->gr_name);
-            else
-                fprintf(stderr, "%d", stb.st_gid);
-            fprintf(stderr, " %04o - not listed in /etc/permissions\n",
-                    (int)(stb.st_mode&07777));
-            continue;
-        }
         if (!pwd)
         {
             fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", norm_path.c_str(), entry.owner.c_str());

@@ -100,8 +100,13 @@ protected: // functions
      **/
     bool processArguments();
 
-    bool isInChecklist(const std::string &path) const
+    bool needToCheck(const std::string &path) const
     {
+        if (m_checklist.empty())
+            // all paths should be checked
+            return true;
+
+        // otherwise only if the path is explicitly listed
         return m_checklist.find(path) != m_checklist.end();
     }
 
