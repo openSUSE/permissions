@@ -49,6 +49,8 @@ struct EntryContext
     std::string subpath;
     //! a path for safely opening the target file (typically in ///proc/self/fd/...)
     std::string fd_path;
+    //! the actual capabilities currently set on the file
+    FileCapabilities caps;
 
     explicit EntryContext()
     {
@@ -61,6 +63,10 @@ struct EntryContext
         gid = (gid_t)-1;
         subpath.clear();
         fd_path.clear();
+        if (caps.valid())
+        {
+            caps.destroy();
+        }
     }
 };
 
@@ -185,14 +191,15 @@ protected: // functions
 
     /**
      * \brief
-     *      Gets the currently set capabilities from ctx.fd_path and stores them in \c out
+     *      Gets the currently set capabilities from ctx.fd_path and stores
+     *      them in \c ctx.caps
      * \details
      *      \c entry is potentially modified if capabilities can't be applied.
      *      The return value indicates if an operational error occured but it
-     *      doesn't indicate whether \c out was assigned a value. If
-     *      capabilities aren't supported then \c out can still be nullptr.
+     *      doesn't indicate whether a capability valoue could be assigned.
+     *      Check ctx.caps.valid() for this.
      **/
-    bool getCapabilities(ProfileEntry &entry, EntryContext &ctx, FileCapabilities &out);
+    bool getCapabilities(ProfileEntry &entry, EntryContext &ctx);
 
     // intermediate member functions in the process of refactoring global
     // functions

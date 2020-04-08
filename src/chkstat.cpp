@@ -846,11 +846,11 @@ void Chkstat::printHeader()
     }
 }
 
-bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx, FileCapabilities &out)
+bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx)
 {
-    out.setFromFile(ctx.fd_path);
+    ctx.caps.setFromFile(ctx.fd_path);
 
-    if (!out.valid())
+    if (!ctx.caps.valid())
     {
         if (!entry.hasCaps())
             return true;
@@ -915,7 +915,6 @@ int Chkstat::processEntries()
     EntryContext ctx;
     FileDescGuard fd;
     size_t errors = 0;
-    FileCapabilities caps;
     bool traversed_insecure;
 
     if (m_apply_changes.isSet() && !checkHaveProc())
@@ -968,14 +967,14 @@ int Chkstat::processEntries()
             ctx.fd_path = entry.file;
         }
 
-        if (!getCapabilities(entry, ctx, caps))
+        if (!getCapabilities(entry, ctx))
         {
             errors++;
         }
 
         const bool perm_ok = (file_status.getModeBits()) == entry.mode;
         const bool owner_ok = file_status.matchesOwnership(ctx.uid, ctx.gid);
-        const bool caps_ok = entry.caps == caps;
+        const bool caps_ok = entry.caps == ctx.caps;
 
         if (perm_ok && owner_ok && caps_ok)
             // nothing to do
@@ -1015,9 +1014,9 @@ int Chkstat::processEntries()
                 std::cout << ", ";
             }
 
-            if (caps.valid())
+            if (ctx.caps.valid())
             {
-                std::cout << "capabilities \"" << caps.toText() << "\"";
+                std::cout << "capabilities \"" << ctx.caps.toText() << "\"";
             }
             else
             {
