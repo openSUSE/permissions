@@ -217,6 +217,10 @@ protected: // functions
     //! prints an introductory text describing the active configuration
     void printHeader();
 
+    //! outputs the difference that will (or should) be performed to arrived
+    //! at the ProfileEntry configuration
+    void printEntryDifferences(const ProfileEntry &entry, const EntryContext &ctx) const;
+
     /**
      * \brief
      *      Gets the currently set capabilities from ctx.fd_path and stores
