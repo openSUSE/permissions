@@ -1,5 +1,7 @@
 // Linux
+#include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -8,6 +10,7 @@
 #include "utility.h"
 
 // C++
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -42,6 +45,19 @@ void splitWords(const std::string &input, std::vector<std::string> &words)
             words.emplace_back(word);
         }
     }
+}
+
+void FileDescGuard::close()
+{
+    if (!valid())
+        return;
+
+    if (::close(m_fd) != 0)
+    {
+        std::cerr << "Closing FD " << m_fd << ": " << strerror(errno) << std::endl;
+    }
+    
+    invalidate();
 }
 
 // vim: et ts=4 sts=4 sw=4 :

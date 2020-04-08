@@ -35,6 +35,7 @@
 
 // local headers
 #include "chkstat.h"
+#include "formatting.h"
 #include "utility.h"
 
 // C++
@@ -49,36 +50,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-
-enum proc_mount_state
-{
-    PROC_MOUNT_STATE_UNKNOWN,
-    PROC_MOUNT_STATE_AVAIL,
-    PROC_MOUNT_STATE_UNAVAIL,
-};
-static enum proc_mount_state proc_mount_avail = PROC_MOUNT_STATE_UNKNOWN;
-
-static bool
-check_have_proc(void)
-{
-    if (proc_mount_avail == PROC_MOUNT_STATE_UNKNOWN)
-    {
-        char *override = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
-
-        struct statfs proc;
-        int r = statfs("/proc", &proc);
-        if (override == NULL && r == 0 && proc.f_type == PROC_SUPER_MAGIC)
-        {
-            proc_mount_avail = PROC_MOUNT_STATE_AVAIL;
-        }
-        else
-        {
-            proc_mount_avail = PROC_MOUNT_STATE_UNAVAIL;
-        }
-    }
-
-    return proc_mount_avail == PROC_MOUNT_STATE_AVAIL;
-}
 
 #define _STRINGIFY(s) #s
 #define STRINGIFY(s) _STRINGIFY(s)
@@ -843,18 +814,319 @@ void Chkstat::parseProfile(const std::string &path)
     }
 }
 
-int Chkstat::run()
+bool Chkstat::checkHaveProc() const
 {
-    char *str;
-    struct stat stb;
-    struct passwd *pwd = 0;
-    struct group *grp = 0;
+    if (m_proc_mount_avail == ProcMountState::PROC_MOUNT_STATE_UNKNOWN)
+    {
+        m_proc_mount_avail = ProcMountState::PROC_MOUNT_STATE_UNAVAIL;
+        char *pretend_no_proc = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
+
+        struct statfs proc;
+        int r = statfs("/proc", &proc);
+        if (!pretend_no_proc && r == 0 && proc.f_type == PROC_SUPER_MAGIC)
+        {
+            m_proc_mount_avail = ProcMountState::PROC_MOUNT_STATE_AVAIL;
+        }
+    }
+
+    return m_proc_mount_avail == ProcMountState::PROC_MOUNT_STATE_AVAIL;
+}
+
+void Chkstat::printHeader()
+{
+    if (m_no_header.isSet())
+        return;
+
+    std::cout << "Checking permissions and ownerships - using the permissions files" << std::endl;
+
+    for (const auto &profile_path: m_profile_paths)
+    {
+        std::cout << "\t" << profile_path << "\n";
+    }
+
+    if (!m_root_path.getValue().empty())
+    {
+        std::cout << "Using root " << m_root_path.getValue() << "\n";
+    }
+}
+
+bool Chkstat::getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, cap_t &out)
+{
+    if (out != nullptr)
+    {
+        cap_free(out);
+    }
+
+    out = cap_get_file(path.c_str());
+
+    if (!out)
+    {
+        if (!entry.hasCaps())
+            return true;
+
+        switch(errno)
+        {
+            default:
+                break;
+            // we get EBADF for files that don't support capabilities,
+            // e.g. sockets or FIFOs
+            case EBADF:
+            {
+                std::cerr << label << ": cannot assign capabilities for this kind of file" << std::endl;
+                entry.freeCaps();
+                return false;
+            }
+            case EOPNOTSUPP:
+            {
+                std::cerr << label << ": no support for capabilities" << std::endl;
+                entry.freeCaps();
+                return false;
+            }
+        }
+    }
+
+    if (entry.hasCaps())
+    {
+        // don't apply any set*id bits in case we apply capabilities
+        // capabilities are the safer variant of set*id, the set*id bits
+        // are only a fallback.
+        entry.mode &= 0777;
+    }
+
+    return true;
+}
+
+int Chkstat::processEntries()
+{
+    FileStatus file_status;
+    struct passwd *pwd = nullptr;
+    struct group *grp = nullptr;
     uid_t uid;
     gid_t gid;
-    int fd = -1;
-    int errors = 0;
-    cap_t caps = NULL;
+    FileDescGuard fd;
+    size_t errors = 0;
+    cap_t caps = nullptr;
+    bool traversed_insecure;
+    std::string fd_path;
 
+    if (m_apply_changes.isSet() && !checkHaveProc())
+    {
+        std::cerr << "ERROR: /proc is not available - unable to fix policy violations." << std::endl;
+        errors++;
+        m_apply_changes.setValue(false);
+    }
+
+    for (auto &pair: m_profile_entries)
+    {
+        // these needs to be non-const currently, because further below the
+        // capability logic is modifying entry properties on the fly.
+        auto &entry = pair.second;
+        const auto norm_path = entry.file.substr(m_root_path.getValue().length());
+
+        if (!needToCheck(norm_path))
+            continue;
+
+        pwd = getpwnam(entry.owner.c_str());
+        grp = getgrnam(entry.group.c_str());
+
+        if (!pwd)
+        {
+            std::cerr << norm_path << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
+            continue;
+        }
+        else if (!grp)
+        {
+            std::cerr << norm_path << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
+            continue;
+        }
+
+        uid = pwd->pw_uid;
+        gid = grp->gr_gid;
+
+        fd.set(safe_open(entry.file.c_str(), &file_status, uid, &traversed_insecure));
+
+        if (!fd.valid())
+            continue;
+        else if (file_status.isLink())
+            continue;
+
+        // fd is opened with O_PATH, file operations like cap_get_fd() and fchown() don't work with it.
+        //
+        // We also don't want to do a proper open() of the file, since that doesn't even work for sockets
+        // and might have side effects for pipes or devices.
+        //
+        // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
+        // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
+        if (checkHaveProc())
+        {
+            fd_path = std::string("/proc/self/fd/") + std::to_string(fd.get());
+        }
+        else
+        {
+            // fall back to plain path-access for read-only operation. (this much is fine)
+            // below we make sure that in this case we report errors instead
+            // of trying to fix policy violations insecurely
+            fd_path = entry.file;
+        }
+
+        if (!getCapabilities(fd_path, norm_path, entry, caps))
+        {
+            errors++;
+        }
+
+        const bool perm_ok = (file_status.getModeBits()) == entry.mode;
+        const bool owner_ok = file_status.matchesOwnership(uid, gid);
+        const bool caps_ok = matchCapabilities(entry, caps);
+
+        if (perm_ok && owner_ok && caps_ok)
+            // nothing to do
+            continue;
+
+        /*
+         * first explain the differences between the encountered state of the
+         * file and the desired state of the file
+         */
+
+        std::cout << norm_path << ": "
+            << (m_apply_changes.isSet() ? "setting to " : "should be ")
+            << entry.owner << ":" << entry.group << " "
+            << FileModeInt(entry.mode);
+
+        if (!caps_ok && entry.hasCaps())
+        {
+            auto str = cap_to_text(entry.caps, nullptr);
+            std::cout << " \"" << str << "\"";
+            cap_free(str);
+        }
+
+        std::cout << ". (wrong";
+
+        if (!owner_ok)
+        {
+            std::cout << " owner/group " << FileOwnership(file_status);
+        }
+
+        if (!perm_ok)
+        {
+            std::cout << " permissions " << FileModeInt(file_status.getModeBits());
+        }
+
+        if (!caps_ok)
+        {
+            if (!perm_ok || !owner_ok)
+            {
+                std::cout << ", ";
+            }
+
+            if (caps)
+            {
+                auto str = cap_to_text(caps, nullptr);
+                std::cout << "capabilities \"" << str << "\"";
+                cap_free(str);
+            }
+            else
+            {
+                std::cout << "missing capabilities";
+            }
+        }
+
+        std::cout << ")" << std::endl;
+
+        if (!m_apply_changes.isSet())
+            continue;
+
+        // don't allow high privileges for unusual file types
+        if ((entry.hasCaps() || entry.hasSetXID()) && !file_status.isRegular() && !file_status.isDirectory())
+        {
+            std::cerr << norm_path << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
+            errors++;
+            continue;
+        }
+
+        // don't give high privileges to files controlled by non-root users
+        if (traversed_insecure)
+        {
+            if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && file_status.isRegular()))
+            {
+                std::cerr << norm_path << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
+                errors++;
+                continue;
+            }
+        }
+
+        // only attempt to change the owner if we're actually privileged to do
+        // so
+        const bool change_owner = m_euid == 0 && !owner_ok;
+
+        if (change_owner)
+        {
+            if (chown(fd_path.c_str(), uid, gid) != 0)
+            {
+                std::cerr << norm_path << ": chown: " << strerror(errno) << std::endl;
+                errors++;
+            }
+        }
+
+        // also re-apply the mode if we had to change ownership and a setXid
+        // bit was set before, since this resets the setXid bit.
+        if (!perm_ok || (change_owner && entry.hasSetXID()))
+        {
+            if (chmod(fd_path.c_str(), entry.mode) != 0)
+            {
+                std::cerr << norm_path << ": chmod: " << strerror(errno) << std::endl;
+                errors++;
+            }
+        }
+
+        // chown and - depending on the file system - chmod clear existing capabilities
+        // so apply the intended caps even if they were correct previously
+        if (entry.hasCaps() || !caps_ok)
+        {
+            if (file_status.isRegular())
+            {
+                // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
+                // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
+                FileDescGuard cap_fd( open(fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
+                if (!cap_fd.valid())
+                {
+                    std::cerr << norm_path << ": open() for changing capabilities: " << strerror(errno) << std::endl;
+                    errors++;
+                }
+                else if (cap_set_fd(cap_fd.get(), entry.caps))
+                {
+                    // ignore ENODATA when clearing caps - it just means there were no caps to remove
+                    if (errno != ENODATA || entry.hasCaps())
+                    {
+                        std::cerr << norm_path << ": cap_set_fd: " << strerror(errno) << std::endl;
+                        errors++;
+                    }
+                }
+            }
+            else
+            {
+                std::cerr << norm_path << ": cannot set capabilities: not a regular file" << std::endl;
+                errors++;
+            }
+        }
+    }
+
+    if (caps != nullptr)
+    {
+        cap_free(caps);
+        caps = nullptr;
+    }
+
+    if (errors)
+    {
+        std::cerr << "ERROR: not all operations were successful." << std::endl;
+        return 1;
+    }
+
+    return 0;
+}
+
+int Chkstat::run()
+{
     if (!validateArguments())
     {
         return 2;
@@ -919,6 +1191,7 @@ int Chkstat::run()
         parseProfile(profile_path);
     }
 
+
     // check whether explicitly listed files are actually configured in
     // profiles
     for( const auto &path: m_checklist )
@@ -944,256 +1217,9 @@ int Chkstat::run()
         }
     }
 
-    for (auto &pair: m_profile_entries)
-    {
-        // these needs to be non-const currently, because further below the
-        // capability logic is modifying entry properties on the fly.
-        auto &entry = pair.second;
-        const auto norm_path = entry.file.substr(m_root_path.getValue().length());
+    printHeader();
 
-        if (!needToCheck(norm_path))
-            continue;
-
-        pwd = getpwnam(entry.owner.c_str());
-        grp = getgrnam(entry.group.c_str());
-        uid = pwd ? pwd->pw_uid : 0;
-        gid = grp ? grp->gr_gid : 0;
-
-        bool traversed_insecure;
-        if (fd >= 0)
-        {
-            // close fd from previous loop iteration
-            close(fd);
-            fd = -1;
-        }
-
-        fd = safe_open(entry.file.c_str(), &stb, uid, &traversed_insecure);
-        if (fd < 0)
-            continue;
-        if (S_ISLNK(stb.st_mode))
-            continue;
-
-        if (!pwd)
-        {
-            fprintf(stderr, "%s: unknown user %s. ignoring entry.\n", norm_path.c_str(), entry.owner.c_str());
-            continue;
-        }
-        else if (!grp)
-        {
-            fprintf(stderr, "%s: unknown group %s. ignoring entry.\n", norm_path.c_str(), entry.group.c_str());
-            continue;
-        }
-
-        // fd is opened with O_PATH, file oeprations like cap_get_fd() and fchown() don't work with it.
-        //
-        // We also don't want to do a proper open() of the file, since that doesn't even work for sockets
-        // and might have side effects for pipes or devices.
-        //
-        // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
-        // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-        char fd_path_buf[PROC_FD_PATH_SIZE];
-        const char *fd_path;
-        if (check_have_proc())
-        {
-            snprintf(fd_path_buf, sizeof(fd_path_buf), "/proc/self/fd/%d", fd);
-            fd_path = fd_path_buf;
-        }
-        else
-            // fall back to plain path-access for read-only operation. (this much is fine)
-            // below we make sure that in this case we report errors instead of trying to fix policy violations insecurely
-            fd_path = entry.file.c_str();
-
-        caps = cap_get_file(fd_path);
-        if (!caps)
-        {
-            // we get EBADF for files that don't support capabilities, e.g. sockets or FIFOs
-            if (errno == EBADF)
-            {
-                if (entry.caps)
-                {
-                    fprintf(stderr, "%s: cannot assign capabilities for this kind of file\n", norm_path.c_str());
-                    cap_free(entry.caps);
-                    errors++;
-                }
-                entry.caps = NULL;
-            }
-            if (errno == EOPNOTSUPP)
-            {
-                if (entry.caps)
-                    cap_free(entry.caps);
-                entry.caps = NULL;
-            }
-        }
-        if (entry.caps)
-        {
-            entry.mode &= 0777;
-        }
-
-        int perm_ok = (stb.st_mode & 07777) == entry.mode;
-        int owner_ok = stb.st_uid == uid && stb.st_gid == gid;
-        int caps_ok = 0;
-
-        if (!caps && !entry.caps)
-            caps_ok = 1;
-        else if (caps && entry.caps && !cap_compare(entry.caps, caps))
-            caps_ok = 1;
-
-        if (perm_ok && owner_ok && caps_ok)
-            continue;
-
-        if (!m_no_header.isSet())
-        {
-            std::cout << "Checking permissions and ownerships - using the permissions files" << std::endl;
-
-            for (const auto &profile_path: m_profile_paths)
-            {
-                std::cout << "\t" << profile_path << "\n";
-            }
-
-            if (!m_root_path.getValue().empty())
-            {
-                std::cout << "Using root " << m_root_path.getValue() << "\n";
-            }
-
-            m_no_header.setValue(true);
-        }
-
-        if (m_apply_changes.isSet() && fd_path != fd_path_buf)
-        {
-            fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
-            errors++;
-            m_apply_changes.setValue(false);
-        }
-
-        if (!m_apply_changes.isSet())
-            printf("%s should be %s:%s %04o", norm_path.c_str(), entry.owner.c_str(), entry.group.c_str(), entry.mode);
-        else
-            printf("setting %s to %s:%s %04o", norm_path.c_str(), entry.owner.c_str(), entry.group.c_str(), entry.mode);
-
-        if (!caps_ok && entry.caps)
-        {
-            str = cap_to_text(entry.caps, NULL);
-            printf(" \"%s\"", str);
-            cap_free(str);
-        }
-        printf(". (wrong");
-        if (!owner_ok)
-        {
-            pwd = getpwuid(stb.st_uid);
-            grp = getgrgid(stb.st_gid);
-            if (pwd)
-                printf(" owner/group %s", pwd->pw_name);
-            else
-                printf(" owner/group %d", stb.st_uid);
-            if (grp)
-                printf(":%s", grp->gr_name);
-            else
-                printf(":%d", stb.st_gid);
-            pwd = 0;
-            grp = 0;
-        }
-
-        if (!perm_ok)
-            printf(" permissions %04o", (int)(stb.st_mode & 07777));
-
-        if (!caps_ok)
-        {
-            if (!perm_ok || !owner_ok)
-            {
-                fputc(',', stdout);
-            }
-            if (caps)
-            {
-                str = cap_to_text(caps, NULL);
-                printf(" capabilities \"%s\"", str);
-                cap_free(str);
-            }
-            else
-                fputs(" missing capabilities", stdout);
-        }
-        putchar(')');
-        putchar('\n');
-
-        if (!m_apply_changes.isSet())
-            continue;
-
-        // don't give high privileges to files controlled by non-root users
-        if ((entry.caps || (entry.mode & S_ISUID) || (entry.mode & S_ISGID)) && !S_ISREG(stb.st_mode) && !S_ISDIR(stb.st_mode))
-        {
-            fprintf(stderr, "%s: will only assign capabilities or setXid bits to regular files or directories\n", norm_path.c_str());
-            errors++;
-            continue;
-        }
-        if (traversed_insecure && (entry.caps || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && S_ISREG(stb.st_mode))))
-        {
-            fprintf(stderr, "%s: will not give away capabilities or setXid bits on an insecure path\n", norm_path.c_str());
-            errors++;
-            continue;
-        }
-
-        if (m_euid == 0 && !owner_ok)
-        {
-            /* if we change owner or group of a setuid file the bit gets reset so
-               also set perms again */
-            if (entry.mode & (S_ISUID | S_ISGID))
-                perm_ok = 0;
-            if (chown(fd_path, uid, gid))
-            {
-                fprintf(stderr, "%s: chown: %s\n", norm_path.c_str(), strerror(errno));
-                errors++;
-            }
-        }
-        if (!perm_ok && chmod(fd_path, entry.mode))
-        {
-            fprintf(stderr, "%s: chmod: %s\n", norm_path.c_str(), strerror(errno));
-            errors++;
-        }
-        // chown and - depending on the file system - chmod clear existing capabilities
-        // so apply the intended caps even if they were correct previously
-        if (entry.caps || !caps_ok)
-        {
-            if (S_ISREG(stb.st_mode))
-            {
-                // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
-                // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-                int cap_fd = open(fd_path, O_NOATIME | O_CLOEXEC | O_RDONLY);
-                if (cap_fd == -1)
-                {
-                    fprintf(stderr, "%s: open() for changing capabilities: %s\n", norm_path.c_str(), strerror(errno));
-                    errors++;
-                }
-                else if (cap_set_fd(cap_fd, entry.caps))
-                {
-                    // ignore ENODATA when clearing caps - it just means there were no caps to remove
-                    if (errno != ENODATA || entry.caps)
-                    {
-                        fprintf(stderr, "%s: cap_set_fd: %s\n", norm_path.c_str(), strerror(errno));
-                        errors++;
-                    }
-                }
-                if (cap_fd != -1)
-                    close(cap_fd);
-            }
-            else
-            {
-                fprintf(stderr, "%s: cannot set capabilities: not a regular file\n", norm_path.c_str());
-                errors++;
-            }
-        }
-    }
-    // close fd from last loop iteration
-    if (fd >= 0)
-    {
-        close(fd);
-        fd = -1;
-    }
-    if (errors)
-    {
-        fprintf(stderr, "ERROR: not all operations were successful.\n");
-        return 1;
-    }
-
-    return 0;
+    return processEntries();
 }
 
 int main(int argc, const char **argv)
