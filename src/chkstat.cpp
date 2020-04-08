@@ -683,7 +683,7 @@ Chkstat::addProfileEntry(const std::string &file, const std::string &owner, cons
     entry.owner = owner;
     entry.group = group;
     entry.mode = mode;
-    entry.caps = nullptr;
+    entry.caps.destroy();
 
     return entry;
 }
@@ -710,12 +710,8 @@ bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry *entry
                 // ignore empty capability specification
                 return true;
 
-            auto caps = cap_from_text(cap_text.c_str());
-            if (caps)
-            {
-                entry->setCaps(caps);
-                return true;
-            }
+            entry->caps.setFromText(cap_text);
+            return entry->caps.valid();
         }
 
         return false;
@@ -850,16 +846,11 @@ void Chkstat::printHeader()
     }
 }
 
-bool Chkstat::getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, cap_t &out)
+bool Chkstat::getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, FileCapabilities &out)
 {
-    if (out != nullptr)
-    {
-        cap_free(out);
-    }
+    out.setFromFile(path);
 
-    out = cap_get_file(path.c_str());
-
-    if (!out)
+    if (!out.valid())
     {
         if (!entry.hasCaps())
             return true;
@@ -873,13 +864,13 @@ bool Chkstat::getCapabilities(const std::string &path, const std::string &label,
             case EBADF:
             {
                 std::cerr << label << ": cannot assign capabilities for this kind of file" << std::endl;
-                entry.freeCaps();
+                entry.caps.destroy();
                 return false;
             }
             case EOPNOTSUPP:
             {
                 std::cerr << label << ": no support for capabilities" << std::endl;
-                entry.freeCaps();
+                entry.caps.destroy();
                 return false;
             }
         }
@@ -905,7 +896,7 @@ int Chkstat::processEntries()
     gid_t gid;
     FileDescGuard fd;
     size_t errors = 0;
-    cap_t caps = nullptr;
+    FileCapabilities caps;
     bool traversed_insecure;
     std::string fd_path;
 
@@ -976,7 +967,7 @@ int Chkstat::processEntries()
 
         const bool perm_ok = (file_status.getModeBits()) == entry.mode;
         const bool owner_ok = file_status.matchesOwnership(uid, gid);
-        const bool caps_ok = matchCapabilities(entry, caps);
+        const bool caps_ok = entry.caps == caps;
 
         if (perm_ok && owner_ok && caps_ok)
             // nothing to do
@@ -994,9 +985,7 @@ int Chkstat::processEntries()
 
         if (!caps_ok && entry.hasCaps())
         {
-            auto str = cap_to_text(entry.caps, nullptr);
-            std::cout << " \"" << str << "\"";
-            cap_free(str);
+            std::cout << " \"" << entry.caps.toText() << "\"";
         }
 
         std::cout << ". (wrong";
@@ -1018,11 +1007,9 @@ int Chkstat::processEntries()
                 std::cout << ", ";
             }
 
-            if (caps)
+            if (caps.valid())
             {
-                auto str = cap_to_text(caps, nullptr);
-                std::cout << "capabilities \"" << str << "\"";
-                cap_free(str);
+                std::cout << "capabilities \"" << caps.toText() << "\"";
             }
             else
             {
@@ -1092,7 +1079,7 @@ int Chkstat::processEntries()
                     std::cerr << norm_path << ": open() for changing capabilities: " << strerror(errno) << std::endl;
                     errors++;
                 }
-                else if (cap_set_fd(cap_fd.get(), entry.caps))
+                else if (!entry.caps.applyToFD(cap_fd.get()))
                 {
                     // ignore ENODATA when clearing caps - it just means there were no caps to remove
                     if (errno != ENODATA || entry.hasCaps())
@@ -1108,12 +1095,6 @@ int Chkstat::processEntries()
                 errors++;
             }
         }
-    }
-
-    if (caps != nullptr)
-    {
-        cap_free(caps);
-        caps = nullptr;
     }
 
     if (errors)

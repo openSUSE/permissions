@@ -1,8 +1,10 @@
 #ifndef CHKSTAT_H
 #define CHKSTAT_H
 
+// local headers
+#include "utility.h"
+
 // POSIX / Linux
-#include <sys/capability.h>
 #include <sys/types.h>
 
 // third party
@@ -15,73 +17,21 @@
 #include <string_view>
 #include <vector>
 
-/**
- * \brief
- *     SwitchArg that can be programmatically set
- * \details
- *     TCLAP::SwitchArg doesn't offer a public API to programmatically change
- *     the switch's value. Therefore this specializations provides an
- *     additional method to make this possible.
- **/
-class SwitchArgRW :
-    public TCLAP::SwitchArg
-{
-public:
-    SwitchArgRW(
-        const std::string &flag,
-        const std::string &name,
-        const std::string &desc,
-        TCLAP::CmdLineInterface &parser) :
-        TCLAP::SwitchArg(flag, name, desc, parser)
-    {}
-
-    void setValue(bool val)
-    {
-        _value = val;
-        // this is used for isSet(), _value only for getValue(), so
-        // sync both.
-        _alreadySet = val;
-    }
-};
-
 struct ProfileEntry
 {
     std::string file;
     std::string owner;
     std::string group;
     mode_t mode;
-    cap_t caps = nullptr;
+    FileCapabilities caps;
 
-    ~ProfileEntry()
-    {
-        freeCaps();
-    }
-
-    void freeCaps()
-    {
-        if (caps)
-        {
-            cap_free(caps);
-        }
-
-        caps = nullptr;
-    }
-
-    void setCaps(cap_t new_caps)
-    {
-        freeCaps();
-        caps = new_caps;
-    }
-
-    bool hasCaps() const { return caps != nullptr; }
+    bool hasCaps() const { return caps.valid(); }
 
     //! returns whether this profile entry contains a setuid or setgid bit
     bool hasSetXID() const
     {
         return (this->mode & (S_ISUID | S_ISGID)) != 0;
     }
-
-    cap_t getCaps() const { return caps; }
 };
 
 //! enum to differentiate different /proc availibility situations
@@ -207,17 +157,7 @@ protected: // functions
      *
      *      \c label is a descriptive path label for diagnostic messages.
      **/
-    bool getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, cap_t &out);
-
-    bool matchCapabilities(const ProfileEntry &entry, cap_t actual_caps) const
-    {
-        if (!actual_caps && !entry.hasCaps())
-            return true;
-        else if (actual_caps && entry.hasCaps() && !cap_compare(entry.getCaps(), actual_caps))
-            return true;
-
-        return false;
-    }
+    bool getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, FileCapabilities &out);
 
     // intermediate member functions in the process of refactoring global
     // functions
