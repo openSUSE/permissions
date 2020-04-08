@@ -846,9 +846,9 @@ void Chkstat::printHeader()
     }
 }
 
-bool Chkstat::getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, FileCapabilities &out)
+bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx, FileCapabilities &out)
 {
-    out.setFromFile(path);
+    out.setFromFile(ctx.fd_path);
 
     if (!out.valid())
     {
@@ -863,13 +863,13 @@ bool Chkstat::getCapabilities(const std::string &path, const std::string &label,
             // e.g. sockets or FIFOs
             case EBADF:
             {
-                std::cerr << label << ": cannot assign capabilities for this kind of file" << std::endl;
+                std::cerr << ctx.subpath << ": cannot assign capabilities for this kind of file" << std::endl;
                 entry.caps.destroy();
                 return false;
             }
             case EOPNOTSUPP:
             {
-                std::cerr << label << ": no support for capabilities" << std::endl;
+                std::cerr << ctx.subpath << ": no support for capabilities" << std::endl;
                 entry.caps.destroy();
                 return false;
             }
@@ -917,7 +917,6 @@ int Chkstat::processEntries()
     size_t errors = 0;
     FileCapabilities caps;
     bool traversed_insecure;
-    std::string fd_path;
 
     if (m_apply_changes.isSet() && !checkHaveProc())
     {
@@ -940,7 +939,10 @@ int Chkstat::processEntries()
         if (!resolveEntryOwnership(entry, ctx))
             continue;
 
-        fd.set(safe_open(entry.file.c_str(), &file_status, ctx.uid, &traversed_insecure));
+        {
+            auto desc = safe_open(entry.file.c_str(), &file_status, ctx.uid, &traversed_insecure);
+            fd.set(desc);
+        }
 
         if (!fd.valid())
             continue;
@@ -956,17 +958,17 @@ int Chkstat::processEntries()
         // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
         if (checkHaveProc())
         {
-            fd_path = std::string("/proc/self/fd/") + std::to_string(fd.get());
+            ctx.fd_path = std::string("/proc/self/fd/") + std::to_string(fd.get());
         }
         else
         {
             // fall back to plain path-access for read-only operation. (this much is fine)
             // below we make sure that in this case we report errors instead
             // of trying to fix policy violations insecurely
-            fd_path = entry.file;
+            ctx.fd_path = entry.file;
         }
 
-        if (!getCapabilities(fd_path, ctx.subpath, entry, caps))
+        if (!getCapabilities(entry, ctx, caps))
         {
             errors++;
         }
@@ -1053,7 +1055,7 @@ int Chkstat::processEntries()
 
         if (change_owner)
         {
-            if (chown(fd_path.c_str(), ctx.uid, ctx.gid) != 0)
+            if (chown(ctx.fd_path.c_str(), ctx.uid, ctx.gid) != 0)
             {
                 std::cerr << ctx.subpath << ": chown: " << strerror(errno) << std::endl;
                 errors++;
@@ -1064,7 +1066,7 @@ int Chkstat::processEntries()
         // bit was set before, since this resets the setXid bit.
         if (!perm_ok || (change_owner && entry.hasSetXID()))
         {
-            if (chmod(fd_path.c_str(), entry.mode) != 0)
+            if (chmod(ctx.fd_path.c_str(), entry.mode) != 0)
             {
                 std::cerr << ctx.subpath << ": chmod: " << strerror(errno) << std::endl;
                 errors++;
@@ -1079,7 +1081,7 @@ int Chkstat::processEntries()
             {
                 // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
                 // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-                FileDescGuard cap_fd( open(fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
+                FileDescGuard cap_fd( open(ctx.fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
                 if (!cap_fd.valid())
                 {
                     std::cerr << ctx.subpath << ": open() for changing capabilities: " << strerror(errno) << std::endl;
