@@ -887,13 +887,32 @@ bool Chkstat::getCapabilities(const std::string &path, const std::string &label,
     return true;
 }
 
+bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx)
+{
+    struct passwd *pwd = getpwnam(entry.owner.c_str());
+    struct group *grp = getgrnam(entry.group.c_str());
+
+    if (!pwd)
+    {
+        std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
+    }
+    else if (!grp)
+    {
+        std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
+    }
+    else
+    {
+        ctx.uid = pwd->pw_uid;
+        ctx.gid = grp->gr_gid;
+    }
+
+    return pwd != nullptr && grp != nullptr;
+}
+
 int Chkstat::processEntries()
 {
     FileStatus file_status;
-    struct passwd *pwd = nullptr;
-    struct group *grp = nullptr;
-    uid_t uid;
-    gid_t gid;
+    EntryContext ctx;
     FileDescGuard fd;
     size_t errors = 0;
     FileCapabilities caps;
@@ -912,29 +931,16 @@ int Chkstat::processEntries()
         // these needs to be non-const currently, because further below the
         // capability logic is modifying entry properties on the fly.
         auto &entry = pair.second;
-        const auto norm_path = entry.file.substr(m_root_path.getValue().length());
+        ctx.reset();
+        ctx.subpath = entry.file.substr(m_root_path.getValue().length());
 
-        if (!needToCheck(norm_path))
+        if (!needToCheck(ctx.subpath))
             continue;
 
-        pwd = getpwnam(entry.owner.c_str());
-        grp = getgrnam(entry.group.c_str());
-
-        if (!pwd)
-        {
-            std::cerr << norm_path << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
+        if (!resolveEntryOwnership(entry, ctx))
             continue;
-        }
-        else if (!grp)
-        {
-            std::cerr << norm_path << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
-            continue;
-        }
 
-        uid = pwd->pw_uid;
-        gid = grp->gr_gid;
-
-        fd.set(safe_open(entry.file.c_str(), &file_status, uid, &traversed_insecure));
+        fd.set(safe_open(entry.file.c_str(), &file_status, ctx.uid, &traversed_insecure));
 
         if (!fd.valid())
             continue;
@@ -960,13 +966,13 @@ int Chkstat::processEntries()
             fd_path = entry.file;
         }
 
-        if (!getCapabilities(fd_path, norm_path, entry, caps))
+        if (!getCapabilities(fd_path, ctx.subpath, entry, caps))
         {
             errors++;
         }
 
         const bool perm_ok = (file_status.getModeBits()) == entry.mode;
-        const bool owner_ok = file_status.matchesOwnership(uid, gid);
+        const bool owner_ok = file_status.matchesOwnership(ctx.uid, ctx.gid);
         const bool caps_ok = entry.caps == caps;
 
         if (perm_ok && owner_ok && caps_ok)
@@ -978,7 +984,7 @@ int Chkstat::processEntries()
          * file and the desired state of the file
          */
 
-        std::cout << norm_path << ": "
+        std::cout << ctx.subpath << ": "
             << (m_apply_changes.isSet() ? "setting to " : "should be ")
             << entry.owner << ":" << entry.group << " "
             << FileModeInt(entry.mode);
@@ -1025,7 +1031,7 @@ int Chkstat::processEntries()
         // don't allow high privileges for unusual file types
         if ((entry.hasCaps() || entry.hasSetXID()) && !file_status.isRegular() && !file_status.isDirectory())
         {
-            std::cerr << norm_path << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
+            std::cerr << ctx.subpath << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
             errors++;
             continue;
         }
@@ -1035,7 +1041,7 @@ int Chkstat::processEntries()
         {
             if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && file_status.isRegular()))
             {
-                std::cerr << norm_path << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
+                std::cerr << ctx.subpath << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
                 errors++;
                 continue;
             }
@@ -1047,9 +1053,9 @@ int Chkstat::processEntries()
 
         if (change_owner)
         {
-            if (chown(fd_path.c_str(), uid, gid) != 0)
+            if (chown(fd_path.c_str(), ctx.uid, ctx.gid) != 0)
             {
-                std::cerr << norm_path << ": chown: " << strerror(errno) << std::endl;
+                std::cerr << ctx.subpath << ": chown: " << strerror(errno) << std::endl;
                 errors++;
             }
         }
@@ -1060,7 +1066,7 @@ int Chkstat::processEntries()
         {
             if (chmod(fd_path.c_str(), entry.mode) != 0)
             {
-                std::cerr << norm_path << ": chmod: " << strerror(errno) << std::endl;
+                std::cerr << ctx.subpath << ": chmod: " << strerror(errno) << std::endl;
                 errors++;
             }
         }
@@ -1076,7 +1082,7 @@ int Chkstat::processEntries()
                 FileDescGuard cap_fd( open(fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
                 if (!cap_fd.valid())
                 {
-                    std::cerr << norm_path << ": open() for changing capabilities: " << strerror(errno) << std::endl;
+                    std::cerr << ctx.subpath << ": open() for changing capabilities: " << strerror(errno) << std::endl;
                     errors++;
                 }
                 else if (!entry.caps.applyToFD(cap_fd.get()))
@@ -1084,14 +1090,14 @@ int Chkstat::processEntries()
                     // ignore ENODATA when clearing caps - it just means there were no caps to remove
                     if (errno != ENODATA || entry.hasCaps())
                     {
-                        std::cerr << norm_path << ": cap_set_fd: " << strerror(errno) << std::endl;
+                        std::cerr << ctx.subpath << ": cap_set_fd: " << strerror(errno) << std::endl;
                         errors++;
                     }
                 }
             }
             else
             {
-                std::cerr << norm_path << ": cannot set capabilities: not a regular file" << std::endl;
+                std::cerr << ctx.subpath << ": cannot set capabilities: not a regular file" << std::endl;
                 errors++;
             }
         }
