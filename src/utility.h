@@ -220,6 +220,10 @@ public:
     FileCapabilities& operator=(const FileCapabilities &other) = delete;
 
     bool operator==(const FileCapabilities &other) const;
+    bool operator!=(const FileCapabilities &other) const
+    {
+        return !(*this == other);
+    }
 
     bool valid() const { return m_caps != nullptr; }
     void invalidate() { m_caps = nullptr; }
