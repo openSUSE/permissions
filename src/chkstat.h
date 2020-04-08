@@ -34,6 +34,33 @@ struct ProfileEntry
     }
 };
 
+/**
+ * \brief
+ *  scratch data used while processing individual profile entries in
+ *  processEntries()
+ **/
+struct EntryContext
+{
+    //! the resolved user-id corresponding to the active ProfileEntry
+    uid_t uid;
+    //! the resolved group-id corresponding to the active ProfileEntry
+    gid_t gid;
+    //! the path of the current file to check below a potential m_root_path
+    std::string subpath;
+
+    explicit EntryContext()
+    {
+        reset();
+    }
+
+    void reset()
+    {
+        uid = (uid_t)-1;
+        gid = (gid_t)-1;
+        subpath.clear();
+    }
+};
+
 //! enum to differentiate different /proc availibility situations
 enum class ProcMountState
 {
@@ -139,6 +166,13 @@ protected: // functions
      *      algorithm that carries out required file system operations
      **/
     int processEntries();
+
+    /**
+     * \brief
+     *      Resolves the textual user:group in \c entry and stores the result
+     *      in \c ctx
+     **/
+    bool resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx);
 
     //! tests whether /proc is available in a caching manner
     bool checkHaveProc() const;
