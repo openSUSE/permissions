@@ -846,6 +846,45 @@ void Chkstat::printHeader()
     }
 }
 
+void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContext &ctx) const
+{
+    std::cout << ctx.subpath << ": "
+        << (m_apply_changes.isSet() ? "setting to " : "should be ")
+        << entry.owner << ":" << entry.group << " "
+        << FileModeInt(entry.mode);
+
+    if (ctx.need_fix_caps && entry.hasCaps())
+    {
+        std::cout << " \"" << entry.caps.toText() << "\"";
+    }
+
+    std::cout << ". (wrong";
+
+    if (ctx.need_fix_ownership)
+    {
+        std::cout << " owner/group " << FileOwnership(ctx.status);
+    }
+
+    if (ctx.need_fix_perms)
+    {
+        std::cout << " permissions " << FileModeInt(ctx.status.getModeBits());
+    }
+
+    if (ctx.need_fix_caps)
+    {
+        if (ctx.caps.valid())
+        {
+            std::cout << "capabilities \"" << ctx.caps.toText() << "\"";
+        }
+        else
+        {
+            std::cout << "missing capabilities";
+        }
+    }
+
+    std::cout << ")" << std::endl;
+}
+
 bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx)
 {
     ctx.caps.setFromFile(ctx.fd_path);
@@ -981,42 +1020,7 @@ int Chkstat::processEntries()
          * first explain the differences between the encountered state of the
          * file and the desired state of the file
          */
-
-        std::cout << ctx.subpath << ": "
-            << (m_apply_changes.isSet() ? "setting to " : "should be ")
-            << entry.owner << ":" << entry.group << " "
-            << FileModeInt(entry.mode);
-
-        if (ctx.need_fix_caps && entry.hasCaps())
-        {
-            std::cout << " \"" << entry.caps.toText() << "\"";
-        }
-
-        std::cout << ". (wrong";
-
-        if (ctx.need_fix_ownership)
-        {
-            std::cout << " owner/group " << FileOwnership(ctx.status);
-        }
-
-        if (ctx.need_fix_perms)
-        {
-            std::cout << " permissions " << FileModeInt(ctx.status.getModeBits());
-        }
-
-        if (ctx.need_fix_caps)
-        {
-            if (ctx.caps.valid())
-            {
-                std::cout << "capabilities \"" << ctx.caps.toText() << "\"";
-            }
-            else
-            {
-                std::cout << "missing capabilities";
-            }
-        }
-
-        std::cout << ")" << std::endl;
+        printEntryDifferences(entry, ctx);
 
         if (!m_apply_changes.isSet())
             continue;
@@ -1040,11 +1044,14 @@ int Chkstat::processEntries()
             }
         }
 
-        // only attempt to change the owner if we're actually privileged to do
-        // so
-        const bool change_owner = m_euid == 0 && ctx.need_fix_ownership;
+        if (m_euid != 0)
+        {
+            // only attempt to change the owner if we're actually privileged
+            // to do so
+            ctx.need_fix_ownership = false;
+        }
 
-        if (change_owner)
+        if (ctx.need_fix_ownership)
         {
             if (chown(ctx.fd_path.c_str(), ctx.uid, ctx.gid) != 0)
             {
@@ -1055,7 +1062,7 @@ int Chkstat::processEntries()
 
         // also re-apply the mode if we had to change ownership and a setXid
         // bit was set before, since this resets the setXid bit.
-        if (ctx.need_fix_perms || (change_owner && entry.hasSetXID()))
+        if (ctx.need_fix_perms || (ctx.need_fix_ownership && entry.hasSetXID()))
         {
             if (chmod(ctx.fd_path.c_str(), entry.mode) != 0)
             {
