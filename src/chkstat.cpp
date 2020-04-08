@@ -948,12 +948,33 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
     return pwd != nullptr && grp != nullptr;
 }
 
+bool Chkstat::isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx) const
+{
+    // don't allow high privileges for unusual file types
+    if ((entry.hasCaps() || entry.hasSetXID()) && !ctx.status.isRegular() && !ctx.status.isDirectory())
+    {
+        std::cerr << ctx.subpath << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
+        return false;
+    }
+
+    // don't give high privileges to files controlled by non-root users
+    if (ctx.traversedInsecure())
+    {
+        if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && ctx.status.isRegular()))
+        {
+            std::cerr << ctx.subpath << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int Chkstat::processEntries()
 {
     EntryContext ctx;
     FileDescGuard fd;
     size_t errors = 0;
-    bool traversed_insecure;
 
     if (m_apply_changes.isSet() && !checkHaveProc())
     {
@@ -977,7 +998,7 @@ int Chkstat::processEntries()
             continue;
 
         {
-            auto desc = safe_open(entry.file.c_str(), &ctx.status, ctx.uid, &traversed_insecure);
+            auto desc = safe_open(entry.file.c_str(), &ctx.status, ctx.uid, &ctx.traversed_insecure);
             fd.set(desc);
         }
 
@@ -1025,23 +1046,10 @@ int Chkstat::processEntries()
         if (!m_apply_changes.isSet())
             continue;
 
-        // don't allow high privileges for unusual file types
-        if ((entry.hasCaps() || entry.hasSetXID()) && !ctx.status.isRegular() && !ctx.status.isDirectory())
+        if (!isSafeToChange(entry, ctx))
         {
-            std::cerr << ctx.subpath << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
             errors++;
             continue;
-        }
-
-        // don't give high privileges to files controlled by non-root users
-        if (traversed_insecure)
-        {
-            if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && ctx.status.isRegular()))
-            {
-                std::cerr << ctx.subpath << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
-                errors++;
-                continue;
-            }
         }
 
         if (m_euid != 0)

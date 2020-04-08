@@ -59,6 +59,7 @@ struct EntryContext
     bool need_fix_caps;
     //! indicates whether actual file user:group ownership needs to be fixed
     bool need_fix_ownership;
+    bool traversed_insecure;
 
     explicit EntryContext()
     {
@@ -78,6 +79,7 @@ struct EntryContext
         need_fix_perms = false;
         need_fix_caps = false;
         need_fix_ownership = false;
+        traversed_insecure = false;
     }
 
     //! based on the given \c entry sets need_fix_* members as required
@@ -96,6 +98,8 @@ struct EntryContext
     bool needFixPerms() const { return need_fix_perms; }
     bool needFixCaps() const { return need_fix_caps; }
     bool needFixOwnership() const { return need_fix_ownership; }
+
+    bool traversedInsecure() const { return traversed_insecure; }
 };
 
 //! enum to differentiate different /proc availibility situations
@@ -220,6 +224,10 @@ protected: // functions
     //! outputs the difference that will (or should) be performed to arrived
     //! at the ProfileEntry configuration
     void printEntryDifferences(const ProfileEntry &entry, const EntryContext &ctx) const;
+
+    //! performs checks whether it is safe to adjust the actual file given the
+    //! collected information
+    bool isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx) const;
 
     /**
      * \brief
