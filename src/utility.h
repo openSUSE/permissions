@@ -197,6 +197,18 @@ public:
         return this->st_uid == uid && this->st_gid == gid;
     }
 
+    //! returns whether this file status and the other file status refer to
+    //! the same file object (based on device and inode identification)
+    bool sameObject(const struct ::stat &other) const
+    {
+        return this->st_dev == other.st_dev && this->st_ino == other.st_ino;
+    }
+
+    bool isWorldWritable() const
+    {
+        return (this->st_mode & S_IWOTH) != 0;
+    }
+
 protected:
 };
 

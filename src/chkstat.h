@@ -59,7 +59,12 @@ struct EntryContext
     bool need_fix_caps;
     //! indicates whether actual file user:group ownership needs to be fixed
     bool need_fix_ownership;
+    //! safeOpen() flags this when it detects an insecure ownership
+    //! constellation in the file's path.
     bool traversed_insecure;
+    //! an O_PATH file descriptor for the target file which is set in
+    //! safeOpen()
+    FileDescGuard fd;
 
     explicit EntryContext()
     {
@@ -80,6 +85,10 @@ struct EntryContext
         need_fix_caps = false;
         need_fix_ownership = false;
         traversed_insecure = false;
+        if (fd.valid())
+        {
+            fd.close();
+        }
     }
 
     //! based on the given \c entry sets need_fix_* members as required
@@ -245,9 +254,16 @@ protected: // functions
      **/
     bool getCapabilities(ProfileEntry &entry, EntryContext &ctx);
 
-    // intermediate member functions in the process of refactoring global
-    // functions
-    int safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure);
+    /**
+     * \brief
+     *      Safely open the target file taking symlinks and insecure
+     *      constellations into account
+     * \details
+     *      On success the file descriptor will be stored in ctx.fd.
+     * \return
+     *      An indication whether the file could be successfully opened
+     **/
+    bool safeOpen(EntryContext &ctx);
 
 protected: // data
 
