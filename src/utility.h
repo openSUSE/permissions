@@ -3,12 +3,45 @@
 
 // POSIX
 #include <sys/stat.h>
+#include <sys/capability.h>
+
+// third party
+#include <tclap/CmdLine.h>
 
 // C++
 #include <cctype>
 #include <string>
 #include <string_view>
 #include <vector>
+
+/**
+ * \brief
+ *     SwitchArg that can be programmatically set
+ * \details
+ *     TCLAP::SwitchArg doesn't offer a public API to programmatically change
+ *     the switch's value. Therefore this specializations provides an
+ *     additional method to make this possible.
+ **/
+class SwitchArgRW :
+    public TCLAP::SwitchArg
+{
+public:
+    SwitchArgRW(
+        const std::string &flag,
+        const std::string &name,
+        const std::string &desc,
+        TCLAP::CmdLineInterface &parser) :
+        TCLAP::SwitchArg(flag, name, desc, parser)
+    {}
+
+    void setValue(bool val)
+    {
+        _value = val;
+        // this is used for isSet(), _value only for getValue(), so
+        // sync both.
+        _alreadySet = val;
+    }
+};
 
 // isspace has overloads which gives trouble with template argument deduction,
 // therefore provide a wrapper
@@ -136,10 +169,9 @@ public:
     }
 
     bool valid() const { return m_fd != -1; }
+    void invalidate() { m_fd = -1; }
 
     void close();
-
-    void invalidate() { m_fd = -1; }
 
 protected:
 
@@ -166,6 +198,70 @@ public:
     }
 
 protected:
+};
+
+//! a wrapper around the native cap_t type to ease memory management
+class FileCapabilities
+{
+public:
+
+    ~FileCapabilities();
+
+    explicit FileCapabilities() {}
+
+    FileCapabilities(FileCapabilities &&other)
+    {
+        // steal the rvalue's caps so we take over ownership, while
+        // the other doesn't free them during destruction.
+        m_caps = other.m_caps;
+        other.invalidate();
+    }
+    FileCapabilities(const FileCapabilities &other) = delete;
+    FileCapabilities& operator=(const FileCapabilities &other) = delete;
+
+    bool operator==(const FileCapabilities &other) const;
+
+    bool valid() const { return m_caps != nullptr; }
+    void invalidate() { m_caps = nullptr; }
+
+    void destroy();
+
+    cap_t raw() { return m_caps; }
+
+    /**
+     * \brief
+     *  set new capability data from a textual representation
+     * \details
+     *  If the operation fails then after return valid() will return \c false.
+     **/
+    void setFromText(const std::string &text);
+
+    /**
+     * \brief
+     *  set new capability data from the given file path
+     * \details
+     *  If the operation fails then after return valid() will return \c false.
+     **/
+    void setFromFile(const std::string &path);
+
+    /**
+     * \brief
+     *  Applies the currently stored capability data to the given file
+     *  descriptors
+     **/
+    bool applyToFD(int fd);
+
+    /**
+     * \brief
+     *  Returns a human readable string describing the current capability data
+     * \return
+     *  The human readable string on success, an empty string on error.
+     **/
+    std::string toText() const;
+
+protected:
+
+     cap_t m_caps = nullptr;
 };
 
 #endif // inc. guard
