@@ -229,6 +229,10 @@ protected: // functions
     //! collected information
     bool isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx) const;
 
+    //! actually perform the necessary changes for the actual file to arrive
+    //! and the configuration given in \c entry.
+    bool applyChanges(const ProfileEntry &entry, const EntryContext &ctx) const;
+
     /**
      * \brief
      *      Gets the currently set capabilities from ctx.fd_path and stores

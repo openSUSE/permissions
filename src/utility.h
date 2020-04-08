@@ -253,7 +253,7 @@ public:
      *  Applies the currently stored capability data to the given file
      *  descriptors
      **/
-    bool applyToFD(int fd);
+    bool applyToFD(int fd) const;
 
     /**
      * \brief

@@ -970,6 +970,64 @@ bool Chkstat::isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx)
     return true;
 }
 
+bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) const
+{
+    bool ret = true;
+
+    if (ctx.need_fix_ownership)
+    {
+        if (chown(ctx.fd_path.c_str(), ctx.uid, ctx.gid) != 0)
+        {
+            std::cerr << ctx.subpath << ": chown: " << strerror(errno) << std::endl;
+            ret = false;
+        }
+    }
+
+    // also re-apply the mode if we had to change ownership and a setXid
+    // bit was set before, since this resets the setXid bit.
+    if (ctx.need_fix_perms || (ctx.need_fix_ownership && entry.hasSetXID()))
+    {
+        if (chmod(ctx.fd_path.c_str(), entry.mode) != 0)
+        {
+            std::cerr << ctx.subpath << ": chmod: " << strerror(errno) << std::endl;
+            ret = false;
+        }
+    }
+
+    // chown and - depending on the file system - chmod clear existing capabilities
+    // so apply the intended caps even if they were correct previously
+    if (entry.hasCaps() || ctx.need_fix_caps)
+    {
+        if (ctx.status.isRegular())
+        {
+            // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
+            // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
+            FileDescGuard cap_fd( open(ctx.fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
+            if (!cap_fd.valid())
+            {
+                std::cerr << ctx.subpath << ": open() for changing capabilities: " << strerror(errno) << std::endl;
+                ret = false;
+            }
+            else if (!entry.caps.applyToFD(cap_fd.get()))
+            {
+                // ignore ENODATA when clearing caps - it just means there were no caps to remove
+                if (errno != ENODATA || entry.hasCaps())
+                {
+                    std::cerr << ctx.subpath << ": cap_set_fd: " << strerror(errno) << std::endl;
+                    ret = false;
+                }
+            }
+        }
+        else
+        {
+            std::cerr << ctx.subpath << ": cannot set capabilities: not a regular file" << std::endl;
+            ret = false;
+        }
+    }
+
+    return ret;
+}
+
 int Chkstat::processEntries()
 {
     EntryContext ctx;
@@ -1055,59 +1113,15 @@ int Chkstat::processEntries()
         if (m_euid != 0)
         {
             // only attempt to change the owner if we're actually privileged
-            // to do so
+            // to do so (chkstat also supports to run as a regular user within
+            // certain limits)
             ctx.need_fix_ownership = false;
         }
 
-        if (ctx.need_fix_ownership)
+        if (!applyChanges(entry, ctx))
         {
-            if (chown(ctx.fd_path.c_str(), ctx.uid, ctx.gid) != 0)
-            {
-                std::cerr << ctx.subpath << ": chown: " << strerror(errno) << std::endl;
-                errors++;
-            }
-        }
-
-        // also re-apply the mode if we had to change ownership and a setXid
-        // bit was set before, since this resets the setXid bit.
-        if (ctx.need_fix_perms || (ctx.need_fix_ownership && entry.hasSetXID()))
-        {
-            if (chmod(ctx.fd_path.c_str(), entry.mode) != 0)
-            {
-                std::cerr << ctx.subpath << ": chmod: " << strerror(errno) << std::endl;
-                errors++;
-            }
-        }
-
-        // chown and - depending on the file system - chmod clear existing capabilities
-        // so apply the intended caps even if they were correct previously
-        if (entry.hasCaps() || ctx.need_fix_caps)
-        {
-            if (ctx.status.isRegular())
-            {
-                // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
-                // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-                FileDescGuard cap_fd( open(ctx.fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
-                if (!cap_fd.valid())
-                {
-                    std::cerr << ctx.subpath << ": open() for changing capabilities: " << strerror(errno) << std::endl;
-                    errors++;
-                }
-                else if (!entry.caps.applyToFD(cap_fd.get()))
-                {
-                    // ignore ENODATA when clearing caps - it just means there were no caps to remove
-                    if (errno != ENODATA || entry.hasCaps())
-                    {
-                        std::cerr << ctx.subpath << ": cap_set_fd: " << strerror(errno) << std::endl;
-                        errors++;
-                    }
-                }
-            }
-            else
-            {
-                std::cerr << ctx.subpath << ": cannot set capabilities: not a regular file" << std::endl;
-                errors++;
-            }
+            errors++;
+            continue;
         }
     }
 

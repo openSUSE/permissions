@@ -126,9 +126,9 @@ void FileCapabilities::setFromFile(const std::string &path)
     m_caps = cap_get_file(path.c_str());
 }
 
-bool FileCapabilities::applyToFD(int fd)
+bool FileCapabilities::applyToFD(int fd) const
 {
-    if (cap_set_fd(fd, this->raw()) != 0)
+    if (cap_set_fd(fd, m_caps) != 0)
     {
         return false;
     }
