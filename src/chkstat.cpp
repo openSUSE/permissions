@@ -911,7 +911,6 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
 
 int Chkstat::processEntries()
 {
-    FileStatus file_status;
     EntryContext ctx;
     FileDescGuard fd;
     size_t errors = 0;
@@ -939,13 +938,13 @@ int Chkstat::processEntries()
             continue;
 
         {
-            auto desc = safe_open(entry.file.c_str(), &file_status, ctx.uid, &traversed_insecure);
+            auto desc = safe_open(entry.file.c_str(), &ctx.status, ctx.uid, &traversed_insecure);
             fd.set(desc);
         }
 
         if (!fd.valid())
             continue;
-        else if (file_status.isLink())
+        else if (ctx.status.isLink())
             continue;
 
         // fd is opened with O_PATH, file operations like cap_get_fd() and fchown() don't work with it.
@@ -972,11 +971,9 @@ int Chkstat::processEntries()
             errors++;
         }
 
-        const bool perm_ok = (file_status.getModeBits()) == entry.mode;
-        const bool owner_ok = file_status.matchesOwnership(ctx.uid, ctx.gid);
-        const bool caps_ok = entry.caps == ctx.caps;
+        ctx.checkNeedFixed(entry);
 
-        if (perm_ok && owner_ok && caps_ok)
+        if (!ctx.needsFixing())
             // nothing to do
             continue;
 
@@ -990,30 +987,25 @@ int Chkstat::processEntries()
             << entry.owner << ":" << entry.group << " "
             << FileModeInt(entry.mode);
 
-        if (!caps_ok && entry.hasCaps())
+        if (ctx.need_fix_caps && entry.hasCaps())
         {
             std::cout << " \"" << entry.caps.toText() << "\"";
         }
 
         std::cout << ". (wrong";
 
-        if (!owner_ok)
+        if (ctx.need_fix_ownership)
         {
-            std::cout << " owner/group " << FileOwnership(file_status);
+            std::cout << " owner/group " << FileOwnership(ctx.status);
         }
 
-        if (!perm_ok)
+        if (ctx.need_fix_perms)
         {
-            std::cout << " permissions " << FileModeInt(file_status.getModeBits());
+            std::cout << " permissions " << FileModeInt(ctx.status.getModeBits());
         }
 
-        if (!caps_ok)
+        if (ctx.need_fix_caps)
         {
-            if (!perm_ok || !owner_ok)
-            {
-                std::cout << ", ";
-            }
-
             if (ctx.caps.valid())
             {
                 std::cout << "capabilities \"" << ctx.caps.toText() << "\"";
@@ -1030,7 +1022,7 @@ int Chkstat::processEntries()
             continue;
 
         // don't allow high privileges for unusual file types
-        if ((entry.hasCaps() || entry.hasSetXID()) && !file_status.isRegular() && !file_status.isDirectory())
+        if ((entry.hasCaps() || entry.hasSetXID()) && !ctx.status.isRegular() && !ctx.status.isDirectory())
         {
             std::cerr << ctx.subpath << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
             errors++;
@@ -1040,7 +1032,7 @@ int Chkstat::processEntries()
         // don't give high privileges to files controlled by non-root users
         if (traversed_insecure)
         {
-            if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && file_status.isRegular()))
+            if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && ctx.status.isRegular()))
             {
                 std::cerr << ctx.subpath << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
                 errors++;
@@ -1050,7 +1042,7 @@ int Chkstat::processEntries()
 
         // only attempt to change the owner if we're actually privileged to do
         // so
-        const bool change_owner = m_euid == 0 && !owner_ok;
+        const bool change_owner = m_euid == 0 && ctx.need_fix_ownership;
 
         if (change_owner)
         {
@@ -1063,7 +1055,7 @@ int Chkstat::processEntries()
 
         // also re-apply the mode if we had to change ownership and a setXid
         // bit was set before, since this resets the setXid bit.
-        if (!perm_ok || (change_owner && entry.hasSetXID()))
+        if (ctx.need_fix_perms || (change_owner && entry.hasSetXID()))
         {
             if (chmod(ctx.fd_path.c_str(), entry.mode) != 0)
             {
@@ -1074,9 +1066,9 @@ int Chkstat::processEntries()
 
         // chown and - depending on the file system - chmod clear existing capabilities
         // so apply the intended caps even if they were correct previously
-        if (entry.hasCaps() || !caps_ok)
+        if (entry.hasCaps() || ctx.need_fix_caps)
         {
-            if (file_status.isRegular())
+            if (ctx.status.isRegular())
             {
                 // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
                 // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().

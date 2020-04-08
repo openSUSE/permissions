@@ -49,8 +49,16 @@ struct EntryContext
     std::string subpath;
     //! a path for safely opening the target file (typically in ///proc/self/fd/...)
     std::string fd_path;
-    //! the actual capabilities currently set on the file
+    //! the actual capabilities found on on the file
     FileCapabilities caps;
+    //! the actual file status info found on the file
+    FileStatus status;
+    //! indicates whether actual file permissions need to be fixed
+    bool need_fix_perms;
+    //! indicates whether actual file capabilities need to be fixed
+    bool need_fix_caps;
+    //! indicates whether actual file user:group ownership needs to be fixed
+    bool need_fix_ownership;
 
     explicit EntryContext()
     {
@@ -67,7 +75,27 @@ struct EntryContext
         {
             caps.destroy();
         }
+        need_fix_perms = false;
+        need_fix_caps = false;
+        need_fix_ownership = false;
     }
+
+    //! based on the given \c entry sets need_fix_* members as required
+    void checkNeedFixed(const ProfileEntry &entry)
+    {
+        need_fix_perms = status.getModeBits() != entry.mode;
+        need_fix_ownership = !status.matchesOwnership(this->uid, this->gid);
+        need_fix_caps = entry.caps != this->caps;
+    }
+
+    bool needsFixing() const
+    {
+        return need_fix_perms || need_fix_caps || need_fix_ownership;
+    }
+
+    bool needFixPerms() const { return need_fix_perms; }
+    bool needFixCaps() const { return need_fix_caps; }
+    bool needFixOwnership() const { return need_fix_ownership; }
 };
 
 //! enum to differentiate different /proc availibility situations
