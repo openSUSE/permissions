@@ -72,6 +72,25 @@ struct ProfileEntry
         freeCaps();
         caps = new_caps;
     }
+
+    bool hasCaps() const { return caps != nullptr; }
+
+    //! returns whether this profile entry contains a setuid or setgid bit
+    bool hasSetXID() const
+    {
+        return (this->mode & (S_ISUID | S_ISGID)) != 0;
+    }
+
+    cap_t getCaps() const { return caps; }
+};
+
+//! enum to differentiate different /proc availibility situations
+enum class ProcMountState
+{
+    //! status was not investigated yet
+    PROC_MOUNT_STATE_UNKNOWN,
+    PROC_MOUNT_STATE_AVAIL,
+    PROC_MOUNT_STATE_UNAVAIL,
 };
 
 /**
@@ -164,6 +183,42 @@ protected: // functions
     ProfileEntry&
     addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode);
 
+    /**
+     * \brief
+     *      This function contains the actual profile entry traversal
+     *      algorithm that carries out required file system operations
+     **/
+    int processEntries();
+
+    //! tests whether /proc is available in a caching manner
+    bool checkHaveProc() const;
+
+    //! prints an introductory text describing the active configuration
+    void printHeader();
+
+    /**
+     * \brief
+     *      Gets the currently set capabilities from \c path storing them in \c out
+     * \details
+     *      \c entry is potentially modified if capabilities can't be applied.
+     *      The return value indicates if an operational error occured but it
+     *      doesn't indicate whether \c out was assigned a value. If
+     *      capabilities aren't supported then \c out can still be nullptr.
+     *
+     *      \c label is a descriptive path label for diagnostic messages.
+     **/
+    bool getCapabilities(const std::string &path, const std::string &label, ProfileEntry &entry, cap_t &out);
+
+    bool matchCapabilities(const ProfileEntry &entry, cap_t actual_caps) const
+    {
+        if (!actual_caps && !entry.hasCaps())
+            return true;
+        else if (actual_caps && entry.hasCaps() && !cap_compare(entry.getCaps(), actual_caps))
+            return true;
+
+        return false;
+    }
+
     // intermediate member functions in the process of refactoring global
     // functions
     int safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure);
@@ -221,6 +276,8 @@ protected: // data
 
     //! the effective user ID we're running as
     const uid_t m_euid;
+
+    mutable ProcMountState m_proc_mount_avail = ProcMountState::PROC_MOUNT_STATE_UNKNOWN;
 };
 
 #endif // inc. guard

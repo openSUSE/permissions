@@ -1,6 +1,9 @@
 #ifndef CHKSTAT_UTILITY_H
 #define CHKSTAT_UTILITY_H
 
+// POSIX
+#include <sys/stat.h>
+
 // C++
 #include <cctype>
 #include <string>
@@ -91,6 +94,79 @@ void appendContainer(T1 &container, const T2 &sequence)
 //! splits up the \c input string into whitespace separated words and stores
 //! them in \c words
 void splitWords(const std::string &input, std::vector<std::string> &words);
+
+//! a helper class that wraps a plain POSIX file descriptor and makes sure it
+//! gets closed at descruction/assignment time
+class FileDescGuard
+{
+public:
+
+    explicit FileDescGuard(int fd = -1) :
+        m_fd(fd)
+    {}
+
+    FileDescGuard(FileDescGuard &&other)
+    {
+        // steal the rvalue's file descriptor so we take over ownership, while
+        // the other doesn't close it during destruction.
+        m_fd = other.get();
+        other.invalidate();
+    }
+    FileDescGuard(const FileDescGuard &other) = delete;
+    FileDescGuard& operator=(const FileDescGuard &other) = delete;
+
+    ~FileDescGuard()
+    {
+        if (valid())
+        {
+            close();
+        }
+    }
+
+    int get() { return m_fd; }
+
+    void set(int fd)
+    {
+        if (valid())
+        {
+            close();
+        }
+
+        m_fd = fd;
+    }
+
+    bool valid() const { return m_fd != -1; }
+
+    void close();
+
+    void invalidate() { m_fd = -1; }
+
+protected:
+
+    int m_fd = -1;
+};
+
+//! C++ wrapper around the POSIX struct stat
+class FileStatus :
+    public ::stat
+{
+public:
+
+    bool isLink() const { return S_ISLNK(this->st_mode); }
+    bool isRegular() const { return S_ISREG(this->st_mode); }
+    bool isDirectory() const { return S_ISDIR(this->st_mode); }
+
+    //! returns the file mode bits portion consisting of the permission bits
+    //! plus any special bits like setXid but not the file type bits
+    auto getModeBits() const { return this->st_mode & 07777; }
+
+    bool matchesOwnership(const uid_t uid, const gid_t gid) const
+    {
+        return this->st_uid == uid && this->st_gid == gid;
+    }
+
+protected:
+};
 
 #endif // inc. guard
 
