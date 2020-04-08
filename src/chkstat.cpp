@@ -56,207 +56,6 @@
 
 #define PROC_FD_PATH_SIZE (sizeof("/proc/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
 
-int
-Chkstat::safe_open(const char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
-{
-    char pathbuf[PATH_MAX];
-    char *path_rest;
-    int lcnt;
-    int pathfd = -1;
-    int parentfd = -1;
-    struct stat root_st;
-    bool is_final_path_element = false;
-    const auto &altroot = m_root_path.getValue();
-
-    *traversed_insecure = false;
-
-    lcnt = 0;
-    if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", path + altroot.length()) >= sizeof(pathbuf))
-        goto fail;
-
-    path_rest = pathbuf;
-
-    while (!is_final_path_element)
-    {
-        *path_rest = '/';
-        char *cursor = path_rest + 1;
-
-        if (pathfd == -1)
-        {
-            const auto root = altroot.empty() ? std::string("/") : altroot;
-            pathfd = open(root.c_str(), O_PATH | O_CLOEXEC);
-
-            if (pathfd == -1)
-            {
-                fprintf(stderr, "failed to open root directory %s: %s\n", root.c_str(), strerror(errno));
-                goto fail;
-            }
-
-            if (fstat(pathfd, &root_st))
-            {
-                fprintf(stderr, "failed to stat root directory %s: %s\n", root.c_str(), strerror(errno));
-                goto fail;
-            }
-            // stb and pathfd must be in sync for the root-escape check below
-            memcpy(stb, &root_st, sizeof(*stb));
-        }
-
-        path_rest = strchr(cursor, '/');
-        // path_rest is NULL when we reach the final path element
-        is_final_path_element = path_rest == NULL || strcmp("/", path_rest) == 0;
-
-        if (!is_final_path_element)
-        {
-            *path_rest = 0;
-        }
-
-        // multiple consecutive slashes: ignore
-        if (!is_final_path_element && *cursor == '\0')
-            continue;
-
-        // never move up from the configured root directory (using the stat result from the previous loop iteration)
-        if (strcmp(cursor, "..") == 0 && !altroot.empty() && stb->st_dev == root_st.st_dev && stb->st_ino == root_st.st_ino)
-            continue;
-
-        // cursor is an empty string for trailing slashes, open again with different open_flags.
-        int newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-        if (newpathfd == -1)
-            goto fail;
-
-        close(pathfd);
-        pathfd = newpathfd;
-
-        if (fstat(pathfd, stb))
-            goto fail;
-
-        /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
-        /* for euid != 0 it is also ok if the owner is euid */
-        if (stb->st_uid && stb->st_uid != m_euid && !is_final_path_element)
-        {
-            *traversed_insecure = true;
-        }
-        // path is in a world-writable directory, or file is world-writable itself.
-        else if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && !is_final_path_element)
-        {
-            *traversed_insecure = true;
-        }
-
-        // if parent directory is not owned by root, the file owner must match the owner of parent
-        if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != m_euid)
-        {
-            if (is_final_path_element)
-            {
-                fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", path+altroot.length());
-                goto fail;
-            }
-            else
-                goto fail_insecure_path;
-        }
-
-        if (S_ISLNK(stb->st_mode))
-        {
-            // If the path configured in the permissions configuration is a symlink, we don't follow it.
-            // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
-            if (is_final_path_element || ++lcnt >= 256)
-                goto fail;
-
-            // Don't follow symlinks owned by regular users.
-            // In theory, we could also trust symlinks where the owner of the target matches the owner
-            // of the link, but we're going the simple route for now.
-            if (stb->st_uid && stb->st_uid != m_euid)
-                goto fail_insecure_path;
-
-            char linkbuf[PATH_MAX];
-            ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
-
-            if (l <= 0 || (size_t)l >= sizeof(linkbuf) - 1)
-                goto fail;
-
-            while(l && linkbuf[l - 1] == '/')
-            {
-                l--;
-            }
-
-            linkbuf[l] = 0;
-
-            if (linkbuf[0] == '/')
-            {
-                // absolute link
-                close(pathfd);
-                pathfd = -1;
-            }
-            else
-            {
-                // relative link: continue relative to the parent directory
-                close(pathfd);
-                if (parentfd == -1) // we encountered a link directly below /
-                    pathfd = -1;
-                else
-                    pathfd = dup(parentfd);
-            }
-
-            // need a temporary buffer because path_rest points into pathbuf
-            // and snprintf doesn't allow the same buffer as source and
-            // destination
-            char tmp[sizeof(pathbuf) - 1];
-            size_t len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
-            if (len >= sizeof(tmp))
-                goto fail;
-
-            // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
-            strcpy(pathbuf + 1, tmp);
-            path_rest = pathbuf;
-        }
-        else if (S_ISDIR(stb->st_mode))
-        {
-            if (parentfd >= 0)
-                close(parentfd);
-            // parentfd is only needed to find the parent of a symlink.
-            // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
-            parentfd = dup(pathfd);
-        }
-    }
-
-    // world-writable file: error out due to unknown file integrity
-    if (S_ISREG(stb->st_mode) && (stb->st_mode & S_IWOTH))
-    {
-        fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", path+altroot.length());
-        goto fail;
-    }
-
-    if (parentfd >= 0)
-    {
-        close(parentfd);
-    }
-
-    return pathfd;
-fail_insecure_path:
-
-    {
-        char linkpath[PATH_MAX] = "ancestor";
-        char procpath[PROC_FD_PATH_SIZE];
-        snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
-        ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
-        if (l > 0)
-        {
-            linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
-        }
-        fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", path+altroot.length(), linkpath);
-    }
-
-fail:
-    if (pathfd >= 0)
-    {
-        close(pathfd);
-    }
-    if (parentfd >= 0)
-    {
-        close(parentfd);
-    }
-    return -1;
-}
-
-
 Chkstat::Chkstat(int argc, const char **argv) :
     m_argc(argc),
     m_argv(argv),
@@ -1028,10 +827,212 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     return ret;
 }
 
+bool Chkstat::safeOpen(EntryContext &ctx)
+{
+    char pathbuf[PATH_MAX];
+    char *path_rest;
+    int lcnt;
+    int pathfd = -1;
+    int parentfd = -1;
+    struct stat root_st;
+    bool is_final_path_element = false;
+    const auto &altroot = m_root_path.getValue();
+
+    ctx.traversed_insecure = false;
+    ctx.fd.close();
+
+    lcnt = 0;
+    if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", ctx.subpath.c_str()) >= sizeof(pathbuf))
+        goto fail;
+
+    path_rest = pathbuf;
+
+    while (!is_final_path_element)
+    {
+        *path_rest = '/';
+        char *cursor = path_rest + 1;
+
+        if (pathfd == -1)
+        {
+            const auto root = altroot.empty() ? std::string("/") : altroot;
+            pathfd = open(root.c_str(), O_PATH | O_CLOEXEC);
+
+            if (pathfd == -1)
+            {
+                fprintf(stderr, "failed to open root directory %s: %s\n", root.c_str(), strerror(errno));
+                goto fail;
+            }
+
+            if (fstat(pathfd, &root_st))
+            {
+                fprintf(stderr, "failed to stat root directory %s: %s\n", root.c_str(), strerror(errno));
+                goto fail;
+            }
+            // status and pathfd must be in sync for the root-escape check below
+            memcpy(&ctx.status, &root_st, sizeof(ctx.status));
+        }
+
+        path_rest = strchr(cursor, '/');
+        // path_rest is NULL when we reach the final path element
+        is_final_path_element = path_rest == NULL || strcmp("/", path_rest) == 0;
+
+        if (!is_final_path_element)
+        {
+            *path_rest = 0;
+        }
+
+        // multiple consecutive slashes: ignore
+        if (!is_final_path_element && *cursor == '\0')
+            continue;
+
+        // never move up from the configured root directory (using the stat result from the previous loop iteration)
+        if (strcmp(cursor, "..") == 0 && !altroot.empty() && ctx.status.sameObject(root_st))
+            continue;
+
+        // cursor is an empty string for trailing slashes, open again with different open_flags.
+        int newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+        if (newpathfd == -1)
+            goto fail;
+
+        close(pathfd);
+        pathfd = newpathfd;
+
+        if (fstat(pathfd, &ctx.status))
+            goto fail;
+
+        /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
+        /* for euid != 0 it is also ok if the owner is euid */
+        if (ctx.status.st_uid && ctx.status.st_uid != m_euid && !is_final_path_element)
+        {
+            ctx.traversed_insecure = true;
+        }
+        // path is in a world-writable directory, or file is world-writable itself.
+        else if (!ctx.status.isLink() && ctx.status.isWorldWritable() && !is_final_path_element)
+        {
+            ctx.traversed_insecure = true;
+        }
+
+        // if parent directory is not owned by root, the file owner must match the owner of parent
+        if (ctx.status.st_uid && ctx.status.st_uid != ctx.uid && ctx.status.st_uid != m_euid)
+        {
+            if (is_final_path_element)
+            {
+                fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", ctx.subpath.c_str());
+                goto fail;
+            }
+            else
+                goto fail_insecure_path;
+        }
+
+        if (ctx.status.isLink())
+        {
+            // If the path configured in the permissions configuration is a symlink, we don't follow it.
+            // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
+            if (is_final_path_element || ++lcnt >= 256)
+                goto fail;
+
+            // Don't follow symlinks owned by regular users.
+            // In theory, we could also trust symlinks where the owner of the target matches the owner
+            // of the link, but we're going the simple route for now.
+            if (ctx.status.st_uid && ctx.status.st_uid != m_euid)
+                goto fail_insecure_path;
+
+            char linkbuf[PATH_MAX];
+            ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
+
+            if (l <= 0 || (size_t)l >= sizeof(linkbuf) - 1)
+                goto fail;
+
+            while(l && linkbuf[l - 1] == '/')
+            {
+                l--;
+            }
+
+            linkbuf[l] = 0;
+
+            if (linkbuf[0] == '/')
+            {
+                // absolute link
+                close(pathfd);
+                pathfd = -1;
+            }
+            else
+            {
+                // relative link: continue relative to the parent directory
+                close(pathfd);
+                if (parentfd == -1) // we encountered a link directly below /
+                    pathfd = -1;
+                else
+                    pathfd = dup(parentfd);
+            }
+
+            // need a temporary buffer because path_rest points into pathbuf
+            // and snprintf doesn't allow the same buffer as source and
+            // destination
+            char tmp[sizeof(pathbuf) - 1];
+            size_t len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
+            if (len >= sizeof(tmp))
+                goto fail;
+
+            // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
+            strcpy(pathbuf + 1, tmp);
+            path_rest = pathbuf;
+        }
+        else if (ctx.status.isDirectory())
+        {
+            if (parentfd >= 0)
+                close(parentfd);
+            // parentfd is only needed to find the parent of a symlink.
+            // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
+            parentfd = dup(pathfd);
+        }
+    }
+
+    // world-writable file: error out due to unknown file integrity
+    if (ctx.status.isRegular() && ctx.status.isWorldWritable())
+    {
+        fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", ctx.subpath.c_str());
+        goto fail;
+    }
+
+    if (parentfd >= 0)
+    {
+        close(parentfd);
+    }
+
+    ctx.fd.set(pathfd);
+    return true;
+fail_insecure_path:
+
+    {
+        char linkpath[PATH_MAX] = "ancestor";
+        char procpath[PROC_FD_PATH_SIZE];
+        snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
+        ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
+        if (l > 0)
+        {
+            linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
+        }
+        fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", ctx.subpath.c_str(), linkpath);
+    }
+
+fail:
+    if (pathfd >= 0)
+    {
+        close(pathfd);
+    }
+    if (parentfd >= 0)
+    {
+        close(parentfd);
+    }
+    return false;
+}
+
+
+
 int Chkstat::processEntries()
 {
     EntryContext ctx;
-    FileDescGuard fd;
     size_t errors = 0;
 
     if (m_apply_changes.isSet() && !checkHaveProc())
@@ -1055,12 +1056,10 @@ int Chkstat::processEntries()
         if (!resolveEntryOwnership(entry, ctx))
             continue;
 
-        {
-            auto desc = safe_open(entry.file.c_str(), &ctx.status, ctx.uid, &ctx.traversed_insecure);
-            fd.set(desc);
-        }
+        if (!safeOpen(ctx))
+            continue;
 
-        if (!fd.valid())
+        if (!ctx.fd.valid())
             continue;
         else if (ctx.status.isLink())
             continue;
@@ -1074,13 +1073,14 @@ int Chkstat::processEntries()
         // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
         if (checkHaveProc())
         {
-            ctx.fd_path = std::string("/proc/self/fd/") + std::to_string(fd.get());
+            ctx.fd_path = std::string("/proc/self/fd/") + std::to_string(ctx.fd.get());
         }
         else
         {
-            // fall back to plain path-access for read-only operation. (this much is fine)
-            // below we make sure that in this case we report errors instead
-            // of trying to fix policy violations insecurely
+            // fall back to plain path-access for read-only operation. (this
+            // much is fine)
+            // we only report errors below, m_apply_changes is set to false by
+            // the login above.
             ctx.fd_path = entry.file;
         }
 
