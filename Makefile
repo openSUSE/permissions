@@ -3,6 +3,10 @@ ifdef CHKSTAT_TEST
 # for testing, add sanitizers:
 CXXFLAGS+=-fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=undefined
 endif
+# if debugging is desired then remove optimizations
+ifdef CHKSTAT_DEBUG
+CXXFLAGS+=-O0
+endif
 CXX=g++
 # link statically against libstdc++. since some people are afraid of ABI
 # changes in this area and since permissions is a base package in SUSE this

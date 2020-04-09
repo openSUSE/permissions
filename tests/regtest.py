@@ -161,6 +161,11 @@ class ChkstatRegtest:
 		)
 
 		self.m_parser.add_argument(
+			"--build-debug", action = 'store_true',
+			help = "Build a more debug friendly version of chkstat to make tracking down bugs in `gdb` easier"
+		)
+
+		self.m_parser.add_argument(
 			"--skip-make", action = 'store_true',
 			help = "By default the regtest tries to (re)build the chkstat binary. If this switch is set then whichever binary is currently found will be used."
 		)
@@ -610,6 +615,8 @@ class ChkstatRegtest:
 		make_env = os.environ.copy()
 		if not self.m_args.skip_proc:
 			make_env["CHKSTAT_TEST"] = "1"
+		if self.m_args.build_debug:
+			make_env["CHKSTAT_DEBUG"] = "1"
 
 		try:
 			subprocess.check_call(
