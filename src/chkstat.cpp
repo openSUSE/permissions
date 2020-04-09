@@ -829,29 +829,22 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
 
 bool Chkstat::safeOpen(EntryContext &ctx)
 {
-    char pathbuf[PATH_MAX];
-    char *path_rest;
     int lcnt;
     int pathfd = -1;
     int parentfd = -1;
     struct stat root_st;
     bool is_final_path_element = false;
     const auto &altroot = m_root_path.getValue();
+    std::string path_rest = ctx.subpath;
+    std::string component;
 
     ctx.traversed_insecure = false;
     ctx.fd.close();
 
     lcnt = 0;
-    if ((size_t)snprintf(pathbuf, sizeof(pathbuf), "%s", ctx.subpath.c_str()) >= sizeof(pathbuf))
-        goto fail;
-
-    path_rest = pathbuf;
 
     while (!is_final_path_element)
     {
-        *path_rest = '/';
-        char *cursor = path_rest + 1;
-
         if (pathfd == -1)
         {
             const auto root = altroot.empty() ? std::string("/") : altroot;
@@ -872,25 +865,24 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             memcpy(&ctx.status, &root_st, sizeof(ctx.status));
         }
 
-        path_rest = strchr(cursor, '/');
-        // path_rest is NULL when we reach the final path element
-        is_final_path_element = path_rest == NULL || strcmp("/", path_rest) == 0;
-
-        if (!is_final_path_element)
-        {
-            *path_rest = 0;
-        }
+        // make out the leading path component
+        auto sep = path_rest.find_first_of('/', 1);
+        component = path_rest.substr(1, sep - 1);
+        // strip the leading path component
+        path_rest = path_rest.substr(component.length() + 1);
+        // path_rest is empty when we reach the final path element
+        is_final_path_element = path_rest.empty() || path_rest == "/";
 
         // multiple consecutive slashes: ignore
-        if (!is_final_path_element && *cursor == '\0')
+        if (!is_final_path_element && component.empty())
             continue;
 
         // never move up from the configured root directory (using the stat result from the previous loop iteration)
-        if (strcmp(cursor, "..") == 0 && !altroot.empty() && ctx.status.sameObject(root_st))
+        if (component == ".." && !altroot.empty() && ctx.status.sameObject(root_st))
             continue;
 
-        // cursor is an empty string for trailing slashes, open again with different open_flags.
-        int newpathfd = openat(pathfd, *cursor ? cursor : ".", O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+        // component is an empty string for trailing slashes, open again with different open_flags.
+        int newpathfd = openat(pathfd, component.empty() ? "." : component.c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
         if (newpathfd == -1)
             goto fail;
 
@@ -966,17 +958,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
                     pathfd = dup(parentfd);
             }
 
-            // need a temporary buffer because path_rest points into pathbuf
-            // and snprintf doesn't allow the same buffer as source and
-            // destination
-            char tmp[sizeof(pathbuf) - 1];
-            size_t len = (size_t)snprintf(tmp, sizeof(tmp), "%s/%s", linkbuf, path_rest + 1);
-            if (len >= sizeof(tmp))
-                goto fail;
-
-            // the first byte of path_rest is always set to a slash at the start of the loop, so we offset by one byte
-            strcpy(pathbuf + 1, tmp);
-            path_rest = pathbuf;
+            path_rest = std::string(linkbuf) + path_rest;
         }
         else if (ctx.status.isDirectory())
         {
