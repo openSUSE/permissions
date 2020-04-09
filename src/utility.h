@@ -128,6 +128,19 @@ void appendContainer(T1 &container, const T2 &sequence)
 //! them in \c words
 void splitWords(const std::string &input, std::vector<std::string> &words);
 
+template <typename T>
+bool stringToUnsigned(const std::string &s, T &out, const size_t base = 10)
+{
+    char *end = nullptr;
+    out = static_cast<T>(std::strtoul(s.c_str(), &end, base));
+    if (end && *end != '\0')
+    {
+        return false;
+    }
+
+    return true;
+}
+
 //! a helper class that wraps a plain POSIX file descriptor and makes sure it
 //! gets closed at descruction/assignment time
 class FileDescGuard

@@ -596,9 +596,7 @@ void Chkstat::parseProfile(const std::string &path)
         const auto &location = parts[0];
         const auto &mode = parts[2];
 
-        char *end = nullptr;
-        mode_int = static_cast<mode_t>(std::strtoul(mode.c_str(), &end, 8));
-        if (mode_int > 07777 || (end && *end != '\0'))
+        if (!stringToUnsigned(mode, mode_int, 8) || mode_int > 07777)
         {
             badProfileLine(path, linenr, "bad mode specification");
             continue;
@@ -730,21 +728,37 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
     struct passwd *pwd = getpwnam(entry.owner.c_str());
     struct group *grp = getgrnam(entry.group.c_str());
 
-    if (!pwd)
+    bool good = true;
+
+    if (pwd)
     {
-        std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
+        ctx.uid = pwd->pw_uid;
     }
-    else if (!grp)
+    else if (stringToUnsigned(entry.owner, ctx.uid))
     {
-        std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
+        // it's a numerical value, lets try it
     }
     else
     {
-        ctx.uid = pwd->pw_uid;
-        ctx.gid = grp->gr_gid;
+        good = false;
+        std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
     }
 
-    return pwd != nullptr && grp != nullptr;
+    if (grp)
+    {
+        ctx.gid = grp->gr_gid;
+    }
+    else if (stringToUnsigned(entry.group, ctx.gid))
+    {
+        // it's a numerical value, lets try it
+    }
+    else
+    {
+        good = false;
+        std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
+    }
+
+    return good;
 }
 
 bool Chkstat::isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx) const
