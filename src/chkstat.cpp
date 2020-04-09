@@ -652,26 +652,37 @@ void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContex
 
     if (ctx.need_fix_caps && entry.hasCaps())
     {
-        std::cout << " \"" << entry.caps.toText() << "\"";
+        std::cout << " \"" << entry.caps.toText() << "\".";
     }
 
-    std::cout << ". (wrong";
+    std::cout << " (";
+    bool need_comma = false;
 
     if (ctx.need_fix_ownership)
     {
-        std::cout << " owner/group " << FileOwnership(ctx.status);
+        std::cout << "wrong owner/group " << FileOwnership(ctx.status);
+        need_comma = true;
     }
 
     if (ctx.need_fix_perms)
     {
-        std::cout << " permissions " << FileModeInt(ctx.status.getModeBits());
+        if (need_comma)
+        {
+            std::cout << ", ";
+        }
+        std::cout << "wrong permissions " << FileModeInt(ctx.status.getModeBits());
+        need_comma = true;
     }
 
     if (ctx.need_fix_caps)
     {
+        if (need_comma)
+        {
+            std::cout << ", ";
+        }
         if (ctx.caps.valid())
         {
-            std::cout << "capabilities \"" << ctx.caps.toText() << "\"";
+            std::cout << "wrong capabilities \"" << ctx.caps.toText() << "\"";
         }
         else
         {
