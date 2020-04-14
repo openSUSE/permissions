@@ -51,11 +51,6 @@
 #include <string_view>
 #include <utility>
 
-#define _STRINGIFY(s) #s
-#define STRINGIFY(s) _STRINGIFY(s)
-
-#define PROC_FD_PATH_SIZE (sizeof("/proc/self/fd/") + sizeof(STRINGIFY(INT_MAX)))
-
 Chkstat::Chkstat(int argc, const char **argv) :
     m_argc(argc),
     m_argv(argv),
@@ -852,42 +847,46 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     return ret;
 }
 
+static inline std::string& stripTrailingSlashes(std::string &s)
+{
+    return rstrip(s, [](char c) { return c == '/'; });
+}
+
 bool Chkstat::safeOpen(EntryContext &ctx)
 {
-    int lcnt;
-    int pathfd = -1;
-    int parentfd = -1;
-    struct stat root_st;
+    size_t link_count = 0;
+    FileDescGuard pathfd;
+    FileDescGuard parentfd;
+    FileStatus root_status;
     bool is_final_path_element = false;
     const auto &altroot = m_root_path.getValue();
     std::string path_rest = ctx.subpath;
     std::string component;
+    std::string link;
 
     ctx.traversed_insecure = false;
     ctx.fd.close();
 
-    lcnt = 0;
-
     while (!is_final_path_element)
     {
-        if (pathfd == -1)
+        if (pathfd.invalid())
         {
             const auto root = altroot.empty() ? std::string("/") : altroot;
-            pathfd = open(root.c_str(), O_PATH | O_CLOEXEC);
+            pathfd.set( open(root.c_str(), O_PATH | O_CLOEXEC) );
 
-            if (pathfd == -1)
+            if (pathfd.invalid())
             {
-                fprintf(stderr, "failed to open root directory %s: %s\n", root.c_str(), strerror(errno));
-                goto fail;
+                std::cerr << root << ": failed to open root directory: " << strerror(errno) << std::endl;
+                return false;
             }
 
-            if (fstat(pathfd, &root_st))
+            if (!root_status.fstat(pathfd.get()))
             {
-                fprintf(stderr, "failed to stat root directory %s: %s\n", root.c_str(), strerror(errno));
-                goto fail;
+                std::cerr << root << ": failed to fstat root directory: " << root << std::endl;
+                return false;
             }
             // status and pathfd must be in sync for the root-escape check below
-            memcpy(&ctx.status, &root_st, sizeof(ctx.status));
+            ctx.status.copy(root_status);
         }
 
         // make out the leading path component
@@ -903,22 +902,29 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             continue;
 
         // never move up from the configured root directory (using the stat result from the previous loop iteration)
-        if (component == ".." && !altroot.empty() && ctx.status.sameObject(root_st))
+        if (component == ".." && !altroot.empty() && ctx.status.sameObject(root_status))
             continue;
 
-        // component is an empty string for trailing slashes, open again with different open_flags.
-        int newpathfd = openat(pathfd, component.empty() ? "." : component.c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-        if (newpathfd == -1)
-            goto fail;
+        {
+            // component is an empty string for trailing slashes, open again with different open_flags.
+            auto child = component.empty() ? "." : component.c_str();
+            int tmpfd = openat(pathfd.get(), child, O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+            // TODO: shouldn't there be some error handling here? ENOENT is
+            // probably to be tolerated when packages aren't installed, but
+            // what about e.g. EACCES or other errors?
+            if( tmpfd == -1 )
+                return false;
+            pathfd.set(tmpfd);
+        }
 
-        close(pathfd);
-        pathfd = newpathfd;
+        if (!ctx.status.fstat(pathfd.get()))
+            // TODO: this is also a strange case, should be complained about
+            return false;
 
-        if (fstat(pathfd, &ctx.status))
-            goto fail;
-
-        /* owner of directories must be trusted for setuid/setgid/capabilities as we have no way to verify file contents */
-        /* for euid != 0 it is also ok if the owner is euid */
+        // owner of directories must be trusted for setuid/setgid/capabilities
+        // as we have no way to verify file contents
+        //
+        // for euid != 0 it is also ok if the owner is euid
         if (ctx.status.st_uid && ctx.status.st_uid != m_euid && !is_final_path_element)
         {
             ctx.traversed_insecure = true;
@@ -934,108 +940,107 @@ bool Chkstat::safeOpen(EntryContext &ctx)
         {
             if (is_final_path_element)
             {
-                fprintf(stderr, "%s: has unexpected owner. refusing to correct due to unknown integrity.\n", ctx.subpath.c_str());
-                goto fail;
+                std::cerr << ctx.subpath << ": has unexpected owner (" << ctx.status.st_uid << "). refusing to correct due to unknown integrity." << std::endl;
+                return false;
             }
             else
-                goto fail_insecure_path;
+            {
+                const auto path = getPathFromProc(pathfd);
+                std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;
+                return false;
+            }
         }
 
         if (ctx.status.isLink())
         {
             // If the path configured in the permissions configuration is a symlink, we don't follow it.
             // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
-            if (is_final_path_element || ++lcnt >= 256)
-                goto fail;
+            if (is_final_path_element || ++link_count >= 256)
+                // TODO: would an excess link count not warrant a complaint?
+                return false;
 
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
             // of the link, but we're going the simple route for now.
             if (ctx.status.st_uid && ctx.status.st_uid != m_euid)
-                goto fail_insecure_path;
-
-            char linkbuf[PATH_MAX];
-            ssize_t l = readlinkat(pathfd, "", linkbuf, sizeof(linkbuf) - 1);
-
-            if (l <= 0 || (size_t)l >= sizeof(linkbuf) - 1)
-                goto fail;
-
-            while(l && linkbuf[l - 1] == '/')
             {
-                l--;
+                const auto path = getPathFromProc(pathfd);
+                std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;
+                return false;
             }
 
-            linkbuf[l] = 0;
+            link.resize(PATH_MAX);
+            const auto len = ::readlinkat(pathfd.get(), "", &link[0], link.size() - 1);
 
-            if (linkbuf[0] == '/')
+            if (len <= 0 || static_cast<size_t>(len) >= link.size() - 1)
+                // TODO: would an error read the link not warrant a complaint?
+                return false;
+
+            link.resize(static_cast<size_t>(len));
+            stripTrailingSlashes(link);
+
+            if (link[0] == '/')
             {
-                // absolute link
-                close(pathfd);
-                pathfd = -1;
+                // absolute link, need to continue from a new root
+                pathfd.close();
             }
             else
             {
                 // relative link: continue relative to the parent directory
-                close(pathfd);
-                if (parentfd == -1) // we encountered a link directly below /
-                    pathfd = -1;
+
+                // we encountered a link directly below /, simply continue
+                // from the root again
+                if (parentfd.invalid())
+                {
+                    pathfd.close();
+                }
                 else
-                    pathfd = dup(parentfd);
+                {
+                    pathfd.set( dup(parentfd.get()) );
+                }
             }
 
-            path_rest = std::string(linkbuf) + path_rest;
+            path_rest = link + path_rest;
         }
         else if (ctx.status.isDirectory())
         {
-            if (parentfd >= 0)
-                close(parentfd);
             // parentfd is only needed to find the parent of a symlink.
             // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
-            parentfd = dup(pathfd);
+            parentfd.set( dup(pathfd.get()) );
         }
     }
 
     // world-writable file: error out due to unknown file integrity
     if (ctx.status.isRegular() && ctx.status.isWorldWritable())
     {
-        fprintf(stderr, "%s: file has insecure permissions (world-writable)\n", ctx.subpath.c_str());
-        goto fail;
+        std::cerr << ctx.subpath << ": file has insecure permissions (world-writable)" << std::endl;
+        return false;
     }
 
-    if (parentfd >= 0)
-    {
-        close(parentfd);
-    }
+    ctx.fd.steal(pathfd);
 
-    ctx.fd.set(pathfd);
     return true;
-fail_insecure_path:
-
-    {
-        char linkpath[PATH_MAX] = "ancestor";
-        char procpath[PROC_FD_PATH_SIZE];
-        snprintf(procpath, sizeof(procpath), "/proc/self/fd/%d", pathfd);
-        ssize_t l = readlink(procpath, linkpath, sizeof(linkpath) - 1);
-        if (l > 0)
-        {
-            linkpath[MIN((size_t)l, sizeof(linkpath) - 1)] = '\0';
-        }
-        fprintf(stderr, "%s: on an insecure path - %s has different non-root owner who could tamper with the file.\n", ctx.subpath.c_str(), linkpath);
-    }
-
-fail:
-    if (pathfd >= 0)
-    {
-        close(pathfd);
-    }
-    if (parentfd >= 0)
-    {
-        close(parentfd);
-    }
-    return false;
 }
 
+std::string Chkstat::getPathFromProc(const FileDescGuard &fd) const
+{
+    std::string linkpath;
+    auto procpath = std::string("/proc/self/fd/") + std::to_string(fd.get());
 
+    linkpath.resize(PATH_MAX);
+
+    ssize_t l = readlink(procpath.c_str(), &linkpath[0], linkpath.size() - 1);
+    if (l > 0)
+    {
+        linkpath.resize( std::min(static_cast<size_t>(l), linkpath.size() - 1) );
+    }
+    else
+    {
+        linkpath = "ancestor";
+    }
+
+    return linkpath;
+}
 
 int Chkstat::processEntries()
 {

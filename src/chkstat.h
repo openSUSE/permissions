@@ -265,6 +265,13 @@ protected: // functions
      **/
     bool safeOpen(EntryContext &ctx);
 
+    /**
+     * \brief
+     *      Resolves the file system path for the given file descriptor via
+     *      /proc/self/fd
+     **/
+    std::string getPathFromProc(const FileDescGuard &fd) const;
+
 protected: // data
 
     const int m_argc = 0;

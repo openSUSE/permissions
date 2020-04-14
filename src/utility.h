@@ -10,6 +10,7 @@
 
 // C++
 #include <cctype>
+#include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -169,7 +170,7 @@ public:
         }
     }
 
-    int get() { return m_fd; }
+    int get() const { return m_fd; }
 
     void set(int fd)
     {
@@ -181,7 +182,14 @@ public:
         m_fd = fd;
     }
 
+    void steal(FileDescGuard &other)
+    {
+        set(other.get());
+        other.invalidate();
+    }
+
     bool valid() const { return m_fd != -1; }
+    bool invalid() const { return !valid(); }
     void invalidate() { m_fd = -1; }
 
     void close();
@@ -220,6 +228,16 @@ public:
     bool isWorldWritable() const
     {
         return (this->st_mode & S_IWOTH) != 0;
+    }
+
+    void copy(const struct stat &other)
+    {
+        std::memcpy(this, &other, sizeof(*this));
+    }
+
+    bool fstat(int fd)
+    {
+        return ::fstat(fd, this) == 0;
     }
 
 protected:
