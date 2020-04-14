@@ -47,7 +47,7 @@ void splitWords(const std::string &input, std::vector<std::string> &words)
     }
 }
 
-void FileDescGuard::close()
+void FileDesc::close()
 {
     if (!valid())
         return;
