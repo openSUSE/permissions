@@ -958,6 +958,13 @@ class TestBase:
 		color_printer.reset()
 		self.m_warnings += 1
 
+	def complainOnNoSubIdSupport(self):
+		if self.m_main_test_instance.haveSubIdSupport():
+			return False
+
+		self.printWarning("skipping this test since there is no sub*id support available")
+		return True
+
 	def getMode(self, path):
 		s = os.stat(path)
 		return self.extractPerms(s)
@@ -968,6 +975,17 @@ class TestBase:
 		if actual != expected:
 			self.printError("{}: expected mode {} but encountered mode {}".format(
 				path, str(oct(expected)), str(oct(actual))
+			))
+			return False
+
+		return True
+
+	def assertOwnership(self, path, user, group):
+		s = os.stat(path)
+
+		if s.st_uid != int(user) or s.st_gid != int(group):
+			self.printError("{}: expected ownership {}:{} but encountered ownership {}:{}".format(
+				path, user, group, s.st_uid, s.st_gid
 			))
 			return False
 
@@ -1164,6 +1182,56 @@ class TestCorrectMode(TestBase):
 				self.assertMode(path, mode)
 
 			print()
+
+class TestCorrectOwner(TestBase):
+
+	def __init__(self):
+		super().__init__("TestCorrectOwner", "checks whether file owner/group assignments are corectly applied as configured")
+
+	def run(self):
+
+		if self.complainOnNoSubIdSupport():
+			# we need sub-uids to test ownership changes
+			return
+
+		testdir = self.createAndGetTestDir(0o770)
+
+		# don't use friendly user and group names but plain numerical
+		# IDs instead. This way we don't have to adjust /etc/passwd
+		# and /etc/group. Numerical IDs are only supported in newer
+		# chkstat versions.
+
+		# we need a defined order of execution here, therefore
+		# iterate over the sorted dictionary keys.
+		#
+		# we start out from 0:0 and downgrade first to 0:1 then to 1:1
+		# to avoid triggering the "refusing to correct" logic in
+		# chkstat.
+		owners = {
+			"easy": ("0", "0"),
+			"paranoid": ("0", "1"),
+			"secure": ("1", "1"),
+		}
+
+		entries = {}
+
+		for profile in sorted(owners.keys()):
+			user, group = owners[profile]
+			lines = entries.setdefault(profile, [])
+			lines.append( self.buildProfileLine(testdir, 0o775, owner = user, group = group) )
+
+		self.addProfileEntries(entries)
+
+		for profile, entries in entries.items():
+
+			self.printMode(testdir)
+
+			self.switchSystemProfile(profile)
+			self.applySystemProfile()
+
+			user, group = owners[profile]
+			self.assertOwnership(testdir, user, group)
+
 
 class TestBasePermissions(TestBase):
 
@@ -1884,8 +1952,7 @@ class TestRejectUserSymlink(TestBase):
 
 	def run(self):
 
-		if not self.m_main_test_instance.haveSubIdSupport():
-			self.printWarning("skipping this test since there is no sub*id support available")
+		if self.complainOnNoSubIdSupport():
 			return
 
 		testroot = self.createAndGetTestDir(0o755)
@@ -2154,6 +2221,7 @@ class TestSymlinkDirBehaviour(TestBase):
 test = ChkstatRegtest()
 res = test.run((
 		TestCorrectMode,
+		TestCorrectOwner,
 		TestBasePermissions,
 		TestPackagePermissions,
 		TestLocalPermissions,

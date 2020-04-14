@@ -46,7 +46,7 @@ std::ostream& operator<<(std::ostream &o, const FileOwnership &fo)
 {
     const struct passwd *pwd = ::getpwuid(fo.getUid());
     const struct group *grp = ::getgrgid(fo.getGid());;
-    
+
     if (pwd)
     {
         o << pwd->pw_name;
