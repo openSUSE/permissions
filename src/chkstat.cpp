@@ -1,4 +1,4 @@
-/* Copyright (c) 2004 SuSE Linux AG
+/* Copyright (c) 2020 SUSE LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,17 +21,17 @@
 #ifndef _GNU_SOURCE
 #   define _GNU_SOURCE
 #endif
-#include <pwd.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <grp.h>
+#include <limits.h>
+#include <linux/magic.h>
+#include <pwd.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
-#include <linux/magic.h>
 #include <unistd.h>
-#include <errno.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <sys/param.h>
-#include <limits.h>
 
 // local headers
 #include "chkstat.h"
@@ -39,14 +39,9 @@
 #include "utility.h"
 
 // C++
-#include <cassert>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <set>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -76,6 +71,8 @@ bool Chkstat::validateArguments()
     // exits on error/usage
     m_parser.parse(m_argc, m_argv);
 
+    // check all parameters and only then return to provide full diagnostic to
+    // the user, not just bit by bit complaining.
     bool ret = true;
 
     const auto xor_args = {
@@ -86,8 +83,8 @@ bool Chkstat::validateArguments()
 
     for (const auto &args: xor_args)
     {
-        const auto &arg1 = *args.first;
-        const auto &arg2 = *args.second;
+        auto &arg1 = *args.first;
+        auto &arg2 = *args.second;
 
         if (arg1.isSet() && arg2.isSet())
         {
@@ -112,7 +109,7 @@ bool Chkstat::validateArguments()
 
         if (path.empty() || path[0] != '/')
         {
-            std::cerr << arg->getName() << " must begin with '/'\n";
+            std::cerr << arg->getName() << " must begin with '/'" << std::endl;
             ret = false;
         }
 
@@ -130,7 +127,9 @@ bool Chkstat::validateArguments()
         // considering NAME_MAX characters left is somewhat arbitrary, but
         // staying within these limits should at least allow us to not
         // encounter ENAMETOOLONG in typical setups
-        if (path.length() >= (PATH_MAX - NAME_MAX -1))
+        constexpr auto MAX_CONFIG_ROOT_LEN = (PATH_MAX - NAME_MAX - 1);
+
+        if (path.length() >= MAX_CONFIG_ROOT_LEN)
         {
             std::cerr << m_config_root_path.getName() << ": prefix is too long\n";
             ret = false;
@@ -144,16 +143,16 @@ bool Chkstat::processArguments()
 {
     for (const auto &path: m_examine_paths.getValue())
     {
-        m_checklist.insert(path);
+        m_files_to_check.insert(path);
     }
 
     for (const auto &path: m_file_lists.getValue())
     {
         std::ifstream fs(path);
 
-        if( !fs )
+        if (!fs)
         {
-            std::cerr << m_file_lists.getName() << ": " << path << ": " << strerror(errno) << std::endl;
+            std::cerr << m_file_lists.getName() << ": " << path << ": " << std::strerror(errno) << std::endl;
             return false;
         }
 
@@ -163,7 +162,7 @@ bool Chkstat::processArguments()
         {
             if (line.empty())
                 continue;
-            m_checklist.insert(line);
+            m_files_to_check.insert(line);
         }
     }
 
@@ -182,8 +181,9 @@ bool Chkstat::parseSysconfig()
 
     if (!fs)
     {
-        std::cerr << "error opening " << file << ": " << strerror(errno) << std::endl;
-        return false;
+        // NOTE: the original code tolerates this situation and continues
+        std::cerr << "error opening " << file << ": " << std::strerror(errno) << std::endl;
+        return true;
     }
 
     std::string line;
@@ -218,21 +218,21 @@ bool Chkstat::parseSysconfig()
                 // explicit levels are specified on the command line
                 continue;
 
-            // parse the space separated, ordered list of profiles to apply
-            std::istringstream ss(value);
-            std::string profile;
+            std::vector<std::string> profiles;
+            splitWords(value, profiles);
 
-            while (std::getline(ss, profile, ' '))
+            for (const auto &profile: profiles)
             {
-                if( profile != "local" && !profile.empty() )
+                if (profile != "local" && !profile.empty())
                 {
                     addProfile(profile);
                 }
             }
         }
-        // this setting was last part of the config file template in SLE-11
+        // this setting was last seen in the config file template in SLE-11
         // but we still support it in the code. The logic behind it is quite
-        // complex since it is crossed with the command line settings
+        // complex since it is crossed with the command line settings (also
+        // see logic after the while loop).
         else if (key == "CHECK_PERMISSIONS")
         {
             if (value == "set")
@@ -258,10 +258,14 @@ bool Chkstat::parseSysconfig()
             {
                 m_use_fscaps = false;
             }
+            else
+            {
+                // TODO: no error/warning handling here?
+            }
         }
     }
 
-    // apply the complex CHECK_PERMISSONS logic
+    // apply the complex CHECK_PERMISSIONS logic
     if (!m_apply_changes.isSet() && !m_only_warn.isSet())
     {
         if (check_permissions)
@@ -271,7 +275,7 @@ bool Chkstat::parseSysconfig()
         else
         {
             std::cerr << "permissions handling disabled in " << file << std::endl;
-            exit(0);
+            return false;
         }
     }
 
@@ -312,32 +316,32 @@ void Chkstat::addProfile(const std::string &name)
     m_profiles.push_back(name);
 }
 
-void Chkstat::collectProfiles()
+void Chkstat::collectProfilePaths()
 {
     /*
      * Since configuration files are in the process of separated between stock
      * configuration files in /usr and editable configuration files in /etc we
      * employ a backward compatibility logic here that prefers files in /usr
-     * but also recognized files in /etc.
+     * but also recognizes files in /etc as a fallback.
      */
     const auto &config_root = m_config_root_path.getValue();
 
     const auto usr_root = config_root + "/usr/share/permissions";
     const auto etc_root = config_root + "/etc";
 
-    // 1. central fixed permissions file
+    // first add the central fixed permissions file
     for (const auto &dir: {usr_root, etc_root})
     {
-        const auto common_profile = dir + "/permissions";
-        if (existsFile(common_profile))
+        const auto path = dir + "/permissions";
+        if (existsFile(path))
         {
-            m_profile_paths.push_back(common_profile);
+            m_profile_paths.push_back(path);
             // only use the first one found
             break;
         }
     }
 
-    // 2. central easy, secure paranoid as those are defined by SUSE
+    // continue with predefined well-known profiles
     for (const auto &profile: m_profiles)
     {
         if (!matchesAny(profile, PREDEFINED_PROFILES))
@@ -347,27 +351,28 @@ void Chkstat::collectProfiles()
 
         for (const auto &dir: {usr_root, etc_root})
         {
-            std::string profile_path = dir + base;
+            std::string path = dir + base;
 
-            if (existsFile(profile_path))
+            if (existsFile(path))
             {
-                m_profile_paths.push_back(profile_path);
+                m_profile_paths.push_back(path);
                 // only use the first one found
                 break;
             }
         }
     }
 
-    // 3. package specific permissions
+    // move on to package specific permissions
     // these files are owned by the individual packages
     // therefore while files are being moved from /etc to /usr we need to
     // consider both locations, not only the first matching one like above.
     for (const auto &dir: {usr_root, etc_root})
     {
-        collectPackageProfiles(dir + "/permissions.d");
+        collectPackageProfilePaths(dir + "/permissions.d");
     }
 
-    // 4. central permissions files with user defined level incl. 'local'
+    // finally add user defined permissions including 'local'
+    // these should *only* be found in the /etc area.
     for (const auto &profile: m_profiles)
     {
         if (matchesAny(profile, PREDEFINED_PROFILES))
@@ -382,18 +387,18 @@ void Chkstat::collectProfiles()
     }
 }
 
-void Chkstat::collectPackageProfiles(const std::string &dir)
+void Chkstat::collectPackageProfilePaths(const std::string &dir)
 {
     auto dir_handle = opendir(dir.c_str());
 
     if (!dir_handle)
     {
-        // anything interesting here? probably ENOENT.
+        // TODO: anything interesting here? probably ENOENT.
         return;
     }
 
     struct dirent* entry = nullptr;
-    // first collect a sorted set of base files, skipping unwanted files like
+    // First collect a sorted set of base files, skipping unwanted files like
     // backup files or specific profile files. Therefore filter out duplicates
     // using the sorted set.
     std::set<std::string> files;
@@ -431,14 +436,15 @@ void Chkstat::collectPackageProfiles(const std::string &dir)
     // on
     for (const auto &file: files)
     {
-        const auto seppos = file.find_first_of('.');
-
-        if (seppos != file.npos)
+        if (file.find_first_of('.') != file.npos)
             // we're only interested in base profiles
             continue;
 
         const auto path = dir + "/" + file;
 
+        // NOTE: we already know that the path exist(ed), because it was
+        // returned from the readdir() above. The existence check is racy
+        // anyways so no need to recheck.
         m_profile_paths.push_back(path);
 
         /*
@@ -461,12 +467,14 @@ void Chkstat::collectPackageProfiles(const std::string &dir)
 ProfileEntry&
 Chkstat::addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode)
 {
-    std::string path = file;
-
-    if (!m_root_path.getValue().empty())
+    // use the full path including a potential alternative root directory as
+    // map key
+    std::string path = m_root_path.getValue();
+    if (!path.empty())
     {
-        path = m_root_path.getValue() + '/' + file;
+        path += '/';
     }
+    path += file;
 
     // this overwrites an possibly already existing entry
     // this is intended behaviour, hence the order in which profiles are
@@ -489,36 +497,37 @@ static inline void badProfileLine(const std::string &file, const size_t line, co
 
 bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry *entry)
 {
-        if (!entry)
-        {
-            return false;
-        }
-        else if (hasPrefix(line, "+capabilities "))
-        {
-            if (!m_use_fscaps)
-                // ignore the content
-                return true;
-
-            auto cap_text = line.substr(line.find_first_of(' '));
-            if (cap_text.empty())
-                // ignore empty capability specification
-                return true;
-
-            entry->caps.setFromText(cap_text);
-            return entry->caps.valid();
-        }
-
+    if (!entry)
+    {
         return false;
+    }
+    else if (hasPrefix(line, "+capabilities "))
+    {
+        if (!m_use_fscaps)
+            // ignore the content
+            return true;
+
+        auto cap_text = line.substr(line.find_first_of(' '));
+        if (cap_text.empty())
+            // ignore empty capability specification
+            return true;
+
+        entry->caps.setFromText(cap_text);
+        return entry->caps.valid();
+    }
+
+    return false;
 }
 
-void Chkstat::parseProfile(const std::string &path)
+bool Chkstat::parseProfile(const std::string &path)
 {
     std::ifstream fs(path);
 
     if (!fs)
     {
-        std::cerr << path << ": " << strerror(errno) << std::endl;
-        exit(1);
+        // the file disappeared in the meantime
+        std::cerr << path << ": " << std::strerror(errno) << std::endl;
+        return false;
     }
 
     size_t linenr = 0;
@@ -551,7 +560,7 @@ void Chkstat::parseProfile(const std::string &path)
 
             if (!good)
             {
-                badProfileLine(path, linenr, "lone capaility line, bad capability spec or bad +keyword");
+                badProfileLine(path, linenr, "lone capability line, bad capability spec or bad +keyword");
             }
 
             continue;
@@ -600,24 +609,26 @@ void Chkstat::parseProfile(const std::string &path)
         auto &entry = addProfileEntry(location, user, group, mode_int);
         last_entry = &entry;
     }
+
+    return true;
 }
 
 bool Chkstat::checkHaveProc() const
 {
-    if (m_proc_mount_avail == ProcMountState::PROC_MOUNT_STATE_UNKNOWN)
+    if (m_proc_mount_avail == ProcMountState::UNKNOWN)
     {
-        m_proc_mount_avail = ProcMountState::PROC_MOUNT_STATE_UNAVAIL;
+        m_proc_mount_avail = ProcMountState::UNAVAIL;
         char *pretend_no_proc = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
 
         struct statfs proc;
         int r = statfs("/proc", &proc);
         if (!pretend_no_proc && r == 0 && proc.f_type == PROC_SUPER_MAGIC)
         {
-            m_proc_mount_avail = ProcMountState::PROC_MOUNT_STATE_AVAIL;
+            m_proc_mount_avail = ProcMountState::AVAIL;
         }
     }
 
-    return m_proc_mount_avail == ProcMountState::PROC_MOUNT_STATE_AVAIL;
+    return m_proc_mount_avail == ProcMountState::AVAIL;
 }
 
 void Chkstat::printHeader()
@@ -650,8 +661,9 @@ void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContex
         std::cout << " \"" << entry.caps.toText() << "\".";
     }
 
-    std::cout << " (";
     bool need_comma = false;
+
+    std::cout << " (";
 
     if (ctx.need_fix_ownership)
     {
@@ -767,7 +779,7 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
     return good;
 }
 
-bool Chkstat::isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx) const
+bool Chkstat::isSafeToApply(const ProfileEntry &entry, const EntryContext &ctx) const
 {
     // don't allow high privileges for unusual file types
     if ((entry.hasCaps() || entry.hasSetXID()) && !ctx.status.isRegular() && !ctx.status.isDirectory())
@@ -797,7 +809,7 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     {
         if (chown(ctx.fd_path.c_str(), ctx.uid, ctx.gid) != 0)
         {
-            std::cerr << ctx.subpath << ": chown: " << strerror(errno) << std::endl;
+            std::cerr << ctx.subpath << ": chown: " << std::strerror(errno) << std::endl;
             ret = false;
         }
     }
@@ -808,7 +820,7 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     {
         if (chmod(ctx.fd_path.c_str(), entry.mode) != 0)
         {
-            std::cerr << ctx.subpath << ": chmod: " << strerror(errno) << std::endl;
+            std::cerr << ctx.subpath << ": chmod: " << std::strerror(errno) << std::endl;
             ret = false;
         }
     }
@@ -819,12 +831,12 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     {
         if (ctx.status.isRegular())
         {
-            // cap_set_file() tries to be helpful and does a lstat() to check that it isn't called on
+            // cap_set_file() tries to be helpful and does an lstat() to check that it isn't called on
             // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-            FileDescGuard cap_fd( open(ctx.fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
+            FileDesc cap_fd( open(ctx.fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY) );
             if (!cap_fd.valid())
             {
-                std::cerr << ctx.subpath << ": open() for changing capabilities: " << strerror(errno) << std::endl;
+                std::cerr << ctx.subpath << ": open() for changing capabilities: " << std::strerror(errno) << std::endl;
                 ret = false;
             }
             else if (!entry.caps.applyToFD(cap_fd.get()))
@@ -832,7 +844,7 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
                 // ignore ENODATA when clearing caps - it just means there were no caps to remove
                 if (errno != ENODATA || entry.hasCaps())
                 {
-                    std::cerr << ctx.subpath << ": cap_set_fd: " << strerror(errno) << std::endl;
+                    std::cerr << ctx.subpath << ": cap_set_fd: " << std::strerror(errno) << std::endl;
                     ret = false;
                 }
             }
@@ -855,8 +867,8 @@ static inline std::string& stripTrailingSlashes(std::string &s)
 bool Chkstat::safeOpen(EntryContext &ctx)
 {
     size_t link_count = 0;
-    FileDescGuard pathfd;
-    FileDescGuard parentfd;
+    FileDesc pathfd;
+    FileDesc parentfd;
     FileStatus root_status;
     bool is_final_path_element = false;
     const auto &altroot = m_root_path.getValue();
@@ -876,7 +888,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
 
             if (pathfd.invalid())
             {
-                std::cerr << root << ": failed to open root directory: " << strerror(errno) << std::endl;
+                std::cerr << root << ": failed to open root directory: " << std::strerror(errno) << std::endl;
                 return false;
             }
 
@@ -912,7 +924,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             // TODO: shouldn't there be some error handling here? ENOENT is
             // probably to be tolerated when packages aren't installed, but
             // what about e.g. EACCES or other errors?
-            if( tmpfd == -1 )
+            if (tmpfd == -1)
                 return false;
             pathfd.set(tmpfd);
         }
@@ -1022,7 +1034,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
     return true;
 }
 
-std::string Chkstat::getPathFromProc(const FileDescGuard &fd) const
+std::string Chkstat::getPathFromProc(const FileDesc &fd) const
 {
     std::string linkpath;
     auto procpath = std::string("/proc/self/fd/") + std::to_string(fd.get());
@@ -1049,15 +1061,15 @@ int Chkstat::processEntries()
 
     if (m_apply_changes.isSet() && !checkHaveProc())
     {
-        std::cerr << "ERROR: /proc is not available - unable to fix policy violations." << std::endl;
+        std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
         errors++;
         m_apply_changes.setValue(false);
     }
 
     for (auto &pair: m_profile_entries)
     {
-        // these needs to be non-const currently, because further below the
-        // capability logic is modifying entry properties on the fly.
+        // this needs to be non-const currently, because further below the
+        // getCapabilities logic is modifying entry properties on the fly.
         auto &entry = pair.second;
         ctx.reset();
         ctx.subpath = entry.file.substr(m_root_path.getValue().length());
@@ -1101,7 +1113,7 @@ int Chkstat::processEntries()
             errors++;
         }
 
-        ctx.checkNeedFixed(entry);
+        ctx.check(entry);
 
         if (!ctx.needsFixing())
             // nothing to do
@@ -1116,7 +1128,7 @@ int Chkstat::processEntries()
         if (!m_apply_changes.isSet())
             continue;
 
-        if (!isSafeToChange(entry, ctx))
+        if (!isSafeToApply(entry, ctx))
         {
             errors++;
             continue;
@@ -1149,25 +1161,25 @@ int Chkstat::processEntries()
 int Chkstat::run()
 {
     if (!validateArguments())
-    {
         return 2;
-    }
 
     if (!processArguments())
-    {
         return 1;
-    }
 
     if (m_system_mode.isSet())
     {
-        parseSysconfig();
+        if (!parseSysconfig())
+            // NOTE: the original code considers this a non-error situation
+            return 0;
+
         if (m_force_level_list.isSet())
         {
-            std::istringstream ss(m_force_level_list.getValue());
-            std::string line;
-            while (std::getline(ss, line))
+            std::vector<std::string> profiles;
+            splitWords(m_force_level_list.getValue(), profiles);
+
+            for (const auto &profile: profiles)
             {
-                addProfile(line);
+                addProfile(profile);
             }
         }
 
@@ -1181,10 +1193,10 @@ int Chkstat::run()
 
         for (const auto &path: m_input_args.getValue())
         {
-            m_checklist.insert(path);
+            m_files_to_check.insert(path);
         }
 
-        collectProfiles();
+        collectProfilePaths();
     }
     else
     {
@@ -1209,13 +1221,15 @@ int Chkstat::run()
 
     for (const auto &profile_path: m_profile_paths)
     {
-        parseProfile(profile_path);
+        if (!parseProfile(profile_path))
+        {
+            return 1;
+        }
     }
-
 
     // check whether explicitly listed files are actually configured in
     // profiles
-    for( const auto &path: m_checklist )
+    for (const auto &path: m_files_to_check)
     {
         // TODO: both here and in needToCheck() the command line arguments are
         // not checked for trailing slashes. For directories the profile

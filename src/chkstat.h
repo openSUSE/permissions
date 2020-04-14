@@ -14,9 +14,12 @@
 #include <map>
 #include <set>
 #include <string>
-#include <string_view>
 #include <vector>
 
+/**
+ * \brief
+ *  Represents a single permissiosn profile entry
+ **/
 struct ProfileEntry
 {
     std::string file;
@@ -36,7 +39,7 @@ struct ProfileEntry
 
 /**
  * \brief
- *  scratch data used while processing individual profile entries in
+ *  Scratch data used while processing an individual ProfileEntry in
  *  processEntries()
  **/
 struct EntryContext
@@ -47,7 +50,7 @@ struct EntryContext
     gid_t gid;
     //! the path of the current file to check below a potential m_root_path
     std::string subpath;
-    //! a path for safely opening the target file (typically in ///proc/self/fd/...)
+    //! a path for safely opening the target file (typically in /proc/self/fd/...)
     std::string fd_path;
     //! the actual capabilities found on on the file
     FileCapabilities caps;
@@ -64,7 +67,7 @@ struct EntryContext
     bool traversed_insecure;
     //! an O_PATH file descriptor for the target file which is set in
     //! safeOpen()
-    FileDescGuard fd;
+    FileDesc fd;
 
     explicit EntryContext()
     {
@@ -92,7 +95,7 @@ struct EntryContext
     }
 
     //! based on the given \c entry sets need_fix_* members as required
-    void checkNeedFixed(const ProfileEntry &entry)
+    void check(const ProfileEntry &entry)
     {
         need_fix_perms = status.getModeBits() != entry.mode;
         need_fix_ownership = !status.matchesOwnership(this->uid, this->gid);
@@ -115,9 +118,9 @@ struct EntryContext
 enum class ProcMountState
 {
     //! status was not investigated yet
-    PROC_MOUNT_STATE_UNKNOWN,
-    PROC_MOUNT_STATE_AVAIL,
-    PROC_MOUNT_STATE_UNAVAIL,
+    UNKNOWN,
+    AVAIL,
+    UNAVAIL,
 };
 
 /**
@@ -148,12 +151,12 @@ protected: // functions
 
     bool needToCheck(const std::string &path) const
     {
-        if (m_checklist.empty())
+        if (m_files_to_check.empty())
             // all paths should be checked
             return true;
 
         // otherwise only if the path is explicitly listed
-        return m_checklist.find(path) != m_checklist.end();
+        return m_files_to_check.find(path) != m_files_to_check.end();
     }
 
     bool parseSysconfig();
@@ -174,25 +177,25 @@ protected: // functions
      *      Collects all profiles configured in m_profiles from /usr and /etc
      *      system directories and stores their paths in m_profile_paths.
      **/
-    void collectProfiles();
+    void collectProfilePaths();
 
     /**
      * \brief
      *      Collects configured per-package profiles from the given directory
      **/
-    void collectPackageProfiles(const std::string &dir);
+    void collectPackageProfilePaths(const std::string &dir);
 
     /**
      * \brief
      *      Parses the given profile file and stores the according entries in
      *      m_profile_entries
      **/
-    void parseProfile(const std::string &path);
+    bool parseProfile(const std::string &path);
 
     /**
      * \brief
      *      Parses extra "+capabilities" lines in permission profiles
-     * \param[in] line 
+     * \param[in] line
      *      The input line from a profile file that starts with "+"
      * \param[inout] entry
      *      The last ProfileEntry that was previously parsed from the profile
@@ -236,10 +239,10 @@ protected: // functions
 
     //! performs checks whether it is safe to adjust the actual file given the
     //! collected information
-    bool isSafeToChange(const ProfileEntry &entry, const EntryContext &ctx) const;
+    bool isSafeToApply(const ProfileEntry &entry, const EntryContext &ctx) const;
 
     //! actually perform the necessary changes for the actual file to arrive
-    //! and the configuration given in \c entry.
+    //! at the configuration given in \c entry.
     bool applyChanges(const ProfileEntry &entry, const EntryContext &ctx) const;
 
     /**
@@ -270,7 +273,7 @@ protected: // functions
      *      Resolves the file system path for the given file descriptor via
      *      /proc/self/fd
      **/
-    std::string getPathFromProc(const FileDescGuard &fd) const;
+    std::string getPathFromProc(const FileDesc &fd) const;
 
 protected: // data
 
@@ -305,9 +308,9 @@ protected: // data
     TCLAP::UnlabeledMultiArg<std::string> m_input_args;
 
     //! optional explicit set of files to check
-    std::set<std::string> m_checklist;
+    std::set<std::string> m_files_to_check;
     //! whether to touch file based capabilities. influenced by command line
-    //! and sysconfig configuration file
+    //! parameters and sysconfig configuration file
     bool m_use_fscaps = true;
 
     //! the default, predefined profile names shipped with permissions
@@ -326,7 +329,7 @@ protected: // data
     //! the effective user ID we're running as
     const uid_t m_euid;
 
-    mutable ProcMountState m_proc_mount_avail = ProcMountState::PROC_MOUNT_STATE_UNKNOWN;
+    mutable ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
 };
 
 #endif // inc. guard

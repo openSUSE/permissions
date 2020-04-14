@@ -2,8 +2,8 @@
 #define CHKSTAT_UTILITY_H
 
 // POSIX
-#include <sys/stat.h>
 #include <sys/capability.h>
+#include <sys/stat.h>
 
 // third party
 #include <tclap/CmdLine.h>
@@ -48,8 +48,8 @@ public:
 // therefore provide a wrapper
 inline bool chkspace(char c) { return std::isspace(c); }
 
-//! remove leading characters characters from the given string, by default
-//! whitespace characters
+//! remove certain leading characters from the given string (by default
+//! whitespace characters)
 template <typename UNARY = bool(char)>
 inline std::string& lstrip(std::string &s, UNARY f = chkspace)
 {
@@ -69,8 +69,8 @@ inline std::string& lstrip(std::string &s, UNARY f = chkspace)
     return s;
 }
 
-//! remove trailing characters from the given string, by default
-//! whitespace characters
+//! remove certain trailing characters from the given string (by default
+//! whitespace characters)
 template <typename UNARY = bool(char)>
 inline std::string& rstrip(std::string &s, UNARY f = chkspace)
 {
@@ -79,8 +79,8 @@ inline std::string& rstrip(std::string &s, UNARY f = chkspace)
     return s;
 }
 
-//! remove leading and trailing characters from the given string, by
-//! default whitespace characters
+//! remove certain leading and trailing characters from the given string (by
+//! default whitespace characters)
 template <typename UNARY = bool(char)>
 std::string& strip(std::string &s, UNARY f = chkspace)
 {
@@ -116,7 +116,13 @@ bool matchesAny(const T &val, const SEQ &seq)
     return false;
 }
 
-//! performs a file existence test for the given path
+/**
+ * \brief
+ *  Performs a file existence test for the given path
+ * \details
+ *  This check only returns \c true for non-directory file types and if
+ *  permission to open the file for reading is granted.
+ **/
 bool existsFile(const std::string &path);
 
 template <typename T1, typename T2>
@@ -142,33 +148,40 @@ bool stringToUnsigned(const std::string &s, T &out, const size_t base = 10)
     return true;
 }
 
-//! a helper class that wraps a plain POSIX file descriptor and makes sure it
-//! gets closed at descruction/assignment time
-class FileDescGuard
+/**
+ * \brief
+ *  Helper class that wraps a plain POSIX file descriptor
+ * \details
+ *  This wrapper takes care of closing the file descriptor upon destruction
+ *  time.
+ **/
+class FileDesc
 {
 public:
 
-    explicit FileDescGuard(int fd = -1) :
+    explicit FileDesc(int fd = -1) :
         m_fd(fd)
     {}
 
-    FileDescGuard(FileDescGuard &&other)
+    FileDesc(FileDesc&&other)
     {
         // steal the rvalue's file descriptor so we take over ownership, while
-        // the other doesn't close it during destruction.
+        // the other doesn't close it during destruction. This allows to keep
+        // this non-copyable type in containers.
         m_fd = other.get();
         other.invalidate();
     }
-    FileDescGuard(const FileDescGuard &other) = delete;
-    FileDescGuard& operator=(const FileDescGuard &other) = delete;
 
-    ~FileDescGuard()
+    ~FileDesc()
     {
         if (valid())
         {
             close();
         }
     }
+
+    FileDesc(const FileDesc &other) = delete;
+    FileDesc& operator=(const FileDesc &other) = delete;
 
     int get() const { return m_fd; }
 
@@ -182,7 +195,7 @@ public:
         m_fd = fd;
     }
 
-    void steal(FileDescGuard &other)
+    void steal(FileDesc &other)
     {
         set(other.get());
         other.invalidate();
@@ -192,6 +205,7 @@ public:
     bool invalid() const { return !valid(); }
     void invalidate() { m_fd = -1; }
 
+    //! explicitly close and invalidate() the currently stored file descriptor
     void close();
 
 protected:
@@ -239,8 +253,6 @@ public:
     {
         return ::fstat(fd, this) == 0;
     }
-
-protected:
 };
 
 //! a wrapper around the native cap_t type to ease memory management
@@ -248,17 +260,19 @@ class FileCapabilities
 {
 public:
 
-    ~FileCapabilities();
-
     explicit FileCapabilities() {}
+
+    ~FileCapabilities();
 
     FileCapabilities(FileCapabilities &&other)
     {
         // steal the rvalue's caps so we take over ownership, while
-        // the other doesn't free them during destruction.
+        // the other doesn't free them during destruction. This allows to keep
+        // this non-copyable type in containers.
         m_caps = other.m_caps;
         other.invalidate();
     }
+
     FileCapabilities(const FileCapabilities &other) = delete;
     FileCapabilities& operator=(const FileCapabilities &other) = delete;
 
@@ -271,6 +285,7 @@ public:
     bool valid() const { return m_caps != nullptr; }
     void invalidate() { m_caps = nullptr; }
 
+    //! explicitly free and invalidate() the currently stored capabilities
     void destroy();
 
     cap_t raw() { return m_caps; }
