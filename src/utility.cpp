@@ -56,7 +56,7 @@ void FileDesc::close()
     {
         std::cerr << "Closing FD " << m_fd << ": " << strerror(errno) << std::endl;
     }
-    
+
     invalidate();
 }
 
