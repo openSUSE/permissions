@@ -958,7 +958,7 @@ class TestBase:
 		color_printer.reset()
 		self.m_warnings += 1
 
-	def complainOnNoSubIdSupport(self):
+	def complainOnMissingSubIdSupport(self):
 		if self.m_main_test_instance.haveSubIdSupport():
 			return False
 
@@ -1190,7 +1190,7 @@ class TestCorrectOwner(TestBase):
 
 	def run(self):
 
-		if self.complainOnNoSubIdSupport():
+		if self.complainOnMissingSubIdSupport():
 			# we need sub-uids to test ownership changes
 			return
 
@@ -1203,22 +1203,24 @@ class TestCorrectOwner(TestBase):
 
 		# we need a defined order of execution here, therefore
 		# iterate over the sorted dictionary keys.
+		# (in newer Python versions 3.6/3.7 dictionaries are sorted by
+		# insertion order by default. Still stay backward compatible
+		# for the moment.)
 		#
 		# we start out from 0:0 and downgrade first to 0:1 then to 1:1
 		# to avoid triggering the "refusing to correct" logic in
 		# chkstat.
 		owners = {
-			"easy": ("0", "0"),
-			"paranoid": ("0", "1"),
-			"secure": ("1", "1"),
+			"easy": (0, 0),
+			"paranoid": (0, 1),
+			"secure": (1, 1),
 		}
 
 		entries = {}
 
 		for profile in sorted(owners.keys()):
 			user, group = owners[profile]
-			lines = entries.setdefault(profile, [])
-			lines.append( self.buildProfileLine(testdir, 0o775, owner = user, group = group) )
+			entries[profile] = [ self.buildProfileLine(testdir, 0o775, owner = user, group = group) ]
 
 		self.addProfileEntries(entries)
 
@@ -1952,7 +1954,7 @@ class TestRejectUserSymlink(TestBase):
 
 	def run(self):
 
-		if self.complainOnNoSubIdSupport():
+		if self.complainOnMissingSubIdSupport():
 			return
 
 		testroot = self.createAndGetTestDir(0o755)

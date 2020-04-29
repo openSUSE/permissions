@@ -48,10 +48,12 @@ public:
 // therefore provide a wrapper
 inline bool chkspace(char c) { return std::isspace(c); }
 
+inline bool chkslash(char c) { return c == '/'; }
+
 //! remove certain leading characters from the given string (by default
 //! whitespace characters)
 template <typename UNARY = bool(char)>
-inline std::string& lstrip(std::string &s, UNARY f = chkspace)
+inline void lstrip(std::string &s, UNARY f = chkspace)
 {
     auto nonmatch_it = s.end();
 
@@ -65,27 +67,24 @@ inline std::string& lstrip(std::string &s, UNARY f = chkspace)
     }
 
     s = s.substr(static_cast<size_t>(nonmatch_it - s.begin()));
-
-    return s;
 }
 
 //! remove certain trailing characters from the given string (by default
 //! whitespace characters)
 template <typename UNARY = bool(char)>
-inline std::string& rstrip(std::string &s, UNARY f = chkspace)
+inline void rstrip(std::string &s, UNARY f = chkspace)
 {
     while( !s.empty() && f(*s.rbegin()) )
         s.pop_back();
-    return s;
 }
 
 //! remove certain leading and trailing characters from the given string (by
 //! default whitespace characters)
 template <typename UNARY = bool(char)>
-std::string& strip(std::string &s, UNARY f = chkspace)
+void strip(std::string &s, UNARY f = chkspace)
 {
     lstrip(s, f);
-    return rstrip(s, f);
+    rstrip(s, f);
 }
 
 //! checks whether the given string has the given prefix
@@ -120,8 +119,8 @@ bool matchesAny(const T &val, const SEQ &seq)
  * \brief
  *  Performs a file existence test for the given path
  * \details
- *  This check only returns \c true for non-directory file types and if
- *  permission to open the file for reading is granted.
+ *  This check only returns \c true if the given file or directory exists and
+ *  the current process has read access permissions for it.
  **/
 bool existsFile(const std::string &path);
 
@@ -163,13 +162,13 @@ public:
         m_fd(fd)
     {}
 
-    FileDesc(FileDesc&&other)
+    FileDesc(FileDesc &&other) :
+        FileDesc()
     {
         // steal the rvalue's file descriptor so we take over ownership, while
         // the other doesn't close it during destruction. This allows to keep
         // this non-copyable type in containers.
-        m_fd = other.get();
-        other.invalidate();
+        steal(other);
     }
 
     ~FileDesc()
@@ -219,13 +218,30 @@ class FileStatus :
 {
 public:
 
+    FileStatus() :
+        // zero initialize the `struct stat` using aggregate initialization
+        // of the base class
+        ::stat{}
+    {}
+
+    FileStatus(const FileStatus &other)
+    {
+        *this = other;
+    }
+
+    FileStatus& operator=(const FileStatus &other)
+    {
+        *static_cast<struct stat*>(this) = other;
+        return *this;
+    }
+
     bool isLink() const { return S_ISLNK(this->st_mode); }
     bool isRegular() const { return S_ISREG(this->st_mode); }
     bool isDirectory() const { return S_ISDIR(this->st_mode); }
 
     //! returns the file mode bits portion consisting of the permission bits
     //! plus any special bits like setXid but not the file type bits
-    auto getModeBits() const { return this->st_mode & 07777; }
+    auto getModeBits() const { return this->st_mode & ALLPERMS; }
 
     bool matchesOwnership(const uid_t uid, const gid_t gid) const
     {
@@ -244,14 +260,9 @@ public:
         return (this->st_mode & S_IWOTH) != 0;
     }
 
-    void copy(const struct stat &other)
+    bool fstat(const FileDesc &fd)
     {
-        std::memcpy(this, &other, sizeof(*this));
-    }
-
-    bool fstat(int fd)
-    {
-        return ::fstat(fd, this) == 0;
+        return ::fstat(fd.get(), this) == 0;
     }
 };
 
@@ -282,8 +293,13 @@ public:
         return !(*this == other);
     }
 
+    // TODO: the code currently inconsistently uses `valid()` for testing for
+    // emptyness in a lot of spots. But `valid()` can mean both: no
+    // capabilities existing or an other error occured. `errno` needs to be
+    // inspected for this to correctly differentiate.
+    // This class's API and the client code should be adjusted to make the
+    // difference clear and the logic robust.
     bool valid() const { return m_caps != nullptr; }
-    void invalidate() { m_caps = nullptr; }
 
     //! explicitly free and invalidate() the currently stored capabilities
     void destroy();
@@ -321,7 +337,11 @@ public:
      **/
     std::string toText() const;
 
-protected:
+protected: // functions
+
+    void invalidate() { m_caps = nullptr; }
+
+protected: // data
 
      cap_t m_caps = nullptr;
 };

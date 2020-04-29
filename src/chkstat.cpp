@@ -39,6 +39,7 @@
 #include "utility.h"
 
 // C++
+#include <cassert>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -75,6 +76,7 @@ bool Chkstat::validateArguments()
     // the user, not just bit by bit complaining.
     bool ret = true;
 
+    // check for mutually exclusive command line arguments
     const auto xor_args = {
         std::make_pair(&m_system_mode, static_cast<TCLAP::SwitchArg*>(&m_apply_changes)),
         {&m_force_fscaps, &m_disable_fscaps},
@@ -113,27 +115,8 @@ bool Chkstat::validateArguments()
             ret = false;
         }
 
-        while (*path.rbegin() == '/')
-        {
-            // remove trailing slashes to normalize arguments
-            path.pop_back();
-        }
-    }
-
-    if (m_config_root_path.isSet())
-    {
-        const auto &path = m_config_root_path.getValue();
-
-        // considering NAME_MAX characters left is somewhat arbitrary, but
-        // staying within these limits should at least allow us to not
-        // encounter ENAMETOOLONG in typical setups
-        constexpr auto MAX_CONFIG_ROOT_LEN = (PATH_MAX - NAME_MAX - 1);
-
-        if (path.length() >= MAX_CONFIG_ROOT_LEN)
-        {
-            std::cerr << m_config_root_path.getName() << ": prefix is too long\n";
-            ret = false;
-        }
+        // remove trailing slashes to normalize arguments
+        rstrip(path, chkslash);
     }
 
     return ret;
@@ -169,9 +152,9 @@ bool Chkstat::processArguments()
     return true;
 }
 
-static inline std::string& stripQuotes(std::string &s)
+static inline void stripQuotes(std::string &s)
 {
-    return strip(s, [](char c) { return c == '"' || c == '\''; });
+    strip(s, [](char c) { return c == '"' || c == '\''; });
 }
 
 bool Chkstat::parseSysconfig()
@@ -181,14 +164,14 @@ bool Chkstat::parseSysconfig()
 
     if (!fs)
     {
-        // NOTE: the original code tolerates this situation and continues
+        // NOTE: the original code tolerated this situation and continued
+        // A system would need to be very broken to get here, therefore make
+        // it an error condition instead.
         std::cerr << "error opening " << file << ": " << std::strerror(errno) << std::endl;
-        return true;
+        return false;
     }
 
     std::string line;
-    std::string key;
-    std::string value;
     size_t linenr = 0;
     bool check_permissions = true;
 
@@ -208,9 +191,9 @@ bool Chkstat::parseSysconfig()
             continue;
         }
 
-        key = line.substr(0, sep);
-        value = line.substr(sep + 1);
-        value = stripQuotes(value);
+        auto key = line.substr(0, sep);
+        auto value = line.substr(sep + 1);
+        stripQuotes(value);
 
         if (key == "PERMISSION_SECURITY")
         {
@@ -229,10 +212,11 @@ bool Chkstat::parseSysconfig()
                 }
             }
         }
+        // REMOVEME:
         // this setting was last seen in the config file template in SLE-11
         // but we still support it in the code. The logic behind it is quite
-        // complex since it is crossed with the command line settings (also
-        // see logic after the while loop).
+        // complex since it is interlocked with the command line settings
+        // (also see logic after the while loop).
         else if (key == "CHECK_PERMISSIONS")
         {
             if (value == "set")
@@ -260,7 +244,9 @@ bool Chkstat::parseSysconfig()
             }
             else
             {
-                // TODO: no error/warning handling here?
+                // NOTE: this was not a warning/error condition in the
+                // original code
+                std::cerr << file << ":" << linenr << ": invalid value for " << key << " (expected 'yes' or 'no'). Falling back to default value." << std::endl;
             }
         }
     }
@@ -284,6 +270,9 @@ bool Chkstat::parseSysconfig()
 
 bool Chkstat::checkFsCapsSupport() const
 {
+    // REMOVEME: this check is really old and should be dropped, today's
+    // kernels all support capabilities.
+
     /* check kernel capability support /sys/kernel/fscaps, 2.6.39 */
     std::ifstream fs("/sys/kernel/fscaps");
 
@@ -328,6 +317,12 @@ void Chkstat::collectProfilePaths()
 
     const auto usr_root = config_root + "/usr/share/permissions";
     const auto etc_root = config_root + "/etc";
+
+    // TODO: the current code only checks for an existing and readable file
+    // object in a racy fashion. The logic would also continue if the file
+    // objects are actually directories. It would be cleaner and more robust
+    // to open the paths right away and `fstat()` them, keeping the open file
+    // descriptors around for future processing.
 
     // first add the central fixed permissions file
     for (const auto &dir: {usr_root, etc_root})
@@ -442,9 +437,6 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir)
 
         const auto path = dir + "/" + file;
 
-        // NOTE: we already know that the path exist(ed), because it was
-        // returned from the readdir() above. The existence check is racy
-        // anyways so no need to recheck.
         m_profile_paths.push_back(path);
 
         /*
@@ -545,7 +537,7 @@ bool Chkstat::parseProfile(const std::string &path)
     while (std::getline(fs, line))
     {
         linenr++;
-        line = strip(line);
+        strip(line);
 
         // don't know exactly why the dollar is also ignored, probably some
         // dark legacy.
@@ -600,7 +592,7 @@ bool Chkstat::parseProfile(const std::string &path)
         const auto &location = parts[0];
         const auto &mode = parts[2];
 
-        if (!stringToUnsigned(mode, mode_int, 8) || mode_int > 07777)
+        if (!stringToUnsigned(mode, mode_int, 8) || mode_int > ALLPERMS)
         {
             badProfileLine(path, linenr, "bad mode specification");
             continue;
@@ -687,6 +679,8 @@ void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContex
         {
             std::cout << ", ";
         }
+        // TODO: this tests for emptyness rather than validity, should be
+        // adjusted, see FileCapabilities::valid().
         if (ctx.caps.valid())
         {
             std::cout << "wrong capabilities \"" << ctx.caps.toText() << "\"";
@@ -704,6 +698,8 @@ bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx)
 {
     ctx.caps.setFromFile(ctx.fd_path);
 
+    // TODO: need to differentiate between "no caps existing" and "error
+    // fetching capabilities", see FileCapabilities::valid()
     if (!ctx.caps.valid())
     {
         if (!entry.hasCaps())
@@ -859,9 +855,9 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     return ret;
 }
 
-static inline std::string& stripTrailingSlashes(std::string &s)
+static inline void stripTrailingSlashes(std::string &s)
 {
-    return rstrip(s, [](char c) { return c == '/'; });
+    rstrip(s, [](char c) { return c == '/'; });
 }
 
 bool Chkstat::safeOpen(EntryContext &ctx)
@@ -872,9 +868,9 @@ bool Chkstat::safeOpen(EntryContext &ctx)
     FileStatus root_status;
     bool is_final_path_element = false;
     const auto &altroot = m_root_path.getValue();
+    const auto root = altroot.empty() ? std::string("/") : altroot;
     std::string path_rest = ctx.subpath;
     std::string component;
-    std::string link;
 
     ctx.traversed_insecure = false;
     ctx.fd.close();
@@ -883,7 +879,6 @@ bool Chkstat::safeOpen(EntryContext &ctx)
     {
         if (pathfd.invalid())
         {
-            const auto root = altroot.empty() ? std::string("/") : altroot;
             pathfd.set( open(root.c_str(), O_PATH | O_CLOEXEC) );
 
             if (pathfd.invalid())
@@ -892,16 +887,17 @@ bool Chkstat::safeOpen(EntryContext &ctx)
                 return false;
             }
 
-            if (!root_status.fstat(pathfd.get()))
+            if (!root_status.fstat(pathfd))
             {
                 std::cerr << root << ": failed to fstat root directory: " << root << std::endl;
                 return false;
             }
             // status and pathfd must be in sync for the root-escape check below
-            ctx.status.copy(root_status);
+            ctx.status = root_status;
         }
 
         // make out the leading path component
+        assert(path_rest[0] == '/');
         auto sep = path_rest.find_first_of('/', 1);
         component = path_rest.substr(1, sep - 1);
         // strip the leading path component
@@ -929,7 +925,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             pathfd.set(tmpfd);
         }
 
-        if (!ctx.status.fstat(pathfd.get()))
+        if (!ctx.status.fstat(pathfd))
             // TODO: this is also a strange case, should be complained about
             return false;
 
@@ -941,7 +937,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
         {
             ctx.traversed_insecure = true;
         }
-        // path is in a world-writable directory, or file is world-writable itself.
+        // path is in a world-writable directory
         else if (!ctx.status.isLink() && ctx.status.isWorldWritable() && !is_final_path_element)
         {
             ctx.traversed_insecure = true;
@@ -981,10 +977,10 @@ bool Chkstat::safeOpen(EntryContext &ctx)
                 return false;
             }
 
-            link.resize(PATH_MAX);
-            const auto len = ::readlinkat(pathfd.get(), "", &link[0], link.size() - 1);
+            std::string link(PATH_MAX, '\0');
+            const auto len = ::readlinkat(pathfd.get(), "", &link[0], link.size());
 
-            if (len <= 0 || static_cast<size_t>(len) >= link.size() - 1)
+            if (len <= 0 || static_cast<size_t>(len) >= link.size())
                 // TODO: would an error read the link not warrant a complaint?
                 return false;
 
@@ -1010,6 +1006,10 @@ bool Chkstat::safeOpen(EntryContext &ctx)
                 {
                     pathfd.set( dup(parentfd.get()) );
                 }
+
+                // prefix the path with a slash to fulfill the expectations of
+                // the loop body (see assert above)
+                link.insert( link.begin(), '/' );
             }
 
             path_rest = link + path_rest;
@@ -1036,15 +1036,13 @@ bool Chkstat::safeOpen(EntryContext &ctx)
 
 std::string Chkstat::getPathFromProc(const FileDesc &fd) const
 {
-    std::string linkpath;
+    std::string linkpath(PATH_MAX, '\0');
     auto procpath = std::string("/proc/self/fd/") + std::to_string(fd.get());
 
-    linkpath.resize(PATH_MAX);
-
-    ssize_t l = readlink(procpath.c_str(), &linkpath[0], linkpath.size() - 1);
+    ssize_t l = readlink(procpath.c_str(), &linkpath[0], linkpath.size());
     if (l > 0)
     {
-        linkpath.resize( std::min(static_cast<size_t>(l), linkpath.size() - 1) );
+        linkpath.resize( std::min(static_cast<size_t>(l), linkpath.size()) );
     }
     else
     {
@@ -1056,7 +1054,6 @@ std::string Chkstat::getPathFromProc(const FileDesc &fd) const
 
 int Chkstat::processEntries()
 {
-    EntryContext ctx;
     size_t errors = 0;
 
     if (m_apply_changes.isSet() && !checkHaveProc())
@@ -1066,12 +1063,15 @@ int Chkstat::processEntries()
         m_apply_changes.setValue(false);
     }
 
-    for (auto &pair: m_profile_entries)
+    // TODO:
+    // entry needs to be non-const currently, because further below the
+    // getCapabilities logic is modifying its properties on the fly.
+    //
+    // This should be changed, ProfileEntry should only represent the data
+    // found in the profiles, not data modified by program logic underway.
+    for (auto& [path, entry]: m_profile_entries)
     {
-        // this needs to be non-const currently, because further below the
-        // getCapabilities logic is modifying entry properties on the fly.
-        auto &entry = pair.second;
-        ctx.reset();
+        EntryContext ctx;
         ctx.subpath = entry.file.substr(m_root_path.getValue().length());
 
         if (!needToCheck(ctx.subpath))
@@ -1104,7 +1104,7 @@ int Chkstat::processEntries()
             // fall back to plain path-access for read-only operation. (this
             // much is fine)
             // we only report errors below, m_apply_changes is set to false by
-            // the login above.
+            // the logic above.
             ctx.fd_path = entry.file;
         }
 

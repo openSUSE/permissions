@@ -16,15 +16,7 @@
 
 bool existsFile(const std::string &path)
 {
-    int fd = open(path.c_str(), O_RDONLY);
-
-    if (fd != -1)
-    {
-        close(fd);
-        return true;
-    }
-
-    return false;
+    return access(path.c_str(), R_OK) == 0;
 }
 
 void splitWords(const std::string &input, std::vector<std::string> &words)
