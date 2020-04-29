@@ -25,7 +25,7 @@ struct ProfileEntry
     std::string file;
     std::string owner;
     std::string group;
-    mode_t mode;
+    mode_t mode = 0;
     FileCapabilities caps;
 
     bool hasCaps() const { return caps.valid(); }
@@ -45,9 +45,9 @@ struct ProfileEntry
 struct EntryContext
 {
     //! the resolved user-id corresponding to the active ProfileEntry
-    uid_t uid;
+    uid_t uid = (uid_t)-1;
     //! the resolved group-id corresponding to the active ProfileEntry
-    gid_t gid;
+    gid_t gid = (gid_t)-1;
     //! the path of the current file to check below a potential m_root_path
     std::string subpath;
     //! a path for safely opening the target file (typically in /proc/self/fd/...)
@@ -57,42 +57,17 @@ struct EntryContext
     //! the actual file status info found on the file
     FileStatus status;
     //! indicates whether actual file permissions need to be fixed
-    bool need_fix_perms;
+    bool need_fix_perms = false;
     //! indicates whether actual file capabilities need to be fixed
-    bool need_fix_caps;
+    bool need_fix_caps = false;
     //! indicates whether actual file user:group ownership needs to be fixed
-    bool need_fix_ownership;
+    bool need_fix_ownership = false;
     //! safeOpen() flags this when it detects an insecure ownership
     //! constellation in the file's path.
-    bool traversed_insecure;
+    bool traversed_insecure = false;
     //! an O_PATH file descriptor for the target file which is set in
     //! safeOpen()
     FileDesc fd;
-
-    explicit EntryContext()
-    {
-        reset();
-    }
-
-    void reset()
-    {
-        uid = (uid_t)-1;
-        gid = (gid_t)-1;
-        subpath.clear();
-        fd_path.clear();
-        if (caps.valid())
-        {
-            caps.destroy();
-        }
-        need_fix_perms = false;
-        need_fix_caps = false;
-        need_fix_ownership = false;
-        traversed_insecure = false;
-        if (fd.valid())
-        {
-            fd.close();
-        }
-    }
 
     //! based on the given \c entry sets need_fix_* members as required
     void check(const ProfileEntry &entry)
@@ -252,7 +227,7 @@ protected: // functions
      * \details
      *      \c entry is potentially modified if capabilities can't be applied.
      *      The return value indicates if an operational error occured but it
-     *      doesn't indicate whether a capability valoue could be assigned.
+     *      doesn't indicate whether a capability valou could be assigned.
      *      Check ctx.caps.valid() for this.
      **/
     bool getCapabilities(ProfileEntry &entry, EntryContext &ctx);
