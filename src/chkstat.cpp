@@ -487,13 +487,9 @@ static inline void badProfileLine(const std::string &file, const size_t line, co
     std::cerr << file << ":" << line << ": syntax error in permissions profile (" << context << ")" << std::endl;
 }
 
-bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry *entry)
+bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry &entry)
 {
-    if (!entry)
-    {
-        return false;
-    }
-    else if (hasPrefix(line, "+capabilities "))
+    if (hasPrefix(line, "+capabilities "))
     {
         if (!m_use_fscaps)
             // ignore the content
@@ -504,8 +500,8 @@ bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry *entry
             // ignore empty capability specification
             return true;
 
-        entry->caps.setFromText(cap_text);
-        return entry->caps.valid();
+        entry.caps.setFromText(cap_text);
+        return entry.caps.valid();
     }
 
     return false;
@@ -523,7 +519,7 @@ bool Chkstat::parseProfile(const std::string &path)
     }
 
     size_t linenr = 0;
-    ProfileEntry *last_entry = nullptr;
+    std::string last_key;
     std::string line;
     std::vector<std::string> parts;
     mode_t mode_int;
@@ -548,11 +544,17 @@ bool Chkstat::parseProfile(const std::string &path)
         // profile entry seen.
         if (line[0] == '+')
         {
-            const auto good = parseExtraProfileLine(line, last_entry);
+            if (last_key.empty())
+            {
+                badProfileLine(path, linenr, "lone capability line");
+                continue;
+            }
+
+            const auto good = parseExtraProfileLine(line, m_profile_entries[last_key]);
 
             if (!good)
             {
-                badProfileLine(path, linenr, "lone capability line, bad capability spec or bad +keyword");
+                badProfileLine(path, linenr, "bad capability spec or bad +keyword");
             }
 
             continue;
@@ -598,8 +600,8 @@ bool Chkstat::parseProfile(const std::string &path)
             continue;
         }
 
-        auto &entry = addProfileEntry(location, user, group, mode_int);
-        last_entry = &entry;
+        const auto &entry = addProfileEntry(location, user, group, mode_int);
+        last_key = entry.file;
     }
 
     return true;
