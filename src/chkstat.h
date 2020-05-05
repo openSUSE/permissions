@@ -178,7 +178,7 @@ protected: // functions
      * \return
      *      Whether the line could successfully be parsed
      **/
-    bool parseExtraProfileLine(const std::string &line, ProfileEntry *entry);
+    bool parseExtraProfileLine(const std::string &line, ProfileEntry &entry);
 
     /**
      * \brief
