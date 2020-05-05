@@ -242,7 +242,7 @@ bool Chkstat::parseSysconfig()
             {
                 m_use_fscaps = false;
             }
-            else
+            else if (!value.empty())
             {
                 // NOTE: this was not a warning/error condition in the
                 // original code
