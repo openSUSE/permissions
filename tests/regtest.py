@@ -2139,11 +2139,22 @@ class TestSymlinkBehaviour(TestBase):
 
 		testlink1 = os.path.join(testroot, "link1")
 		testlink2 = os.path.join(testroot, "link2")
+		testlink3 = os.path.join(testroot, "link3")
 
 		# absolute symlink
 		os.symlink( testfile1, testlink1 )
 		# relative symlink
 		os.symlink( ".." + testfile2, testlink2 )
+		# a very short relative symlink, middle component of testfile3
+		# this can catch certain classes of processing errors in
+		# safeOpen()
+		os.symlink( "d", testlink3 )
+		# the directory testlink3 is pointing to
+		self.createTestDir(os.path.join(testroot, "d"), 0o755)
+
+
+		testfile3 = os.path.join(testlink3, "file3")
+		self.createTestFile(testfile3, 0o644)
 
 		testprofile = "easy"
 
@@ -2151,6 +2162,7 @@ class TestSymlinkBehaviour(TestBase):
 			testprofile: (
 				self.buildProfileLine(testlink1, 0o644),
 				self.buildProfileLine(testlink2, 0o644),
+				self.buildProfileLine(testfile3, 0o600),
 			)
 		}
 
@@ -2161,6 +2173,9 @@ class TestSymlinkBehaviour(TestBase):
 		if self.assertMode(testlink1, 0o600) and \
 			self.assertMode(testlink2, 0o600):
 			print("Modes of symlink targets have been ignored correctly")
+
+		if self.assertMode(testfile3, 0o600):
+			print("Mode of regular file target with short symlink component was set correctly")
 
 class TestSymlinkDirBehaviour(TestBase):
 
