@@ -41,6 +41,7 @@
 // C++
 #include <cassert>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -371,7 +372,17 @@ void Chkstat::collectProfilePaths()
         // TODO: consider changing the /usr path to something more catchy like
         // "packages.d" or "package-overrides.d". A change needs to be
         // synchronized with rpmlint-checks, however.
-        collectPackageProfilePaths(dir + "/permissions.d");
+        try
+        {
+            collectPackageProfilePaths(dir + "/permissions.d");
+        }
+        catch( const std::filesystem::filesystem_error &ex )
+        {
+            if( ex.code().value() != ENOENT )
+            {
+                throw;
+            }
+        }
     }
 
     // finally add user defined permissions including 'local'
@@ -392,35 +403,24 @@ void Chkstat::collectProfilePaths()
 
 void Chkstat::collectPackageProfilePaths(const std::string &dir)
 {
-    auto dir_handle = opendir(dir.c_str());
-
-    if (!dir_handle)
-    {
-        // TODO: anything interesting here? probably ENOENT.
-        return;
-    }
-
-    struct dirent* entry = nullptr;
     // First collect a sorted set of base files, skipping unwanted files like
     // backup files or specific profile files. Therefore filter out duplicates
     // using the sorted set.
     std::set<std::string> files;
 
-    // TODO: error situations in readdir() are currently not recognized.
-    // Consequences?
-    while ((entry = readdir(dir_handle)))
+    for (const auto &entry: std::filesystem::directory_iterator(dir))
     {
-        std::string_view name(entry->d_name);
-
-        if (name == "." || name == "..")
+        if (!entry.is_regular_file())
             continue;
+
+        const auto &basename = entry.path().filename().string();
 
         bool found_suffix = false;
 
         /* filter out backup files */
         for (const auto &suffix: {"~", ".rpmnew", ".rpmsave"})
         {
-            if (hasSuffix(name, suffix))
+            if (hasSuffix(basename, suffix))
             {
                 found_suffix = true;
                 break;
@@ -430,10 +430,8 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir)
         if (found_suffix)
             continue;
 
-        files.insert(std::string(name));
+        files.insert(basename);
     }
-
-    (void)closedir(dir_handle);
 
     // now add the sorted set of files to the profile paths to process later
     // on
@@ -1277,8 +1275,16 @@ int Chkstat::run()
 
 int main(int argc, const char **argv)
 {
-    Chkstat chkstat(argc, argv);
-    return chkstat.run();
+    try
+    {
+        Chkstat chkstat(argc, argv);
+        return chkstat.run();
+    }
+    catch( const std::exception &ex )
+    {
+        std::cerr << "exception occured: " << ex.what() << std::endl;
+        return 1;
+    }
 }
 
 // vim: et ts=4 sts=4 sw=4 :
