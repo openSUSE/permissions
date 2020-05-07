@@ -357,12 +357,20 @@ void Chkstat::collectProfilePaths()
         }
     }
 
+    // make sure to start a fresh collection in collectPackageProfilePaths()
+    m_package_profiles_seen.clear();
+
     // move on to package specific permissions
     // these files are owned by the individual packages
     // therefore while files are being moved from /etc to /usr we need to
-    // consider both locations, not only the first matching one like above.
+    // consider both locations. The /usr location is preferred, though, i.e.
+    // if a package has files in /usr then possible duplicate conflicting
+    // files in /etc are ignored by collectPackageProfilePaths().
     for (const auto &dir: {usr_root, etc_root})
     {
+        // TODO: consider changing the /usr path to something more catchy like
+        // "packages.d" or "package-overrides.d". A change needs to be
+        // synchronized with rpmlint-checks, however.
         collectPackageProfilePaths(dir + "/permissions.d");
     }
 
@@ -434,6 +442,14 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir)
         if (file.find_first_of('.') != file.npos)
             // we're only interested in base profiles
             continue;
+
+        if (m_package_profiles_seen.find(file) != m_package_profiles_seen.end())
+            // per-package profiles for this package have already been
+            // processed in a location of higher priority. ignore these
+            // duplicate files.
+            continue;
+
+        m_package_profiles_seen.insert(file);
 
         const auto path = dir + "/" + file;
 

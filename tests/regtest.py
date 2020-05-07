@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import traceback
+from enum import Enum
 
 # the basic test concept is as follows:
 #
@@ -95,6 +96,14 @@ class ColorPrinter:
 
 color_printer = ColorPrinter()
 
+class ConfigLocation(Enum):
+	ETC = 1,
+	USR = 2
+
+PER_PACKAGE_CONFIG_DIRS = {
+	ConfigLocation.ETC: "/etc/permissions.d/",
+	ConfigLocation.USR: "/usr/share/permissions/permissions.d/"
+}
 
 class ChkstatRegtest:
 	"""The main test execution class. It sets up the fake root using
@@ -756,8 +765,8 @@ class TestBase:
 			return base
 		return '.'.join((base, profile))
 
-	def getPackageProfilePath(self, package, profile):
-		base = TestBase.config_root + "/etc/permissions.d/" + package
+	def getPackageProfilePath(self, package, profile, location):
+		base = TestBase.config_root + PER_PACKAGE_CONFIG_DIRS[location] + package
 
 		if not profile:
 			return base
@@ -811,7 +820,8 @@ class TestBase:
 
 			# make sure base dirs exist
 			os.makedirs(config_root + "/etc/sysconfig", 0o755, exist_ok = True)
-			os.makedirs(config_root + "/etc/permissions.d", 0o755, exist_ok = True)
+			for package_d in PER_PACKAGE_CONFIG_DIRS.values():
+				os.makedirs(config_root + package_d, 0o755, exist_ok = True)
 			os.makedirs(config_root + "/usr/share/permissions", 0o755, exist_ok = True)
 			TestBase.global_init_performed = True
 
@@ -834,7 +844,8 @@ class TestBase:
 		]
 
 		candidates.append( self.getUserProfilePath(self.m_local_profile) )
-		candidates.extend( glob.glob(config_root + "/etc/permissions.d/*") )
+		for package_d in PER_PACKAGE_CONFIG_DIRS.values():
+			candidates.extend( glob.glob(config_root + package_d + "/*") )
 		candidates.extend( [self.getProfilePath(profile) for profile in self.m_profiles] )
 
 		for cand in candidates:
@@ -872,13 +883,13 @@ class TestBase:
 				for line in lines:
 					profile_file.write(line + "\n")
 
-	def addPackageProfileEntries(self, package, entries):
+	def addPackageProfileEntries(self, package, entries, location = ConfigLocation.USR):
 		"""Just like addProfileEntries, but for a specific package in
 		permissions.d."""
 
 		for profile, lines in entries.items():
 
-			with open(self.getPackageProfilePath(package, profile), 'a') as profile_file:
+			with open(self.getPackageProfilePath(package, profile, location), 'a') as profile_file:
 				for line in lines:
 					profile_file.write(line + "\n")
 
@@ -1317,6 +1328,19 @@ class TestPackagePermissions(TestBase):
 				lines.append( self.buildProfileLine(basefile, basemode) )
 
 		self.addPackageProfileEntries(package, entries)
+
+		# add a duplicate per-package profile located in /etc. chkstat
+		# should only apply the /usr one.
+		bad_entries = {
+			# the basename must always exist, even if empty.
+			# otherwise the more specific profiles won't be
+			# processed in the first place.
+			"": [],
+			# only test a diverging secure package profile
+			"secure": [ self.buildProfileLine(basefile, 0o777) ]
+		}
+
+		self.addPackageProfileEntries(package, bad_entries, ConfigLocation.ETC)
 
 		for profile, entries in entries.items():
 

@@ -300,6 +300,12 @@ protected: // data
     //! a mapping of file paths to ProfileEntry, denotes the entry to apply
     //! for each path
     std::map<std::string, ProfileEntry> m_profile_entries;
+    /**
+     * \brief
+     *   A collection of the basenames of packages that have already been
+     *   processed by collectPackageProfilePaths()
+     **/
+    std::set<std::string> m_package_profiles_seen;
 
     //! the effective user ID we're running as
     const uid_t m_euid;
