@@ -58,6 +58,7 @@ Chkstat::Chkstat(int argc, const char **argv) :
     m_apply_changes("s", "set", "actually apply changes (--system mode may imply this depending on file based configuration)", m_parser),
     m_only_warn("", "warn", "only inform about which changes would be performed but don't actually apply them (which is the default, except in --system mode)", m_parser),
     m_no_header("n", "noheader", "don't print intro message", m_parser),
+    m_verbose("v", "verbose", "print additional output that might be useful for diagnosis", m_parser),
     m_examine_paths("e", "examine", "operate only on the specified path(s)", false, "PATH", m_parser),
     m_force_level_list("", "level", "force application of the specified space-separated list of security levels (only supported in --system mode)", false, "", "e.g. \"local paranoid\"", m_parser),
     m_file_lists("f", "files", "read newline separated list of files to check (see --examine) from the specified path", false, "PATH", m_parser),
@@ -771,7 +772,10 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
     else
     {
         good = false;
-        std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
+        if (m_verbose.isSet())
+        {
+            std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
+        }
     }
 
     if (grp)
@@ -785,7 +789,10 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
     else
     {
         good = false;
-        std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
+        if (m_verbose.isSet())
+        {
+            std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
+        }
     }
 
     return good;

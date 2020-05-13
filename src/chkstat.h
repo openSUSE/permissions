@@ -263,6 +263,7 @@ protected: // data
     SwitchArgRW m_apply_changes;
     TCLAP::SwitchArg m_only_warn;
     SwitchArgRW m_no_header;
+    TCLAP::SwitchArg m_verbose;
 
     // NOTE: previously chkstat allowed multiple specifications of value
     // switches like --level and --root but actually only used the last
