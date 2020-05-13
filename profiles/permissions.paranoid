@@ -129,6 +129,7 @@
 
 # libgnomesu (#75823, #175616)
 /usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         0755
+/usr/libexec/libgnomesu/gnomesu-pam-backend             root:root         0755
 
 #
 # networking (need root for the privileged socket)
@@ -157,6 +158,7 @@
 # setuid needed on the text console to set the terminal content on ctrl-o
 # #66112
 /usr/lib/mc/cons.saver                                  root:root         0755
+/usr/libexec/mc/cons.saver                              root:root         0755
 
 
 #
@@ -190,13 +192,21 @@
 # amanda
 #
 /usr/lib/amanda/calcsize                                root:amanda       0750
+/usr/libexec/amanda/calcsize                            root:amanda       0750
 /usr/lib/amanda/rundump                                 root:amanda       0750
+/usr/libexec/amanda/rundump                             root:amanda       0750
 /usr/lib/amanda/runtar                                  root:amanda       0750
+/usr/libexec/amanda/runtar                              root:amanda       0750
 /usr/lib/amanda/killpgrp                                root:amanda       0750
+/usr/libexec/amanda/killpgrp                            root:amanda       0750
 /usr/lib/amanda/ambind                                  root:amanda       0750
+/usr/libexec/amanda/ambind                              root:amanda       0750
 /usr/lib/amanda/application/ambsdtar                    root:amanda       0750
+/usr/libexec/amanda/application/ambsdtar                root:amanda       0750
 /usr/lib/amanda/application/amgtar                      root:amanda       0750
+/usr/libexec/amanda/application/amgtar                  root:amanda       0750
 /usr/lib/amanda/application/amstar                      root:amanda       0750
+/usr/libexec/amanda/application/amstar                  root:amanda       0750
 
 
 #
@@ -216,13 +226,17 @@
 # for operation. (#67032, #594393)
 #
 /usr/lib/news/bin/rnews                                 news:uucp         0555
+/usr/libexec/news/bin/rnews                             news:uucp         0555
 /usr/lib/news/bin/inews                                 news:news         0555
+/usr/libexec/news/bin/inews                             news:news         0555
 /usr/lib/news/bin/innbind                               root:news         0555
+/usr/libexec/news/bin/innbind                           root:news         0555
 
 #
 # sendfax
 #
 /usr/lib/mgetty+sendfax/faxq-helper                     fax:root          0755
+/usr/libexec/mgetty+sendfax/faxq-helper                 fax:root          0755
 /var/spool/fax/outgoing/                                fax:trusted       0755
 /var/spool/fax/outgoing/locks                           fax:trusted       0755
 
@@ -235,7 +249,9 @@
 /usr/bin/uustat                                         uucp:uucp         0555
 /usr/bin/uux                                            uucp:uucp         0555
 /usr/lib/uucp/uucico                                    uucp:uucp         0555
+/usr/libexec/uucp/uucico                                uucp:uucp         0555
 /usr/lib/uucp/uuxqt                                     uucp:uucp         0555
+/usr/libexec/uucp/uuxqt                                 uucp:uucp         0555
 
 # pcp (bnc#782967)
 /var/lib/pcp/tmp/					root:root	  0755
@@ -254,6 +270,7 @@
 
 # polkit new (bnc#523377)
 /usr/lib/polkit-1/polkit-agent-helper-1                 root:root         0755
+/usr/libexec/polkit-1/polkit-agent-helper-1             root:root         0755
 /usr/bin/pkexec                                         root:root         0755
 
 # dbus-1 (#333361)
@@ -268,16 +285,23 @@
 
 # VirtualBox (#429725)
 /usr/lib/virtualbox/VirtualBox                          root:vboxusers    0755
+/usr/libexec/virtualbox/VirtualBox                      root:vboxusers    0755
 # bsc#1120650
 /usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
+/usr/libexec/virtualbox/VirtualBoxVM                    root:vboxusers    0750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
+/usr/libexec/virtualbox/VBoxHeadless                    root:vboxusers    0755
 /usr/lib/virtualbox/VBoxSDL                             root:vboxusers    0755
+/usr/libexec/virtualbox/VBoxSDL                         root:vboxusers    0755
 # (bnc#533550)
 /usr/lib/virtualbox/VBoxNetAdpCtl                       root:vboxusers    0755
+/usr/libexec/virtualbox/VBoxNetAdpCtl                   root:vboxusers    0755
 # bnc#669055
 /usr/lib/virtualbox/VBoxNetDHCP                         root:vboxusers    0755
+/usr/libexec/virtualbox/VBoxNetDHCP                     root:vboxusers    0755
 # bsc#1033425
 /usr/lib/virtualbox/VBoxNetNAT                          root:vboxusers    0755
+/usr/libexec/virtualbox/VBoxNetNAT                      root:vboxusers    0755
 
 
 # open-vm-tools (bnc#474285)
@@ -310,6 +334,7 @@
 /usr/lib/singularity/bin/start-suid			root:singularity  0750
 # singularity version 3 (bsc#1128598)
 /usr/lib/singularity/bin/starter-suid                   root:singularity  0750
+/usr/libexec/singularity/bin/starter-suid               root:singularity  0750
 
 /usr/bin/su                                             root:root         0755
 /usr/bin/mount                                          root:root         0755
@@ -324,15 +349,19 @@
 
 # qemu-bridge-helper has no special privileges currently (bnc#765948)
 /usr/lib/qemu-bridge-helper				root:root	755
+/usr/libexec/qemu-bridge-helper			root:root	755
 
 # systemd-journal (bnc#888151)
 /var/log/journal/                                       root:systemd-journal	2755
 
 #iouyap (bnc#904060)
 /usr/lib/iouyap						root:iouyap	0750
+/usr/libexec/iouyap					root:iouyap	0750
 
 # gstreamer ptp (bsc#960173)
 /usr/lib/gstreamer-1.0/gst-ptp-helper			root:root	0755
+ +capabilities cap_net_bind_service=ep
+/usr/libexec/gstreamer-1.0/gst-ptp-helper		root:root	0755
  +capabilities cap_net_bind_service=ep
 
 
@@ -348,14 +377,15 @@
 /usr/sbin/suexec            				root:root       0755
 
 # newgidmap / newuidmap (bsc#979282, bsc#1048645)
-/usr/bin/newgidmap					root:shadow	4755
-/usr/bin/newuidmap					root:shadow	4755
+/usr/bin/newgidmap					root:shadow	0755
+/usr/bin/newuidmap					root:shadow	0755
 
 # kwayland (bsc#1062182)
 /usr/bin/kwin_wayland					root:root	0755
 
 # gvfs (bsc#1065864)
 /usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
+/usr/libexec/gvfs/gvfsd-nfs                             root:root       0755
 
 # icinga2 (bsc#1069410)
 /run/icinga2/cmd/					icinga:icingacmd 0750
@@ -366,23 +396,28 @@
 # usbauth (bsc#1066877)
 /usr/bin/usbauth-npriv                                  root:usbauth    0750
 /usr/lib/usbauth-notifier/                              root:usbauth-notifier  0750
+/usr/libexec/usbauth-notifier/                          root:usbauth-notifier  0750
 /usr/lib/usbauth-notifier/usbauth-notifier              root:usbauth    0755
+/usr/libexec/usbauth-notifier/usbauth-notifier          root:usbauth    0755
 
 # spice-gtk (bsc#1101420)
 /usr/bin/spice-client-glib-usb-acl-helper               root:kvm        0750
 
 # smc-tools (bsc#1102956)
 /usr/lib/libsmc-preload.so                              root:root       0755
+/usr/libexec/libsmc-preload.so                          root:root       0755
 /usr/lib64/libsmc-preload.so                            root:root       0755
 
 # lxc (bsc#988348)
 /usr/lib/lxc/lxc-user-nic                               root:kvm        0750
+/usr/libexec/lxc/lxc-user-nic                           root:kvm        0750
 
 # firejail (bsc#1059013)
 /usr/bin/firejail                                       root:firejail   0750
 
 # authbind (bsc#1111251)
 /usr/lib/authbind/helper                                root:root       0755
+/usr/libexec/authbind/helper                            root:root       0755
 
 # fuse3 (bsc#1111230)
 /usr/bin/fusermount3                                    root:trusted    0755
@@ -395,8 +430,20 @@
 
 # ksysguard network helper (bsc#1151190)
 /usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
-/usr/lib64/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+/usr/libexec/libexec/ksysguard/ksgrd_network_helper         root:root       0755
+/usr/lib64/libexec/ksysguard/ksgrd_network_helper           root:root       0755
 
 # mariadb auth_pam_tool (bsc#1160285)
-/usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool    root:root         0755
-/usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool  root:root         0755
+/usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool       root:root         0755
+/usr/libexec/mysql/plugin/auth_pam_tool_dir/auth_pam_tool   root:root         0755
+/usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool     root:root         0755
+
+# Workload Memory Protection (bsc#1161335)
+/usr/lib/sapwmp/sapwmp-capture                           root:sapsys    0750
+/usr/libexec/sapwmp/sapwmp-capture                       root:sapsys    0750
+
+# s390-tools log directory for ts-shell (bsc#1167163)
+/var/log/ts-shell/                                      root:ts-shell     0770
+
+# setuid bit for cockpit (bsc#1169614)
+/usr/lib/cockpit-session                                root:cockpit-wsinstance  0750
