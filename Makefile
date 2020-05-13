@@ -12,7 +12,7 @@ CXX=g++
 # changes in this area and since permissions is a base package in SUSE this
 # protects us from such potential breakage at the expense of some increased
 # binary size
-LDFLAGS=-static-libstdc++
+LDFLAGS=-static-libstdc++ -Wl,--as-needed
 DESTDIR=
 LDLIBS=-lcap
 prefix=/usr
@@ -51,7 +51,7 @@ src/chkstat.o: src/*.h
 src/utility.o: src/utility.h
 
 src/chkstat: $(OBJS) | /usr/include/tclap
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) src/*.o -osrc/chkstat
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -osrc/chkstat src/*.o $(LDLIBS)
 
 /usr/include/tclap:
 	@echo "error: The tclap command line parsing library is required for building. Try 'zypper in tclap'."; exit 1; :
