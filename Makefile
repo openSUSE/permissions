@@ -51,7 +51,7 @@ src/chkstat.o: src/*.h
 src/utility.o: src/utility.h
 
 src/chkstat: $(OBJS) | /usr/include/tclap
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) src/*.o -osrc/chkstat
+	$(CXX) $(CXXFLAGS) src/*.o -o src/chkstat $(LDFLAGS) $(LDLIBS)
 
 /usr/include/tclap:
 	@echo "error: The tclap command line parsing library is required for building. Try 'zypper in tclap'."; exit 1; :
