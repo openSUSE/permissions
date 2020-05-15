@@ -478,3 +478,6 @@
 
 # s390-tools log directory for ts-shell (bsc#1167163)
 /var/log/ts-shell/                                      root:ts-shell     2770
+
+# binary that launches texlive tools with group "mktex" (bsc#1171686)
+/usr/lib/mktex/public                                   root:mktex 2755
