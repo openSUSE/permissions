@@ -35,7 +35,8 @@ std::ostream& operator<<(std::ostream &o, const FormattedInt &fi)
     orig_state.copyfmt(o);
 
     fi.applyBase(o);
-    o << std::setw(fi.getWidth()) << std::setfill(fi.getFill()) << fi.getVal();
+    const auto width = static_cast<int>(fi.getWidth());
+    o << std::setw(width >= 0 ? width : 0) << std::setfill(fi.getFill()) << fi.getVal();
 
     o.copyfmt(orig_state);
 
