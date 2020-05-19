@@ -135,7 +135,7 @@ void appendContainer(T1 &container, const T2 &sequence)
 void splitWords(const std::string &input, std::vector<std::string> &words);
 
 template <typename T>
-bool stringToUnsigned(const std::string &s, T &out, const size_t base = 10)
+bool stringToUnsigned(const std::string &s, T &out, const int base = 10)
 {
     char *end = nullptr;
     out = static_cast<T>(std::strtoul(s.c_str(), &end, base));
