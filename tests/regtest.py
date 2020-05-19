@@ -938,7 +938,7 @@ class TestBase:
 
 	def applySystemProfile(self, extra_args = []):
 		print("Applying current system profile using chkstat")
-		args = ["--system"] + extra_args
+		args = ["--set", "--system"] + extra_args
 		return self.callChkstat(args)
 
 	def extractPerms(self, s):
