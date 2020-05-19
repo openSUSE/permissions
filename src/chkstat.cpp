@@ -80,8 +80,7 @@ bool Chkstat::validateArguments()
 
     // check for mutually exclusive command line arguments
     const auto xor_args = {
-        std::make_pair(&m_system_mode, static_cast<TCLAP::SwitchArg*>(&m_apply_changes)),
-        {&m_force_fscaps, &m_disable_fscaps},
+        std::make_pair(&m_force_fscaps, &m_disable_fscaps),
         {&m_apply_changes, &m_only_warn}
     };
 
