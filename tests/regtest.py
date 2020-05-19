@@ -1939,7 +1939,7 @@ class TestUnknownOwnership(TestBase):
 
 		self.addProfileEntries(entries)
 		self.switchSystemProfile(testprofile)
-		code, lines = self.applySystemProfile()
+		code, lines = self.applySystemProfile(["--verbose"])
 
 		messages = self.extractMessagesFromChkstat(lines, (baduser_file, badgroup_file))
 
