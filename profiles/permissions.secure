@@ -127,8 +127,8 @@
 # turned off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          0755
 /usr/bin/write                                          root:tty          0755
-# thttpd: sgid + executeable only for group www. Useless...
-/usr/bin/makeweb                                        root:www          2750
+# thttpd (bsc#1171580)
+/usr/bin/makeweb                                        root:www          2751
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      4750
