@@ -351,9 +351,6 @@
 /usr/lib/qemu-bridge-helper				root:root	755
 /usr/libexec/qemu-bridge-helper			root:root	755
 
-# systemd-journal (bnc#888151)
-/var/log/journal/                                       root:systemd-journal	2755
-
 #iouyap (bnc#904060)
 /usr/lib/iouyap						root:iouyap	0750
 /usr/libexec/iouyap					root:iouyap	0750
