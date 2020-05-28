@@ -41,7 +41,6 @@
 #
 # suid system programs that need the suid bit to work:
 #
-/bin/su                                                 root:root         4755
 /usr/bin/at                                             root:trusted      4755
 /usr/bin/crontab                                        root:trusted      4755
 /usr/bin/gpasswd                                        root:shadow       4755

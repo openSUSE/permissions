@@ -81,7 +81,6 @@
 #
 # suid system programs that need the suid bit to work:
 #
-/bin/su                                                 root:root         4755
 # disable at and cron for users that do not belong to the group "trusted"
 /usr/bin/at                                             root:trusted      4750
 /usr/bin/crontab                                        root:trusted      4750
