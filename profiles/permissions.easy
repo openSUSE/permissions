@@ -74,9 +74,6 @@
 /usr/sbin/basic_pam_auth                                root:shadow       2750
 
 
-# still to be converted to utempter
-/usr/lib/gnome-pty-helper                               root:utmp         2755
-
 #
 # mixed section:
 #
