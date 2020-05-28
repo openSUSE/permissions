@@ -80,8 +80,8 @@
 #
 # mixed section:
 #
-# video
-/usr/bin/v4l-conf                                       root:video        4755
+# xawtv (kind of reviewed via bsc#1171655)
+/usr/bin/v4l-conf                                       root:root         4755
 
 # turn off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          2755

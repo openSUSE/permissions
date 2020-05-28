@@ -97,7 +97,7 @@
 #
 # mixed section: most of it is disabled in this permissions.paranoid:
 #
-# video
+# xawtv (kind of reviewed via bsc#1171655)
 /usr/bin/v4l-conf                                       root:video        0755
 
 # turned off write and wall by disabling sgid tty:
