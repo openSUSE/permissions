@@ -111,10 +111,6 @@
 # dialup networking programs
 #
 /usr/sbin/pppoe-wrapper                                 root:dialout      4750
-# i4l package (#100750):
-/sbin/isdnctrl                                          root:dialout      4750
-# #66111
-/usr/bin/vboxbeep                                       root:trusted      4755
 
 
 #
