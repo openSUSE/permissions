@@ -196,14 +196,6 @@
 
 
 #
-# gnats
-#
-/usr/lib/gnats/gen-index                                gnats:root        4555
-/usr/lib/gnats/pr-edit                                  gnats:root        4555
-/usr/lib/gnats/queue-pr                                 gnats:root        4555
-
-
-#
 # news (inn)
 #
 # the inn start script changes it's uid to news:news. Later innbind
