@@ -88,21 +88,6 @@
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      4755
-# mailman mailing list software
-# #66315
-/usr/lib/mailman/cgi-bin/admin                          root:mailman      2755
-/usr/lib/mailman/cgi-bin/admindb                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/edithtml                       root:mailman      2755
-/usr/lib/mailman/cgi-bin/listinfo                       root:mailman      2755
-/usr/lib/mailman/cgi-bin/options                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/private                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/roster                         root:mailman      2755
-/usr/lib/mailman/cgi-bin/subscribe                      root:mailman      2755
-/usr/lib/mailman/cgi-bin/confirm                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/create                         root:mailman      2755
-/usr/lib/mailman/cgi-bin/editarch                       root:mailman      2755
-/usr/lib/mailman/cgi-bin/rmlist                         root:mailman      2755
-/usr/lib/mailman/mail/mailman                           root:mailman      2755
 
 # libgnomesu (#75823, #175616)
 /usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
