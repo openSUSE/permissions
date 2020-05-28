@@ -175,24 +175,6 @@
 /usr/bin/jfbterm                                        root:tty          0755
 
 #
-# kde
-# (all of them are disabled in permissions.secure except for 
-# the helper programs)
-#
-# needs setuid root when using shadow via NIS:
-# #66218
-/usr/lib/kde4/libexec/kcheckpass                        root:shadow       4755
-/usr/lib64/kde4/libexec/kcheckpass                      root:shadow       4755
-/usr/lib/kde4/libexec/kdesud                            root:nogroup      2755
-/usr/lib64/kde4/libexec/kdesud                          root:nogroup      2755
-/usr/lib/libexec/kf5/kdesud                             root:nogroup      2755
-/usr/lib64/libexec/kf5/kdesud                           root:nogroup      2755
-
-# bnc#523833
-/usr/lib/kde4/libexec/start_kdeinit                     root:root         4755
-/usr/lib64/kde4/libexec/start_kdeinit                   root:root         4755
-
-#
 # amanda
 #
 /usr/lib/amanda/calcsize                                root:amanda       0750
