@@ -322,13 +322,6 @@
 /usr/lib/uucp/uuxqt                                     uucp:uucp         6555
 
 
-# pcp (bnc#782967)
-/var/lib/pcp/tmp/					root:root	  0755
-/var/lib/pcp/tmp/pmdabash/				root:root	  0755
-/var/lib/pcp/tmp/mmv/					root:root	  0755
-/var/lib/pcp/tmp/pmlogger/				root:root	  0755
-/var/lib/pcp/tmp/pmie/					root:root	  0755
-
 # PolicyKit (#295341)
 /usr/lib/PolicyKit/polkit-set-default-helper            polkituser:root   4755
 /usr/lib/PolicyKit/polkit-read-auth-helper              root:polkituser   2755
