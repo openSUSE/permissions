@@ -204,14 +204,6 @@
 /usr/lib/uucp/uuxqt                                     uucp:uucp         0555
 /usr/libexec/uucp/uuxqt                                 uucp:uucp         0555
 
-# PolicyKit (#295341)
-/usr/lib/PolicyKit/polkit-set-default-helper            root:polkituser   0755
-/usr/lib/PolicyKit/polkit-read-auth-helper              root:polkituser   0755
-/usr/lib/PolicyKit/polkit-revoke-helper                 root:polkituser   0755
-/usr/lib/PolicyKit/polkit-explicit-grant-helper         root:polkituser   0755
-/usr/lib/PolicyKit/polkit-grant-helper                  root:polkituser   0755
-/usr/lib/PolicyKit/polkit-grant-helper-pam              root:polkituser   0755
-
 # polkit new (bnc#523377)
 /usr/lib/polkit-1/polkit-agent-helper-1                 root:root         0755
 /usr/libexec/polkit-1/polkit-agent-helper-1             root:root         0755
