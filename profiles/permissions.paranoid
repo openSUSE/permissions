@@ -214,10 +214,7 @@
 # policycoreutils (#440596)
 /usr/bin/newrole                                        root:root         0755
 
-# VirtualBox (#429725)
-/usr/lib/virtualbox/VirtualBox                          root:vboxusers    0755
-/usr/libexec/virtualbox/VirtualBox                      root:vboxusers    0755
-# bsc#1120650
+# VirtualBox (#429725, bsc#1120650)
 /usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
 /usr/libexec/virtualbox/VirtualBoxVM                    root:vboxusers    0750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
