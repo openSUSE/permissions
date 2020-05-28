@@ -108,9 +108,6 @@
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      0755
-# gnokii nokia cellphone software
-# #66209
-/usr/sbin/mgnokiidev                                    root:uucp          755
 # mailman mailing list software
 # #66315
 /usr/lib/mailman/cgi-bin/admin                          root:mailman      0755
