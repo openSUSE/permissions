@@ -133,6 +133,10 @@
 # framebuffer terminal emulator (japanese)
 /usr/bin/jfbterm                                        root:tty          6755
 
+# kdesud (bsc#872276)
+/usr/lib/libexec/kf5/kdesud                             root:nogroup      2755
+/usr/lib64/libexec/kf5/kdesud                           root:nogroup      2755
+
 #
 # amanda
 #
