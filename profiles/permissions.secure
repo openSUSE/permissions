@@ -81,7 +81,6 @@
 #
 # suid system programs that need the suid bit to work:
 #
-/bin/su                                                 root:root         4755
 # disable at and cron for users that do not belong to the group "trusted"
 /usr/bin/at                                             root:trusted      4750
 /usr/bin/crontab                                        root:trusted      4750
@@ -115,41 +114,20 @@
 /usr/sbin/basic_pam_auth                                root:shadow       2750
 
 
-# still to be converted to utempter
-/usr/lib/gnome-pty-helper                               root:utmp         2755
-
 #
 # mixed section: most of it is disabled in this permissions.secure:
 #
-# video
+# xawtv (kind of reviewed via bsc#1171655)
 /usr/bin/v4l-conf                                       root:video        4750
 
 # turned off write and wall by disabling sgid tty:
 /usr/bin/wall                                           root:tty          0755
 /usr/bin/write                                          root:tty          0755
-# thttpd: sgid + executeable only for group www. Useless...
-/usr/bin/makeweb                                        root:www          2750
+# thttpd (bsc#1171580)
+/usr/bin/makeweb                                        root:www          2751
 # pcmcia:
 # Needs setuid to eject cards (#100120)
 /sbin/pccardctl                                         root:trusted      4750
-# gnokii nokia cellphone software
-# #66209
-/usr/sbin/mgnokiidev                                    root:uucp          755
-# mailman mailing list software
-# #66315
-/usr/lib/mailman/cgi-bin/admin                          root:mailman      2755
-/usr/lib/mailman/cgi-bin/admindb                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/edithtml                       root:mailman      2755
-/usr/lib/mailman/cgi-bin/listinfo                       root:mailman      2755
-/usr/lib/mailman/cgi-bin/options                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/private                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/roster                         root:mailman      2755
-/usr/lib/mailman/cgi-bin/subscribe                      root:mailman      2755
-/usr/lib/mailman/cgi-bin/confirm                        root:mailman      2755
-/usr/lib/mailman/cgi-bin/create                         root:mailman      2755
-/usr/lib/mailman/cgi-bin/editarch                       root:mailman      2755
-/usr/lib/mailman/cgi-bin/rmlist                         root:mailman      2755
-/usr/lib/mailman/mail/mailman                           root:mailman      2755
 
 # libgnomesu (#75823, #175616)
 /usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
@@ -172,10 +150,6 @@
 # dialup networking programs
 #
 /usr/sbin/pppoe-wrapper                                 root:dialout      4750
-# i4l package (#100750):
-/sbin/isdnctrl                                          root:dialout      4750
-# #66111
-/usr/bin/vboxbeep                                       root:trusted      0755
 
 
 #
@@ -200,24 +174,6 @@
 /usr/bin/jfbterm                                        root:tty          0755
 
 #
-# kde
-# (all of them are disabled in permissions.secure except for 
-# the helper programs)
-#
-# needs setuid root when using shadow via NIS:
-# #66218
-/usr/lib/kde4/libexec/kcheckpass                        root:shadow       4755
-/usr/lib64/kde4/libexec/kcheckpass                      root:shadow       4755
-/usr/lib/kde4/libexec/kdesud                            root:nogroup      2755
-/usr/lib64/kde4/libexec/kdesud                          root:nogroup      2755
-/usr/lib/libexec/kf5/kdesud                             root:nogroup      2755
-/usr/lib64/libexec/kf5/kdesud                           root:nogroup      2755
-
-# bnc#523833
-/usr/lib/kde4/libexec/start_kdeinit                     root:root         4755
-/usr/lib64/kde4/libexec/start_kdeinit                   root:root         4755
-
-#
 # amanda
 #
 /usr/lib/amanda/calcsize                                root:amanda       0750
@@ -236,14 +192,6 @@
 /usr/libexec/amanda/application/amgtar                  root:amanda       0750
 /usr/lib/amanda/application/amstar                      root:amanda       0750
 /usr/libexec/amanda/application/amstar                  root:amanda       0750
-
-
-#
-# gnats
-#
-/usr/lib/gnats/gen-index                                gnats:root        4555
-/usr/lib/gnats/pr-edit                                  gnats:root        4555
-/usr/lib/gnats/queue-pr                                 gnats:root        4555
 
 
 #
@@ -283,40 +231,18 @@
 /usr/libexec/uucp/uuxqt                                 uucp:uucp         6555
 
 
-# pcp (bnc#782967)
-/var/lib/pcp/tmp/					root:root	  0755
-/var/lib/pcp/tmp/pmdabash/				root:root	  0755
-/var/lib/pcp/tmp/mmv/					root:root	  0755
-/var/lib/pcp/tmp/pmlogger/				root:root	  0755
-/var/lib/pcp/tmp/pmie/					root:root	  0755
-
-# PolicyKit (#295341)
-/usr/lib/PolicyKit/polkit-set-default-helper            polkituser:root   4755
-/usr/lib/PolicyKit/polkit-read-auth-helper              root:polkituser   2755
-/usr/lib/PolicyKit/polkit-revoke-helper                 root:polkituser   2755
-/usr/lib/PolicyKit/polkit-explicit-grant-helper         root:polkituser   2755
-/usr/lib/PolicyKit/polkit-grant-helper                  root:polkituser   2755
-/usr/lib/PolicyKit/polkit-grant-helper-pam              root:polkituser   4750
-
 # polkit new (bnc#523377)
 /usr/lib/polkit-1/polkit-agent-helper-1                 root:root         4755
 /usr/libexec/polkit-1/polkit-agent-helper-1             root:root         4755
 /usr/bin/pkexec                                         root:root         4755
 
-# dbus-1 (#333361)
-/lib/dbus-1/dbus-daemon-launch-helper                   root:messagebus   4750
-/lib64/dbus-1/dbus-daemon-launch-helper                 root:messagebus   4750
-# dbus-1 in /usr #1056764)
+# dbus-1 (#333361 #1056764)
 /usr/lib/dbus-1/dbus-daemon-launch-helper               root:messagebus   4750
-/usr/lib64/dbus-1/dbus-daemon-launch-helper             root:messagebus   4750
 
 # policycoreutils (#440596)
 /usr/bin/newrole                                        root:root         0755
 
-# VirtualBox (#429725)
-/usr/lib/virtualbox/VirtualBox                          root:vboxusers    0755
-/usr/libexec/virtualbox/VirtualBox                      root:vboxusers    0755
-# bsc#1120650
+# VirtualBox (#429725, bsc#1120650)
 /usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
 /usr/libexec/virtualbox/VirtualBoxVM                    root:vboxusers    0750
 /usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
@@ -344,9 +270,6 @@
 /usr/sbin/hawk_chkpwd                                   root:haclient     4750
 /usr/sbin/hawk_invoke                                   root:haclient     4750
 
-# chromium (bnc#718016)
-/usr/lib/chrome_sandbox                                 root:root         4755
-
 # ecryptfs-utils (bnc#740110)
 /sbin/mount.ecryptfs_private                            root:root         0755
 
@@ -354,15 +277,6 @@
 /usr/bin/dumpcap					root:wireshark	  0750
  +capabilities cap_net_raw,cap_net_admin=ep
 
-# singularity (bsc#1028304)
-# these have been dropped in version 2.4 (see bsc#1111411, comment 4)
-#/usr/lib/singularity/bin/expand-suid			root:singularity  4750
-#/usr/lib/singularity/bin/create-suid			root:singularity  4750
-#/usr/lib/singularity/bin/export-suid			root:singularity  4750
-#/usr/lib/singularity/bin/import-suid			root:singularity  4750
-/usr/lib/singularity/bin/action-suid			root:singularity  4750
-/usr/lib/singularity/bin/mount-suid			root:singularity  4750
-/usr/lib/singularity/bin/start-suid			root:singularity  4750
 # singularity version 3 (bsc#1128598)
 /usr/lib/singularity/bin/starter-suid                   root:singularity  4750
 /usr/libexec/singularity/bin/starter-suid               root:singularity  4750
@@ -381,9 +295,6 @@
 # qemu-bridge-helper (bnc#765948, bsc#988279)
 /usr/lib/qemu-bridge-helper				root:kvm	04750
 /usr/libexec/qemu-bridge-helper			root:kvm	04750
-
-# systemd-journal (bnc#888151)
-/var/log/journal/                                       root:systemd-journal	2755
 
 #iouyap (bnc#904060)
 /usr/lib/iouyap						root:iouyap	0750

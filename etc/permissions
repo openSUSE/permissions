@@ -69,8 +69,6 @@
 /var/cache/                                             root:root          755
 /var/run/nscd/socket					root:root	   666
 /run/nscd/socket					root:root	   666
-/var/run/sudo/                                          root:root          700
-/run/sudo/                                          	root:root          700
 
 #
 # login tracking
@@ -136,9 +134,6 @@
 
 #
 # legacy
-#
-# new traceroute program by Olaf Kirch does not need setuid root any more.
-/usr/sbin/traceroute                                    root:root          755
 
 # games:games 775 safe as long as we don't change files below it (#103186)
 # still people do it (#429882) so root:root 755 is the consequence.
@@ -157,60 +152,8 @@
 /lib/udev/devices/tty                                   root:tty          0666
 /lib/udev/devices/zero                                  root:root         0666
 
-#
-# named chroot (#438045)
-#
-/var/lib/named/dev/null                                 root:root         0666
-/var/lib/named/dev/random                               root:root         0666
-
 # opiesu is not allowed setuid root as code quality is bad (bnc#882035)
 /usr/bin/opiesu						root:root         0755
-
-# we no longer make rpm build dirs 1777
-/usr/src/packages/SOURCES/                              root:root         0755
-/usr/src/packages/BUILD/                                root:root         0755
-/usr/src/packages/BUILDROOT/                            root:root         0755
-/usr/src/packages/RPMS/                                 root:root         0755
-/usr/src/packages/RPMS/alphaev56/                       root:root         0755
-/usr/src/packages/RPMS/alphaev67/                       root:root         0755
-/usr/src/packages/RPMS/alphaev6/                        root:root         0755
-/usr/src/packages/RPMS/alpha/                           root:root         0755
-/usr/src/packages/RPMS/amd64/                           root:root         0755
-/usr/src/packages/RPMS/arm4l/                           root:root         0755
-/usr/src/packages/RPMS/armv4l/                          root:root         0755
-/usr/src/packages/RPMS/armv5tejl/                       root:root         0755
-/usr/src/packages/RPMS/armv5tejvl/                      root:root         0755
-/usr/src/packages/RPMS/armv5tel/                        root:root         0755
-/usr/src/packages/RPMS/armv5tevl/                       root:root         0755
-/usr/src/packages/RPMS/armv6l/                          root:root         0755
-/usr/src/packages/RPMS/armv6vl/                         root:root         0755
-/usr/src/packages/RPMS/armv7l/                          root:root         0755
-/usr/src/packages/RPMS/athlon/                          root:root         0755
-/usr/src/packages/RPMS/geode/                           root:root         0755
-/usr/src/packages/RPMS/hppa2.0/                         root:root         0755
-/usr/src/packages/RPMS/hppa/                            root:root         0755
-/usr/src/packages/RPMS/i386/                            root:root         0755
-/usr/src/packages/RPMS/i486/                            root:root         0755
-/usr/src/packages/RPMS/i586/                            root:root         0755
-/usr/src/packages/RPMS/i686/                            root:root         0755
-/usr/src/packages/RPMS/ia32e/                           root:root         0755
-/usr/src/packages/RPMS/ia64/                            root:root         0755
-/usr/src/packages/RPMS/mips/                            root:root         0755
-/usr/src/packages/RPMS/noarch/                          root:root         0755
-/usr/src/packages/RPMS/pentium3/                        root:root         0755
-/usr/src/packages/RPMS/pentium4/                        root:root         0755
-/usr/src/packages/RPMS/powerpc64/                       root:root         0755
-/usr/src/packages/RPMS/powerpc/                         root:root         0755
-/usr/src/packages/RPMS/ppc64/                           root:root         0755
-/usr/src/packages/RPMS/ppc/                             root:root         0755
-/usr/src/packages/RPMS/s390/                            root:root         0755
-/usr/src/packages/RPMS/s390x/                           root:root         0755
-/usr/src/packages/RPMS/sparc64/                         root:root         0755
-/usr/src/packages/RPMS/sparc/                           root:root         0755
-/usr/src/packages/RPMS/sparcv9/                         root:root         0755
-/usr/src/packages/RPMS/x86_64/                          root:root         0755
-/usr/src/packages/SPECS/                                root:root         0755
-/usr/src/packages/SRPMS/                                root:root         0755
 
 # ceph log directory (bsc#1150366)
 /var/log/ceph/                                          ceph:ceph         3770
