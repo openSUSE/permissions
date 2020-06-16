@@ -212,8 +212,9 @@
 /usr/libexec/polkit-1/polkit-agent-helper-1             root:root         0755
 /usr/bin/pkexec                                         root:root         0755
 
-# dbus-1 (#333361, #1056764)
+# dbus-1 (#333361, #1056764, bsc#1171164)
 /usr/lib/dbus-1/dbus-daemon-launch-helper               root:messagebus   0750
+/usr/libexec/dbus-1/dbus-daemon-launch-helper           root:messagebus   0750
 
 # policycoreutils (#440596)
 /usr/bin/newrole                                        root:root         0755
