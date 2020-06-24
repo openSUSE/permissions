@@ -7,42 +7,21 @@
 #
 # This file is used by chkstat (and indirectly by various RPM package scripts)
 # to check or set the modes and ownerships of files and directories in
-# the installation.
+# the installation. It has priority over the distribution defaults in
+# /usr/share/permissions.
 #
-# If you want chkstat to be run automatically after zypper operations, then
-# you can install the permissions-zypp-plugin. This is helpful when you are
-# entering permissions in this file that get overwritten by package updates.
-# The plugin keeps the custom permissions in place.
+# Please see the man page permissions(5) for general usage hints of this and
+# related files. Note that operations like package updates, log rotation or
+# systemd-tmpfiles can reset these file permissions. By default, changes to this
+# file are therefore only really useful to override the distribution default
+# permissions of files shipping with setXid permissions or capabilities.
 #
-# In particular, this file will not be touched during an upgrade of the
-# installation. It is designed to be a placeholder for local
-# additions by the administrator of the system to reflect filemodes
-# of locally installed packages or to override file permissions as
-# shipped with the distribution.
+# If you want entries for files installed through RPM to also be applied after
+# zypper operations, then you can install the permissions-zypp-plugin.  This is
+# helpful when you are entering permissions in this file that get overwritten
+# by package updates.
+#
 #
 # Format:
-# <file> <owner>:<group> <permission>
+# <file> <owner>:<group> <mode>
 #
-# Please see the file /etc/permissions for general usage hints of the
-# /etc/permissions* files.
-# Please remember that logfiles might be modified by the logfile
-# rotation facilities (e.g. logrotate) so settings entered here might
-# be overridden. Also devices files (/dev/*) are not static but
-# managed via udev so this file can't be used to modify device
-# permissions either.
-#
-
-#
-# suexec is only secure if the document root doesn't contain files
-# writeable by wwwrun. Make sure you have a safe server setup
-# before setting the setuid bit! See also
-# https://bugzilla.novell.com/show_bug.cgi?id=263789
-# http://httpd.apache.org/docs/trunk/suexec.html
-#
-#/usr/sbin/suexec2            root:root       4755
-#/usr/sbin/suexec             root:root       4755
-
-# setuid bit on Xorg is only needed if no display manager, ie startx
-# is used. Beware of CVE-2010-2240.
-#
-#/usr/bin/Xorg                 root:root       4711
