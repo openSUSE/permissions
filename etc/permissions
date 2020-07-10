@@ -152,6 +152,16 @@
 /lib/udev/devices/tty                                   root:tty          0666
 /lib/udev/devices/zero                                  root:root         0666
 
+#
+# named chroot (#438045)
+#
+# These currently conflict with a systemd-tmpfiles configuration file.
+# The entries in parallel serve the purpose of a whitelisting for
+# world-writable files, therefore they need to stay in place until we have a
+# better whitelisting concept.
+/var/lib/named/dev/null                                 root:root         0666
+/var/lib/named/dev/random                               root:root         0666
+
 # opiesu is not allowed setuid root as code quality is bad (bnc#882035)
 /usr/bin/opiesu						root:root         0755
 
