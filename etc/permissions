@@ -67,7 +67,6 @@
 #
 # /etc
 #
-/etc/lilo.conf                                          root:root          600
 /etc/passwd                                             root:root          644
 /etc/shadow                                             root:shadow        640
 # Changing the hosts_access(5) files causes trouble with services
@@ -92,36 +91,12 @@
 /usr/lib/utempter/utempter                              root:utmp         2755
 /usr/libexec/utempter/utempter                          root:utmp         2755
 
-# ensure correct permissions on ssh files to avoid sshd refusing
-# logins (bnc#398250)
-/etc/ssh/ssh_host_key                                   root:root          600
-/etc/ssh/ssh_host_key.pub                               root:root          644
-/etc/ssh/ssh_host_dsa_key                               root:root          600
-/etc/ssh/ssh_host_dsa_key.pub                           root:root          644
-/etc/ssh/ssh_host_rsa_key                               root:root          600
-/etc/ssh/ssh_host_rsa_key.pub                           root:root          644
-/etc/ssh/ssh_config                                     root:root          644
-/etc/ssh/sshd_config                                    root:root          640
-
 #
 # legacy
 
 # games:games 775 safe as long as we don't change files below it (#103186)
 # still people do it (#429882) so root:root 755 is the consequence.
 /var/games/                                             root:root         0755
-
-# No longer common. Set setuid bit yourself if you need it
-# (#66191)
-#/usr/bin/ziptool                                        root:trusted      4750
-
-#
-# udev static devices (#438039)
-#
-/lib/udev/devices/net/tun                               root:root         0666
-/lib/udev/devices/null                                  root:root         0666
-/lib/udev/devices/ptmx                                  root:tty          0666
-/lib/udev/devices/tty                                   root:tty          0666
-/lib/udev/devices/zero                                  root:root         0666
 
 #
 # named chroot (#438045)
