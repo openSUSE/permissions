@@ -38,50 +38,23 @@
 # root directories:
 #
 
-/                                                       root:root          755
-/root/                                                  root:root          700
 /tmp/                                                   root:root         1777
 /tmp/.X11-unix/                                         root:root         1777
 /tmp/.ICE-unix/                                         root:root         1777
-/dev/                                                   root:root          755
-/bin/                                                   root:root          755
-/sbin/                                                  root:root          755
-/lib/                                                   root:root          755
-/etc/                                                   root:root          755
-/home/                                                  root:root          755
-/boot/                                                  root:root          755
-/opt/                                                   root:root          755
-/usr/                                                   root:root          755
 
 #
 # /var:
 #
 
 /var/tmp/                                               root:root         1777
-/var/log/                                               root:root          755
-/var/spool/                                             root:root          755
 /var/spool/mqueue/                                      root:root          700
 /var/spool/news/                                        news:news          775
 /var/spool/uucp/                                        uucp:uucp          755
 /var/spool/voice/                                       root:root          755
 /var/spool/mail/                                        root:root         1777
-/var/adm/                                               root:root          755
-/var/adm/backup/                                        root:root          700
-/var/cache/                                             root:root          755
 /var/yp/                                                root:root          755
 /var/run/nscd/socket					root:root	   666
 /run/nscd/socket					root:root	   666
-
-#
-# some device files
-#
-
-/dev/zero                                               root:root          666
-/dev/null                                               root:root          666
-/dev/full                                               root:root          666
-/dev/ip                                                 root:root          660
-/dev/initrd                                             root:disk          660
-/dev/kmem                                               root:kmem          640
 
 #
 # /etc
@@ -89,9 +62,7 @@
 /etc/lilo.conf                                          root:root          600
 /etc/passwd                                             root:root          644
 /etc/shadow                                             root:shadow        640
-/etc/init.d/                                            root:root          755
 /etc/HOSTNAME                                           root:root          644
-/etc/hosts                                              root:root          644
 # Changing the hosts_access(5) files causes trouble with services
 # that do not run as root!
 /etc/hosts.allow                                        root:root          644
