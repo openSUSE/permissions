@@ -1049,27 +1049,38 @@ class TestBase:
 			shell = False,
 		)
 
-		# getcap uses a '+' to indicate capability types, while
-		# permissions uses '=', so adjust accordingly
-		expected_caps = ','.join(caps).replace('=', '+')
+		expected_caps = ','.join(caps)
 		actual_caps = ""
 
-		# output is something like "/path/to/file = cap_stuff+letters"
+		# until libcap-2.32 the output format looked like this:
+		#
+		# /usr/bin/ping = cap_net_raw+ep
+		#
+		# starting from libcap-2.42 it looks like this:
+		#
+		# /usr/bin/ping cap_net_raw=p
+		#
+		# see bsc#1175076 comment 2.
+		# So let's be agnostic to the output format.
+
 		for line in getcap_out.decode('utf8').splitlines():
-			# be prudent about possible spaces or equals in paths,
-			# even though it should never occur in our test
-			# environment
-			parts = line.split('=')
-			if len(parts) < 2:
+			if not line.startswith(path):
 				continue
 
-			cap_path = '='.join(parts[:-1]).strip()
-			if cap_path != path:
-				# not for our file
-				continue
+			line = line[len(path):].strip()
+			parts = line.split()
 
-			actual_caps = parts[-1].strip()
-			break
+			if len(parts) == 2 and parts[0] == '=':
+				# the old output format:
+				# getcap uses a '+' to indicate capability
+				# types, while permissions uses '=', so adjust
+				# accordingly
+				expected_caps = expected_caps.replace('=', '+')
+				actual_caps = parts[1]
+				break
+			elif len(parts) == 1:
+				actual_caps = parts[0]
+				break
 
 		if actual_caps != expected_caps:
 			self.printError(path, "doesn't have expected capabilities '{}' but '{}' instead".format(
