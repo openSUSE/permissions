@@ -694,7 +694,8 @@ class ChkstatRegtest:
 
 			if test.getNumErrors() != 0:
 				color_printer.setRed()
-				print(test.getName(), "encountered", test.getNumErrors(), "errors")
+				sys.stdout.flush()
+				print(test.getName(), "encountered", test.getNumErrors(), "errors", file = sys.stderr)
 			if test.getNumWarnings() != 0:
 				color_printer.setYellow()
 				tests_warned += 1
