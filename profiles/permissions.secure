@@ -139,8 +139,8 @@
  +capabilities cap_net_raw=p
 /usr/bin/ping                                           root:root         0755
  +capabilities cap_net_raw=p
-# mtr is linked against ncurses. no suid bit, for root only:
-/usr/sbin/mtr-packet                                    root:dialout      0750
+# mtr
+/usr/sbin/mtr-packet                                    root:root         0755
 
 # exim
 /usr/sbin/exim                                          root:root         4755
