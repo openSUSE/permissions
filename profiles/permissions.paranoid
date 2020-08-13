@@ -114,7 +114,7 @@
 /usr/bin/clockdiff                                      root:root         0755
 /usr/bin/ping                                           root:root         0755
 # mtr is linked against ncurses.
-/usr/sbin/mtr                                           root:dialout      0750
+/usr/sbin/mtr-packet                                    root:dialout      0750
 
 # exim
 /usr/sbin/exim                                          root:root         0755
