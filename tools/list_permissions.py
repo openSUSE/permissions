@@ -113,29 +113,32 @@ for path, profiles in pp.getEntries().items():
 	print(path + "\n")
 
 	common_comments = extractCommonComments(profiles)
+	comment_indent = "\t" + " ".ljust(max_label_len) + "\t\t"
 
-	if common_comments:
-		for comment in common_comments:
-			print("\t" + comment)
-		print()
+	for comment in common_comments:
+		print(comment_indent + comment)
 
 	for i, profile in enumerate(profiles):
 		entry = profiles[profile]
 
+		if entry["comments"] or (i == 0 and common_comments):
+			print()
 		for line in entry["comments"]:
-			print("\t" + line)
+			print(comment_indent + line)
 
 		print("\t" + profile.ljust(max_label_len), end = '')
-
-		# if the config is equal to the previous profile's then don't
-		# print it again, to avoid printing redundant information
-		if i > 0 and list(profiles.values())[i-1]["config"] == entry["config"]:
-			print("\t\t*")
-			continue
 
 		# merge the config into a single line to allow for a simpler
 		# output structure with a single line per profile
 		config = ' '.join(entry["config"])
+
+		# if the config is equal to the previous profile's then don't
+		# print it again, to avoid printing redundant information
+		if i > 0 and list(profiles.values())[i-1]["config"] == entry["config"]:
+			print('\t\t"{spaces}"'.format(
+				spaces = ' ' * (len(config.expandtabs()) - 2)))
+			continue
+
 		print("\t\t" + config)
 	print()
 
