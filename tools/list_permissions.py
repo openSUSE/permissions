@@ -3,10 +3,11 @@
 # vim: ts=8 noet sw=8 sts=8 :
 
 import argparse
+import fnmatch
 from pathlib import Path
 
 parser = argparse.ArgumentParser("list assembled permissions profile information for individual paths")
-parser.add_argument("-p", "--path", type=str, help = "list only information about the given path")
+parser.add_argument("-p", "--path", type=str, default = "*", help = "list only information about the given path, supports globbing")
 
 repo_root = (Path(__file__).parent.parent).resolve()
 profile_dir = repo_root / "profiles"
@@ -105,8 +106,8 @@ pp.parse()
 max_label_len = pp.getMaxLabelLen()
 
 for path, profiles in pp.getEntries().items():
-	# apply filtering logic from command line
-	if args.path and path != args.path:
+	# apply filtering logic from command line (default matches all files)
+	if not fnmatch.fnmatch(path, args.path):
 		continue
 
 	print(path + "\n")
