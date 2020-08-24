@@ -8,7 +8,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser("list assembled permissions profile information for individual paths")
 parser.add_argument("-p", "--path", type=str, help = "list only information about the given path")
 
-repo_root = (Path(__file__).parent / "..").resolve()
+repo_root = (Path(__file__).parent.parent).resolve()
 profile_dir = repo_root / "profiles"
 etc_dir = repo_root / "etc"
 
@@ -29,8 +29,6 @@ class ProfileParser:
 		#   ...
 		# }
 		self.m_entries = {}
-		self.m_comments = []
-		self.m_current_path = None
 
 	def parse(self):
 		for path in self.m_paths:
@@ -44,6 +42,10 @@ class ProfileParser:
 		return path_entries.setdefault(label, {})
 
 	def _parseFile(self, fd, label):
+
+		comments = []
+		current_path = None
+
 		for line in fd.readlines():
 
 			line = line.strip()
@@ -55,29 +57,42 @@ class ProfileParser:
 				# branch.
 				# Also skip empty comment lines.
 				if line != "#":
-					self.m_comments.append(line)
+					comments.append(line)
 			elif line.startswith("/"):
 				path, config = line.split(None, 1)
-				self.m_current_path = path
+				current_path = path
 
 				entry = self._getDictEntry(path, label)
-				entry["comments"] = self.m_comments
-				self.m_comments = []
+				entry["comments"] = comments
+				comments = []
 
 				lines = entry.setdefault("config", [])
 				lines.append(config)
 			elif line.startswith("+"):
-				entry = self._getDictEntry(self.m_current_path, label)
+				entry = self._getDictEntry(current_path, label)
 				entry["config"].append(line)
 			else:
-				self.m_comments = []
-				self.m_current_path = None
+				comments = []
+				current_path = None
 
 	def getEntries(self):
 		return self.m_entries
 
 	def getMaxLabelLen(self):
-		return max( [ len(str(label.name)) for label in self.m_paths ] )
+		return max( len(str(label.name)) for label in self.m_paths )
+
+def extractCommonComments(profiles):
+	# merge comments for different profiles if they are present and equal
+	ret = []
+	while True:
+		comments = { entry["comments"][0] if entry["comments"] else "" for entry in profiles.values() }
+		line = comments.pop() if len(comments) == 1 else ""
+		if line:
+			ret.append(line)
+			for profile in profiles:
+				profiles[profile]["comments"].pop(0)
+		else:
+			return ret
 
 args = parser.parse_args()
 
@@ -96,20 +111,10 @@ for path, profiles in pp.getEntries().items():
 
 	print(path + "\n")
 
-	# merge comments for different profiles if they are present and equal
-	merged_comment = []
-	while True:
-		comments = [ entry["comments"][0] if entry["comments"] else "" for entry in profiles.values() ]
-		if all(comments) and len(set(comments)) == 1:
-			merged_comment.append(comments[0])
-			for profile in profiles:
-				profiles[profile]["comments"].pop(0)
-		else:
-			break
+	common_comments = extractCommonComments(profiles)
 
-
-	if merged_comment:
-		for comment in merged_comment:
+	if common_comments:
+		for comment in common_comments:
 			print("\t" + comment)
 		print()
 
