@@ -32,13 +32,6 @@
 # in your system.
 
 #
-# Directories
-#
-# for screen's session sockets:
-/run/uscreens/                                      	root:trusted      1775
-
-
-#
 # /etc
 #
 /etc/crontab                                            root:root          600
