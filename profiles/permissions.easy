@@ -15,13 +15,6 @@
 # 
 
 #
-# Directories
-#
-
-# for screen's session sockets:
-/run/uscreens/                                      	root:root         1777
-
-#
 # /etc
 #
 /etc/crontab                                            root:root          600
