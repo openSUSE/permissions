@@ -366,3 +366,6 @@
 
 # physlock (bsc#1175720, not suited for world access)
 /usr/bin/physlock                                       root:trusted 04750
+
+# xorg-x11-server (bsc#1175867)
+/usr/bin/Xorg.wrap                                      root:root 4755
