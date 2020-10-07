@@ -132,7 +132,6 @@
 /usr/bin/clockdiff                                      root:root         0755
  +capabilities cap_net_raw=p
 /usr/bin/ping                                           root:root         0755
- +capabilities cap_net_raw=p
 # mtr
 /usr/sbin/mtr-packet                                    root:root         0755
 
