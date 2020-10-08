@@ -158,7 +158,6 @@
 /usr/lib/mgetty+sendfax/faxq-helper                     fax:root          4755
 /usr/libexec/mgetty+sendfax/faxq-helper                 fax:root          4755
 /var/spool/fax/outgoing/                                fax:root          0755
-/var/spool/fax/outgoing/locks                           fax:root          0755
 
 #
 # uucp
