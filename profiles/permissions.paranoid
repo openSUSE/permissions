@@ -98,7 +98,6 @@
 /sbin/pccardctl                                         root:trusted      0755
 
 # libgnomesu (#75823, #175616)
-/usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         0755
 /usr/libexec/libgnomesu/gnomesu-pam-backend             root:root         0755
 
 #
@@ -123,7 +122,6 @@
 #
 # setuid needed on the text console to set the terminal content on ctrl-o
 # #66112
-/usr/lib/mc/cons.saver                                  root:root         0755
 /usr/libexec/mc/cons.saver                              root:root         0755
 
 
@@ -145,21 +143,13 @@
 #
 # amanda
 #
-/usr/lib/amanda/calcsize                                root:amanda       0750
 /usr/libexec/amanda/calcsize                            root:amanda       0750
-/usr/lib/amanda/rundump                                 root:amanda       0750
 /usr/libexec/amanda/rundump                             root:amanda       0750
-/usr/lib/amanda/runtar                                  root:amanda       0750
 /usr/libexec/amanda/runtar                              root:amanda       0750
-/usr/lib/amanda/killpgrp                                root:amanda       0750
 /usr/libexec/amanda/killpgrp                            root:amanda       0750
-/usr/lib/amanda/ambind                                  root:amanda       0750
 /usr/libexec/amanda/ambind                              root:amanda       0750
-/usr/lib/amanda/application/ambsdtar                    root:amanda       0750
 /usr/libexec/amanda/application/ambsdtar                root:amanda       0750
-/usr/lib/amanda/application/amgtar                      root:amanda       0750
 /usr/libexec/amanda/application/amgtar                  root:amanda       0750
-/usr/lib/amanda/application/amstar                      root:amanda       0750
 /usr/libexec/amanda/application/amstar                  root:amanda       0750
 
 
@@ -194,9 +184,7 @@
 /usr/bin/uuname                                         uucp:uucp         0555
 /usr/bin/uustat                                         uucp:uucp         0555
 /usr/bin/uux                                            uucp:uucp         0555
-/usr/lib/uucp/uucico                                    uucp:uucp         0555
 /usr/libexec/uucp/uucico                                uucp:uucp         0555
-/usr/lib/uucp/uuxqt                                     uucp:uucp         0555
 /usr/libexec/uucp/uuxqt                                 uucp:uucp         0555
 
 # polkit new (bnc#523377)
@@ -205,7 +193,6 @@
 /usr/bin/pkexec                                         root:root         0755
 
 # dbus-1 (#333361, #1056764, bsc#1171164)
-/usr/lib/dbus-1/dbus-daemon-launch-helper               root:messagebus   0750
 /usr/libexec/dbus-1/dbus-daemon-launch-helper           root:messagebus   0750
 
 # policycoreutils (#440596)
@@ -246,7 +233,6 @@
 /usr/bin/dumpcap					root:root	  0755
 
 # singularity version 3 (bsc#1128598)
-/usr/lib/singularity/bin/starter-suid                   root:singularity  0750
 /usr/libexec/singularity/bin/starter-suid               root:singularity  0750
 
 /usr/bin/su                                             root:root         0755
@@ -261,16 +247,12 @@
 /usr/bin/cdda2wav                                       root:root       755
 
 # qemu-bridge-helper has no special privileges currently (bnc#765948)
-/usr/lib/qemu-bridge-helper				root:root	755
 /usr/libexec/qemu-bridge-helper			root:root	755
 
 #iouyap (bnc#904060)
-/usr/lib/iouyap						root:iouyap	0750
 /usr/libexec/iouyap					root:iouyap	0750
 
 # gstreamer ptp (bsc#960173)
-/usr/lib/gstreamer-1.0/gst-ptp-helper			root:root	0755
- +capabilities cap_net_bind_service=ep
 /usr/libexec/gstreamer-1.0/gst-ptp-helper		root:root	0755
  +capabilities cap_net_bind_service=ep
 
@@ -294,7 +276,6 @@
 /usr/bin/kwin_wayland					root:root	0755
 
 # gvfs (bsc#1065864)
-/usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
 /usr/libexec/gvfs/gvfsd-nfs                             root:root       0755
 
 # icinga2 (bsc#1069410)
@@ -319,7 +300,6 @@
 /usr/lib64/libsmc-preload.so                            root:root       0755
 
 # lxc (bsc#988348)
-/usr/lib/lxc/lxc-user-nic                               root:kvm        0750
 /usr/libexec/lxc/lxc-user-nic                           root:kvm        0750
 
 # firejail (bsc#1059013)
@@ -356,7 +336,6 @@
 /var/log/ts-shell/                                      root:ts-shell     0770
 
 # setuid bit for cockpit (bsc#1169614)
-/usr/lib/cockpit-session                                root:cockpit-wsinstance  0750
 /usr/libexec/cockpit-session                            root:cockpit-wsinstance  0750
 
 # binary that launches texlive tools with group "mktex" (bsc#1171686)
