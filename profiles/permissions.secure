@@ -130,8 +130,6 @@
 #
 /usr/bin/clockdiff                                      root:root         0755
  +capabilities cap_net_raw=p
-/usr/bin/ping                                           root:root         0755
- +capabilities cap_net_raw=p
 # mtr
 /usr/sbin/mtr-packet                                    root:root         0755
 
@@ -311,10 +309,6 @@
 
 # icinga2 (bsc#1069410)
 /run/icinga2/cmd/					icinga:icingacmd 2750
-
-# fping (bsc#1047921)
-/usr/sbin/fping						root:root	0755
- +capabilities cap_net_raw=ep
 
 # usbauth (bsc#1066877)
 /usr/bin/usbauth-npriv                                  root:usbauth    04750

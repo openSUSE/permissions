@@ -104,7 +104,6 @@
 # networking (need root for the privileged socket)
 #
 /usr/bin/clockdiff                                      root:root         0755
-/usr/bin/ping                                           root:root         0755
 # mtr
 /usr/sbin/mtr-packet                                    root:root         0755
 
@@ -280,9 +279,6 @@
 
 # icinga2 (bsc#1069410)
 /run/icinga2/cmd/					icinga:icingacmd 0750
-
-# fping (bsc#1047921)
-/usr/sbin/fping                                         root:root       0755
 
 # usbauth (bsc#1066877)
 /usr/bin/usbauth-npriv                                  root:usbauth    0750
