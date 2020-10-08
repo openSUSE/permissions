@@ -81,7 +81,6 @@
 /sbin/pccardctl                                         root:trusted      4755
 
 # libgnomesu (#75823, #175616)
-/usr/lib/libgnomesu/gnomesu-pam-backend                 root:root         4755
 /usr/libexec/libgnomesu/gnomesu-pam-backend             root:root         4755
 
 #
@@ -109,7 +108,6 @@
 #
 # setuid needed on the text console to set the terminal content on ctrl-o
 # #66112
-/usr/lib/mc/cons.saver                                  root:root         4755
 /usr/libexec/mc/cons.saver                              root:root         4755
 
 
@@ -132,21 +130,13 @@
 #
 # amanda
 #
-/usr/lib/amanda/calcsize                                root:amanda       4750
 /usr/libexec/amanda/calcsize                            root:amanda       4750
-/usr/lib/amanda/rundump                                 root:amanda       4750
 /usr/libexec/amanda/rundump                             root:amanda       4750
-/usr/lib/amanda/runtar                                  root:amanda       4750
 /usr/libexec/amanda/runtar                              root:amanda       4750
-/usr/lib/amanda/killpgrp                                root:amanda       4750
 /usr/libexec/amanda/killpgrp                            root:amanda       4750
-/usr/lib/amanda/ambind                                  root:amanda       4750
 /usr/libexec/amanda/ambind                              root:amanda       4750
-/usr/lib/amanda/application/ambsdtar                    root:amanda       4750
 /usr/libexec/amanda/application/ambsdtar                root:amanda       4750
-/usr/lib/amanda/application/amgtar                      root:amanda       4750
 /usr/libexec/amanda/application/amgtar                  root:amanda       4750
-/usr/lib/amanda/application/amstar                      root:amanda       4750
 /usr/libexec/amanda/application/amstar                  root:amanda       4750
 
 
@@ -181,9 +171,7 @@
 /usr/bin/uuname                                         uucp:uucp         6555
 /usr/bin/uustat                                         uucp:uucp         6555
 /usr/bin/uux                                            uucp:uucp         6555
-/usr/lib/uucp/uucico                                    uucp:uucp         6555
 /usr/libexec/uucp/uucico                                uucp:uucp         6555
-/usr/lib/uucp/uuxqt                                     uucp:uucp         6555
 /usr/libexec/uucp/uuxqt                                 uucp:uucp         6555
 
 # polkit new (bnc#523377)
@@ -192,7 +180,6 @@
 /usr/bin/pkexec                                         root:root         4755
 
 # dbus-1 (#333361, #1056764, bsc#1171164)
-/usr/lib/dbus-1/dbus-daemon-launch-helper               root:messagebus   4750
 /usr/libexec/dbus-1/dbus-daemon-launch-helper           root:messagebus   4750
 
 # policycoreutils (#440596)
@@ -233,7 +220,6 @@
  +capabilities cap_net_raw,cap_net_admin=ep
 
 # singularity version 3 (bsc#1128598)
-/usr/lib/singularity/bin/starter-suid                   root:singularity  4750
 /usr/libexec/singularity/bin/starter-suid               root:singularity  4750
 
 /usr/bin/su                                             root:root         4755
@@ -250,18 +236,13 @@
 /usr/bin/cdda2wav					root:root	755
 
 # qemu-bridge-helper (bnc#765948, bsc#988279)
-/usr/lib/qemu-bridge-helper				root:kvm	04750
 /usr/libexec/qemu-bridge-helper			root:kvm	04750
 
 #iouyap (bnc#904060)
-/usr/lib/iouyap						root:iouyap	0750
-  +capabilities cap_net_raw,cap_net_admin=ep
 /usr/libexec/iouyap					root:iouyap	0750
   +capabilities cap_net_raw,cap_net_admin=ep
 
 # gstreamer ptp (bsc#960173)
-/usr/lib/gstreamer-1.0/gst-ptp-helper			root:root	0755
- +capabilities cap_net_bind_service=ep
 /usr/libexec/gstreamer-1.0/gst-ptp-helper		root:root	0755
  +capabilities cap_net_bind_service=ep
 
@@ -285,8 +266,6 @@
  +capabilities cap_sys_nice=ep
 
 # gvfs (bsc#1065864)
-/usr/lib/gvfs/gvfsd-nfs                                 root:root       0755
- +capabilities cap_net_bind_service=ep
 /usr/libexec/gvfs/gvfsd-nfs                             root:root       0755
  +capabilities cap_net_bind_service=ep
 
@@ -313,7 +292,6 @@
 /usr/lib64/libsmc-preload.so                            root:root       04755
 
 # lxc (bsc#988348)
-/usr/lib/lxc/lxc-user-nic                               root:kvm        04750
 /usr/libexec/lxc/lxc-user-nic                           root:kvm        04750
 
 # firejail (bsc#1059013)
@@ -354,7 +332,6 @@
 /var/log/ts-shell/                                      root:ts-shell     2770
 
 # setuid bit for cockpit (bsc#1169614)
-/usr/lib/cockpit-session                                root:cockpit-wsinstance  4750
 /usr/libexec/cockpit-session                            root:cockpit-wsinstance  4750
 
 # binary that launches texlive tools with group "mktex" (bsc#1171686)
