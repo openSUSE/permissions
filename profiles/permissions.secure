@@ -104,8 +104,6 @@
 /var/log/squid/                                         squid:root        0750
 /usr/sbin/pinger                                        root:squid        0750
  +capabilities cap_net_raw=ep
-/usr/sbin/basic_pam_auth                                root:shadow       2750
-
 
 #
 # mixed section: most of it is disabled in this permissions.secure:
@@ -200,7 +198,6 @@
 /usr/lib/mgetty+sendfax/faxq-helper                     fax:trusted       4750
 /usr/libexec/mgetty+sendfax/faxq-helper                 fax:trusted       4750
 /var/spool/fax/outgoing/                                fax:root          0755
-/var/spool/fax/outgoing/locks                           fax:root          0755
 
 #
 # uucp
