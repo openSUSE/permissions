@@ -75,10 +75,13 @@
 /sbin/unix_chkpwd                                       root:shadow       0755
 /sbin/unix2_chkpwd                                      root:shadow       0755
 
-# /quid changes from bnc#891268
+# squid changes from bnc#891268
+# - adjusted paths in bsc#1171569
 /var/cache/squid/                                       squid:root        0750
 /var/log/squid/                                         squid:root        0750
-/usr/sbin/pinger                                        root:squid        0750
+/usr/libexec/squid/pinger                               root:squid        0750
+/usr/lib/squid/pinger                                   root:squid        0750
+/usr/lib64/squid/pinger                                 root:squid        0750
 
 
 #
