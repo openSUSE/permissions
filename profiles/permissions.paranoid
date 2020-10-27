@@ -317,7 +317,6 @@
 
 # ksysguard network helper (bsc#1151190)
 /usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
-/usr/libexec/libexec/ksysguard/ksgrd_network_helper         root:root       0755
 /usr/lib64/libexec/ksysguard/ksgrd_network_helper           root:root       0755
 
 # mariadb auth_pam_tool (bsc#1160285)
