@@ -17,8 +17,8 @@
 # Please see the respective files for their meaning.
 #
 #
-# Format: 
-# <file> <owner>:<group> <permission> 
+# Format:
+# <file> <owner>:<group> <permission>
 #
 # How it works:
 # To change an entry copy the line to permissions.local, modify it
