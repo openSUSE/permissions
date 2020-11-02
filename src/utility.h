@@ -44,6 +44,42 @@ public:
     }
 };
 
+/**
+ * \brief
+ *  ValueArg with sane const semantics
+ * \details
+ *  The TCLAP::ValueArg is missing accessors that allow access the contained
+ *  value in const contexts. Sadly there was no release of TCLAP in a long
+ *  time, the upstream master branch contains suitable fixes already, however.
+ *  This is just a small wrapper to fix this situation.
+ **/
+template <typename T>
+class SaneValueArg :
+    public TCLAP::ValueArg<T>
+{
+public:
+    SaneValueArg(
+        const std::string &flag,
+        const std::string &name,
+        const std::string &desc,
+        bool req,
+        T value,
+        const std::string &typeDesc,
+        TCLAP::CmdLineInterface &parser) :
+        TCLAP::ValueArg<T>(flag, name, desc, req, value, typeDesc, parser)
+    {}
+
+    const T& getValue() const
+    {
+        return this->_value;
+    }
+
+    T& getValue()
+    {
+        return this->_value;
+    }
+};
+
 // isspace has overloads which gives trouble with template argument deduction,
 // therefore provide a wrapper
 inline bool chkspace(char c) { return std::isspace(c); }

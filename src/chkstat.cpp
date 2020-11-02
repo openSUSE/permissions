@@ -314,10 +314,8 @@ void Chkstat::collectProfilePaths()
      * /etc we employ a backward compatibility logic here that prefers files
      * in /usr but also recognizes files in /etc as a fallback.
      */
-    const auto &config_root = m_config_root_path.getValue();
-
-    const auto usr_root = config_root + "/usr/share/permissions";
-    const auto etc_root = config_root + "/etc";
+    const auto usr_root = getUsrRoot();
+    const auto etc_root = getEtcRoot();
 
     // TODO: the current code only checks for an existing and readable file
     // object in a racy fashion. The logic would also continue if the file

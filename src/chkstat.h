@@ -134,6 +134,16 @@ protected: // functions
         return m_files_to_check.find(path) != m_files_to_check.end();
     }
 
+    std::string getUsrRoot() const
+    {
+        return m_config_root_path.getValue() + "/usr/share/permissions";
+    }
+
+    std::string getEtcRoot() const
+    {
+        return m_config_root_path.getValue() + "/etc";
+    }
+
     bool parseSysconfig();
 
     bool checkFsCapsSupport() const;
@@ -274,10 +284,10 @@ protected: // data
     TCLAP::ValueArg<std::string> m_force_level_list;
     TCLAP::MultiArg<std::string> m_file_lists;
 
-    TCLAP::ValueArg<std::string> m_root_path;
+    SaneValueArg<std::string> m_root_path;
     //! alternate config root directory relative to which config files are
     //! looked up
-    TCLAP::ValueArg<std::string> m_config_root_path;
+    SaneValueArg<std::string> m_config_root_path;
 
     //! positional input arguments: either the files to check for --system
     //! mode or the profiles to parse for non-system mode.
