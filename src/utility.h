@@ -20,7 +20,7 @@
  *     SwitchArg that can be programmatically set
  * \details
  *     TCLAP::SwitchArg doesn't offer a public API to programmatically change
- *     the switch's value. Therefore this specializations provides an
+ *     the switch's value. Therefore this specialization provides an
  *     additional method to make this possible.
  **/
 class SwitchArgRW :

@@ -301,6 +301,7 @@ protected: // data
     //! a mapping of file paths to ProfileEntry, denotes the entry to apply
     //! for each path
     std::map<std::string, ProfileEntry> m_profile_entries;
+
     /**
      * \brief
      *   A collection of the basenames of packages that have already been

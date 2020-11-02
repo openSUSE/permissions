@@ -309,10 +309,10 @@ void Chkstat::addProfile(const std::string &name)
 void Chkstat::collectProfilePaths()
 {
     /*
-     * Since configuration files are in the process of separated between stock
-     * configuration files in /usr and editable configuration files in /etc we
-     * employ a backward compatibility logic here that prefers files in /usr
-     * but also recognizes files in /etc as a fallback.
+     * Since configuration files are in the process of being separated between
+     * stock configuration files in /usr and editable configuration files in
+     * /etc we employ a backward compatibility logic here that prefers files
+     * in /usr but also recognizes files in /etc as a fallback.
      */
     const auto &config_root = m_config_root_path.getValue();
 
