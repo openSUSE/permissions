@@ -40,7 +40,7 @@ install: all
 	@install -m 644 man/permissions.5 $(DESTDIR)$(man5dir)
 	@install -m 644 etc/sysconfig.security $(DESTDIR)$(fillupdir)
 	@install -m 755 zypper-plugin/permissions.py $(DESTDIR)$(zypp_commit_plugins)
-	@for i in etc/permissions profiles/permissions.*; \
+	@for i in etc/variables.conf etc/permissions profiles/permissions.*; \
 		do install -m 644 $$i $(DESTDIR)$(permissionsdir); done
 	@install -m 644 etc/permissions.local $(DESTDIR)$(sysconfdir)
 

@@ -59,6 +59,7 @@ Chkstat::Chkstat(int argc, const char **argv) :
     m_only_warn("", "warn", "only inform about which changes would be performed but don't actually apply them (which is the default, except in --system mode)", m_parser),
     m_no_header("n", "noheader", "don't print intro message", m_parser),
     m_verbose("v", "verbose", "print additional output that might be useful for diagnosis", m_parser),
+    m_print_variables("", "print-variables", "print supported profile variable mappings then exit", m_parser),
     m_examine_paths("e", "examine", "operate only on the specified path(s)", false, "PATH", m_parser),
     m_force_level_list("", "level", "force application of the specified space-separated list of security levels (only supported in --system mode)", false, "", "e.g. \"local paranoid\"", m_parser),
     m_file_lists("f", "files", "read newline separated list of files to check (see --examine) from the specified path", false, "PATH", m_parser),
@@ -73,6 +74,10 @@ bool Chkstat::validateArguments()
 {
     // exits on error/usage
     m_parser.parse(m_argc, m_argv);
+
+    // in this case ignore all the rest, we'll just print the variables
+    if (m_print_variables.isSet())
+        return true;
 
     // check all parameters and only then return to provide full diagnostic to
     // the user, not just bit by bit complaining.
@@ -499,24 +504,41 @@ static inline void badProfileLine(const std::string &file, const size_t line, co
     std::cerr << file << ":" << line << ": syntax error in permissions profile (" << context << ")" << std::endl;
 }
 
-bool Chkstat::parseExtraProfileLine(const std::string &line, ProfileEntry &entry)
+bool Chkstat::parseCapabilityLine(const std::string &line, const std::vector<std::string> &active_paths)
 {
-    if (hasPrefix(line, "+capabilities "))
-    {
-        if (!m_use_fscaps)
-            // ignore the content
-            return true;
+    if (!hasPrefix(line, "+capabilities "))
+        return false;
+    else if (!m_use_fscaps)
+        // ignore the content
+        return true;
 
-        auto cap_text = line.substr(line.find_first_of(' '));
-        if (cap_text.empty())
-            // ignore empty capability specification
-            return true;
+    auto cap_text = line.substr(line.find_first_of(' '));
+    if (cap_text.empty())
+        // ignore empty capability specification
+        return true;
+
+    bool ret = true;
+
+    for (const auto &path: active_paths)
+    {
+        auto it = m_profile_entries.find(path);
+        if (it == m_profile_entries.end())
+        {
+            std::cerr << "No profile entry for path " << path << "???";
+            ret = false;
+            continue;
+        }
+
+        auto &entry = it->second;
 
         entry.caps.setFromText(cap_text);
-        return entry.caps.valid();
+        if (!entry.caps.valid())
+        {
+            ret = false;
+        }
     }
 
-    return false;
+    return ret;
 }
 
 bool Chkstat::parseProfile(const std::string &path)
@@ -531,7 +553,7 @@ bool Chkstat::parseProfile(const std::string &path)
     }
 
     size_t linenr = 0;
-    std::string last_key;
+    std::vector<std::string> active_keys;
     std::string line;
     std::vector<std::string> parts;
     mode_t mode_int;
@@ -556,13 +578,13 @@ bool Chkstat::parseProfile(const std::string &path)
         // profile entry seen.
         if (line[0] == '+')
         {
-            if (last_key.empty())
+            if (active_keys.empty())
             {
                 badProfileLine(path, linenr, "lone capability line");
                 continue;
             }
 
-            const auto good = parseExtraProfileLine(line, m_profile_entries[last_key]);
+            const auto good = parseCapabilityLine(line, active_keys);
 
             if (!good)
             {
@@ -571,6 +593,11 @@ bool Chkstat::parseProfile(const std::string &path)
 
             continue;
         }
+
+        // only keep the context for one following non-empty/non-comment line
+        // to prevent the context being applied to unintended '+' lines in
+        // case of parsing errors later on.
+        active_keys.clear();
 
         splitWords(line, parts);
 
@@ -612,8 +639,84 @@ bool Chkstat::parseProfile(const std::string &path)
             continue;
         }
 
-        const auto &entry = addProfileEntry(location, user, group, mode_int);
-        last_key = entry.file;
+        std::vector<std::string> expansions;
+        if (!expandProfilePaths(location, expansions) )
+        {
+            badProfileLine(path, linenr, "bad variable expansions");
+            continue;
+        }
+
+        for (const auto &exp_path: expansions)
+        {
+            addProfileEntry(exp_path, user, group, mode_int);
+            // remember the most recently added entries to allow potential '+'
+            // capability lines to be applied to them.
+            active_keys.push_back(exp_path);
+        }
+    }
+
+    return true;
+}
+
+bool Chkstat::expandProfilePaths(const std::string &path, std::vector<std::string> &expansions)
+{
+    std::stringstream ss;
+    ss.str(path);
+    std::string part;
+
+    // the initial entry
+    expansions.clear();
+    expansions.push_back("");
+
+    // process each path component.
+    //
+    // we support variables only as individual
+    // path components i.e. something like %{myvar}stuff/suffix is not
+    // allowed, only %{myvar}/suffix.
+    //
+    // multiple variable components in the same path are supported
+    while (std::getline(ss, part, '/'))
+    {
+        if (hasPrefix(part, "%{") && hasSuffix(part, "}"))
+        {
+            // variable found
+            const auto variable = part.substr(2, part.length() - 3);
+            auto it = m_variable_expansions.find(variable);
+
+            if (it == m_variable_expansions.end())
+            {
+                expansions.clear();
+                std::cerr << "Undeclared variable %{" << variable << "} encountered." << std::endl;
+                return false;
+            }
+
+            // now we need to create additional entries for each possible
+            // value of the variable
+            std::vector<std::string> new_expansions;
+
+            for (const auto &element: expansions)
+            {
+                for (const auto &var_value: it->second)
+                {
+                    new_expansions.push_back(element + "/" + var_value);
+                }
+            }
+
+            expansions = new_expansions;
+        }
+        else if (part.empty())
+        {
+            // leading slash, ignore
+            continue;
+        }
+        else
+        {
+            // regular fixed string
+            for (auto &element: expansions)
+            {
+                element = element + "/" + part;
+            }
+        }
     }
 
     return true;
@@ -1186,6 +1289,21 @@ int Chkstat::run()
     if (!processArguments())
         return 1;
 
+    loadVariableExpansions();
+
+    if (m_print_variables.isSet())
+    {
+        for (const auto& [var, values]: m_variable_expansions)
+        {
+            std::cout << var << ":\n";
+            for (const auto &val: values)
+            {
+                std::cout << "- " << val << "\n";
+            }
+        }
+        return 0;
+    }
+
     if (m_system_mode.isSet())
     {
         if (!parseSysconfig())
@@ -1275,6 +1393,136 @@ int Chkstat::run()
     printHeader();
 
     return processEntries();
+}
+
+static inline void badVariablesLine(const std::string &file, const size_t line, const std::string &context)
+{
+    std::cerr << file << ":" << line << ": syntax error in variable configuration (" << context << ")" << std::endl;
+}
+
+/**
+ * \brief
+ *  Checks that a path variable identifier contains only valid characters
+ **/
+static inline bool checkValidVariableIdentifier(const std::string &ident)
+{
+    for( auto ch: ident )
+    {
+        if (std::isalnum(ch))
+            continue;
+        else if (ch == '_')
+            continue;
+
+        std::cerr << "Invalid characters encountered in variable name '" << ident << "': '" << ch << "'" << std::endl;
+
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * \brief
+ *  Normalizes the given list of path variable values
+ * \details
+ *  Unnecessary path separators will be removed from each value.
+ **/
+static inline void normalizeVariableValues(std::vector<std::string> &values)
+{
+    for (auto &value: values)
+    {
+        // remove leading/trailing separators
+        strip(value, chkslash);
+
+        // remove consecutive slashes in two passes:
+        // - identify indices of repeated slashes
+        // - remove indices starting from the end of the string to avoid
+        //   shifting index positions.
+        char prev_char = 0;
+        size_t pos = 0;
+        std::vector<size_t> del_indices;
+
+        for (auto ch: value)
+        {
+            if (ch == '/' && prev_char == '/')
+                del_indices.push_back(pos);
+            else
+                prev_char = ch;
+
+            pos++;
+        }
+
+        for (auto it = del_indices.rbegin(); it != del_indices.rend(); it++)
+        {
+            value.erase(*it, 1);
+        }
+    }
+}
+
+void Chkstat::loadVariableExpansions()
+{
+    auto conf_path = getUsrRoot() + "/variables.conf";
+
+    std::ifstream fs(conf_path);
+
+    if (!fs)
+    {
+        std::cerr << "warning: couldn't find variable mapping configuration in " << conf_path << ": " << std::strerror(errno) << std::endl;
+        return;
+    }
+
+    std::vector<std::string> words;
+    size_t linenr = 0;
+    std::string line;
+
+    while (std::getline(fs, line))
+    {
+        linenr++;
+        strip(line);
+
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        auto equal_pos = line.find('=');
+
+        if (equal_pos == line.npos)
+        {
+            badVariablesLine(conf_path, linenr, "missing '=' assignment");
+            continue;
+        }
+
+        auto varname = line.substr(0, equal_pos);
+        strip(varname);
+        if (!checkValidVariableIdentifier(varname))
+        {
+            badVariablesLine(conf_path, linenr, "bad variable identifier");
+            continue;
+        }
+
+        auto values = line.substr(equal_pos + 1);
+        strip(values);
+
+        splitWords(values, words);
+
+        if (words.empty())
+        {
+            badVariablesLine(conf_path, linenr, "empty assignment");
+            continue;
+        }
+
+        normalizeVariableValues(words);
+
+        // tolerate words.size() == 1, we could emit a warning, but it could
+        // be a valid use case.
+
+        if (m_variable_expansions.find(varname) != m_variable_expansions.end())
+        {
+            badVariablesLine(conf_path, linenr, "duplicate variable entry, ignoring");
+            continue;
+        }
+
+        m_variable_expansions[varname] = words;
+    }
 }
 
 int main(int argc, const char **argv)
