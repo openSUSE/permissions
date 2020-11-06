@@ -772,6 +772,9 @@ class TestBase:
 
 		return '.'.join((base, profile))
 
+	def getVariablesConfPath(self):
+		return TestBase.config_root + "/usr/share/permissions/variables.conf"
+
 	def getName(self):
 		return self.m_test_name
 

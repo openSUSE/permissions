@@ -2,6 +2,7 @@
 # vim: ts=8 noet sw=8 sts=8 :
 
 import os
+import pprint
 import shutil
 
 from base import TestBase, ConfigLocation
@@ -1111,6 +1112,118 @@ class TestSymlinkDirBehaviour(TestBase):
 			self.assertMode(testfile2, 0o644):
 			print("Modes of symlink targets have been adjusted correctly")
 
+class TestVariablesBase(TestBase):
+
+	def createVariablesConf(self, var_map):
+		"""Creates a variables.conf file from the given dictionary.
+
+		Expects a dictionary like
+
+		{"myvar": ["/path/1", "/path/2"]}.
+		"""
+		with open(self.getVariablesConfPath(), 'w') as varconf_fd:
+
+			for var, values in var_map.items():
+				varconf_fd.write("{} = {}\n".format(
+					var, ' '.join(values)
+				))
+
+
+class TestVariableParsing(TestVariablesBase):
+
+	def __init__(self):
+
+		super().__init__("tests parsing of variables.conf")
+
+	def run(self):
+		variables = {
+			"var1": ["file1", "file2"],
+			"var2": ["sub/dir1", "sub/dir2"]
+		}
+
+		print("Creating variables.conf from:")
+		pprint.pprint(variables)
+		print()
+
+		self.createVariablesConf(variables)
+
+		res, lines = self.callChkstat(["--print-variables"])
+		print()
+
+		if res != 0:
+			self.printError("failed to run chkstat to print parsed variables")
+			return
+
+		parsed = {}
+		cur_var = ""
+
+		for line in lines:
+
+			line = line.strip()
+
+			if not line.startswith("- "):
+				var = line.strip(':')
+				parsed[var] = []
+				cur_var = var
+			else:
+				parts = line.split()
+				if len(parts) != 2:
+					continue
+
+				parsed[cur_var].append(parts[1])
+
+		if parsed == variables:
+			print("parsed variables match expected values")
+		else:
+			self.printError("printed variables don't match expected variables")
+
+
+class TestVariableApplication(TestVariablesBase):
+
+	def __init__(self):
+
+		super().__init__("tests application of variables in permissions lines")
+
+	def run(self):
+
+		testroot = self.createAndGetTestDir(0o755)
+
+		for d in ("dir1", "dir2"):
+			dpath = os.path.join(testroot, d)
+			self.createTestDir(dpath, 0o755)
+			for f in ("file1", "file2"):
+				fpath = os.path.join(dpath, f)
+				self.createTestFile(fpath, 0o600)
+
+		variables = {
+				"vardir": ["dir1", "dir2"],
+				"varfile": ["file1", "file2"]
+		}
+
+		self.createVariablesConf(variables)
+
+		testprofile = "easy"
+		testpath = testroot + "/%{vardir}/%{varfile}"
+		print(testpath)
+
+		entries = {
+			testprofile: (
+				self.buildProfileLine(testpath, 0o644),
+			)
+		}
+
+		self.addProfileEntries(entries)
+		self.switchSystemProfile(testprofile)
+		self.applySystemProfile()
+
+		for d in ("dir1", "dir2"):
+			dpath = os.path.join(testroot, d)
+			for f in ("file1", "file2"):
+				fpath = os.path.join(dpath, f)
+				if self.assertMode(fpath, 0o644):
+					print("Mode of", fpath, "has been adjusted correctly")
+
+
 tests = (
 	TestCorrectMode,
 	TestCorrectOwner,
@@ -1133,4 +1246,6 @@ tests = (
 	TestPrivsOnInsecurePath,
 	TestSymlinkBehaviour,
 	TestSymlinkDirBehaviour,
+	TestVariableParsing,
+	TestVariableApplication
 )
