@@ -1,2 +1,3 @@
 chkstat
 *.o
+__pycache__
