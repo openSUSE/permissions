@@ -9,7 +9,7 @@ from base import TestBase, ConfigLocation
 class TestCorrectMode(TestBase):
 
 	def __init__(self):
-		super().__init__("TestCorrectMode", "checks whether file mode assignments are correctly applied as configured")
+		super().__init__("checks whether file mode assignments are correctly applied as configured")
 
 	def run(self):
 		testdir = self.createAndGetTestDir(0o770)
@@ -49,7 +49,7 @@ class TestCorrectMode(TestBase):
 class TestCorrectOwner(TestBase):
 
 	def __init__(self):
-		super().__init__("TestCorrectOwner", "checks whether file owner/group assignments are corectly applied as configured")
+		super().__init__("checks whether file owner/group assignments are corectly applied as configured")
 
 	def run(self):
 
@@ -101,7 +101,7 @@ class TestCorrectOwner(TestBase):
 class TestBasePermissions(TestBase):
 
 	def __init__(self):
-		super().__init__("TestBasePermissions", "checks whether entries in /etc/permissions correctly apply")
+		super().__init__("checks whether entries in /etc/permissions correctly apply")
 
 	def run(self):
 
@@ -144,7 +144,7 @@ class TestBasePermissions(TestBase):
 class TestPackagePermissions(TestBase):
 
 	def __init__(self):
-		super().__init__("TestPackagePermissions", "checks whether package entries in /etc/permissions.d correctly apply")
+		super().__init__("checks whether package entries in /etc/permissions.d correctly apply")
 
 	def run(self):
 
@@ -220,7 +220,7 @@ class TestPackagePermissions(TestBase):
 class TestLocalPermissions(TestBase):
 
 	def __init__(self):
-		super().__init__("TestLocalPermissions", "checks whether entries in *.local profiles are respected")
+		super().__init__("checks whether entries in *.local profiles are respected")
 
 	def run(self):
 
@@ -287,7 +287,7 @@ class TestLocalPermissions(TestBase):
 class TestDefaultProfile(TestBase):
 
 	def __init__(self):
-		super().__init__("TestDefaultProfile", "checks whether the default profile is correctly selected")
+		super().__init__("checks whether the default profile is correctly selected")
 		# if no profile is explicitly configured then this one should
 		# be implicitly selected by chkstat
 		self.m_default_profile = "secure"
@@ -394,7 +394,7 @@ class TestForceProfile(TestCommandLineBase):
 
 	def __init__(self):
 
-		super().__init__("TestForceProfile", "Tests whether the `--level` override works")
+		super().__init__("Tests whether the `--level` override works")
 
 	def run(self):
 
@@ -416,7 +416,7 @@ class TestWarnMode(TestCommandLineBase):
 
 	def __init__(self):
 
-		super().__init__("TestWarnMode", "Tests whether the `--warn` switch works as expected")
+		super().__init__("Tests whether the `--warn` switch works as expected")
 
 	def run(self):
 		self.setupTest()
@@ -438,7 +438,7 @@ class TestExamineSwitch(TestCommandLineBase):
 
 	def __init__(self):
 
-		super().__init__("TestExamineSwitch", "Tests whether the `--examine` switch works as expected")
+		super().__init__("Tests whether the `--examine` switch works as expected")
 
 	def run(self):
 		self.setupTest()
@@ -471,7 +471,7 @@ class TestRootSwitch(TestCommandLineBase):
 
 	def __init__(self):
 
-		super().__init__("TestRootSwitch", "Tests whether the `--root` switch works as expected")
+		super().__init__("Tests whether the `--root` switch works as expected")
 
 	def run(self):
 		self.setupTest()
@@ -507,7 +507,7 @@ class TestFilesSwitch(TestCommandLineBase):
 
 	def __init__(self):
 
-		super().__init__("TestFilesSwitch", "Tests whether the `--files` switch works as expected")
+		super().__init__("Tests whether the `--files` switch works as expected")
 
 	def run(self):
 		self.setupTest()
@@ -547,7 +547,7 @@ class TestCapabilities(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestCapabilities", "checks whether capability settings and related command line options work")
+		super().__init__("checks whether capability settings and related command line options work")
 
 	def run(self):
 
@@ -589,7 +589,7 @@ class TestUnexpectedPathOwner(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestUnexpectedPathOwner", "checks whether changes are rejected when parent dir owner and target path owner don't match")
+		super().__init__("checks whether changes are rejected when parent dir owner and target path owner don't match")
 
 	def run(self):
 
@@ -664,7 +664,7 @@ class TestRejectWorldWritable(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestRejectWorldWritable", "checks that world-writable target files aren't touched")
+		super().__init__("checks that world-writable target files aren't touched")
 
 	def run(self):
 
@@ -707,7 +707,7 @@ class TestRejectWorldWritable(TestBase):
 class TestRejectInsecurePath(TestBase):
 
 	def __init__(self):
-		super().__init__("TestRejectInsecurePath", "checks whether paths with insecure inter-mediate ownership are rejected")
+		super().__init__("checks whether paths with insecure inter-mediate ownership are rejected")
 
 	def run(self):
 
@@ -768,7 +768,7 @@ class TestUnknownOwnership(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestUnknownOwnership", "checks whether config entries for unknown user/group are rejected")
+		super().__init__("checks whether config entries for unknown user/group are rejected")
 
 	def run(self):
 
@@ -826,7 +826,7 @@ class TestRejectUserSymlink(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestRejectUserSymlink", "checks whether user-owned symlinks in early path components are rejected")
+		super().__init__("checks whether user-owned symlinks in early path components are rejected")
 
 	def run(self):
 
@@ -879,7 +879,7 @@ class TestPrivsForSpecialFiles(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestPrivsForSpecialFiles", "checks that set*id bits and caps aren't assigned to special files")
+		super().__init__("checks that set*id bits and caps aren't assigned to special files")
 
 	def run(self):
 
@@ -930,7 +930,7 @@ class TestPrivsOnInsecurePath(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestPrivsOnInsecurePath", "checks that no privileges are set beneath path owned by different users")
+		super().__init__("checks that no privileges are set beneath path owned by different users")
 
 	def run(self):
 
@@ -986,7 +986,7 @@ class TestSymlinkBehaviour(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestSymlinkBehaviour", "checks that final symlink components in paths are handled correctly")
+		super().__init__("checks that final symlink components in paths are handled correctly")
 
 	def run(self):
 
@@ -1057,7 +1057,7 @@ class TestSymlinkDirBehaviour(TestBase):
 
 	def __init__(self):
 
-		super().__init__("TestSymlinkDirBehaviour", "checks that intermediary trusted symlink components in paths are handled correctly")
+		super().__init__("checks that intermediary trusted symlink components in paths are handled correctly")
 
 	def run(self):
 

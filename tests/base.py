@@ -737,12 +737,12 @@ class TestBase:
 
 	global_init_performed = False
 
-	def __init__(self, name, desc):
+	def __init__(self, desc):
 
 		self.m_profiles = ("easy", "secure", "paranoid")
 		self.m_local_profile = "local"
 
-		self.m_test_name = name
+		self.m_test_name = type(self).__name__
 		self.m_test_desc = desc
 		self.m_result = 0
 		self.m_warnings = 0
