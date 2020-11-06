@@ -2,16 +2,17 @@
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
-.ad l
+.ad b
 .SH "NAME"
 permission - default permission settings
 .SH "SYNOPSIS"
 The chkstat program sets permissions and ownerships according to the
 permission files\.
 .SH "DESCRIPTION"
+.PP
 \- The files /usr/share/permissions/permissions\.* are line based and space delimited\.
 .br
-\- Lines starting with # are comments\.
+\- Lines starting with '#' are comments\.
 .br
 \- The first column specifies the file name\. Directory names have to
 end with a slash\.
@@ -22,7 +23,69 @@ end with a slash\.
 .br
 \- The special value \fB+capabilities\fR in the first column extends
 the information of the previous line with file capabilites.
+.PP
+The file name in the first column can contain contain variables as defined in
+the \fIvariables.conf\fR file.
 .br
+A variable expands to one or more alternative path segments that relate to the
+same program or file.  chkstat will look in each possible path 
+resulting from the variable expansion and apply the permissions accordingly.
+.PP
+The variables.conf file will ignore empty lines, whitespace only lines or
+comment lines starting with '#'. All other lines must contain variable
+definitions that follow the syntax \fBmyvar = /path/1 /path/2\fR.  This
+example will declare a variable identified as \fImyvar\fR that will expand to
+both specified path segments.
+.br
+Path segments appearing in variable assignments need to be separated by
+whitespace characters. The path values cannot contain whitespace themselves.
+The variable identifier is limited to alphanumeric characters and the
+underscore '_' character.
+.PP
+To reference a variable in a permissions file it needs to be dereferenced
+using the \fB%{myvar}\fR syntax. The variable needs to appear as a single path
+component and cannot be mixed with other literal characters. Multiple
+variables per path are allowed. The following are valid variable uses:
+.PP
+\- %{myvar}/sub/path
+.br
+\- /parent/path/%{myvar}
+.br
+\- /parent/path/%{myvar}/sub/path
+.br
+\- %{var1}/path/%{var2}
+.PP
+While the following are invalid:
+.PP
+\- /prefix/pre%{myvar}suf/suffix
+.br
+\- /%{var}text/path
+.br
+\- /path/text%{var}
+.SH "EXAMPLES"
+.PP
+A specification like this:
+.PP
+\&# in variables.conf
+.br
+lib_dirs = /lib /lib64
+.br
+sub_dirs = prog_v1 prog_v2
+.PP
+\&# in a permissions profile
+.br
+%{lib_dirs}/%{sub_dirs}/libsomething.so root:root 04755
+.PP
+Will cause chkstat to try and apply the given permission to all of the
+following paths:
+.PP
+\- /lib/prog_v1/libsomething.so
+.br
+\- /lib64/prog_v1/libsomething.so
+.br
+\- /lib/prog_v2/libsomething.so
+.br
+\- /lib64/prog_v2/libsomething.so
 .SH "FILES"
 .sp
 /usr/share/permissions/permissions
@@ -33,7 +96,10 @@ the information of the previous line with file capabilites.
 .br
 /usr/share/permissions/permissions\.paranoid
 .br
+.br
 /usr/share/permissions/permissions\.d/*
+.br
+/usr/share/permissions/variables.conf
 .br
 /etc/permissions\.local
 .br
