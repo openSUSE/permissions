@@ -162,8 +162,7 @@
 /usr/bin/jfbterm                                        root:tty          0755
 
 # kdesud (bsc#872276)
-/usr/lib/libexec/kf5/kdesud                             root:nogroup      2755
-/usr/lib64/libexec/kf5/kdesud                           root:nogroup      2755
+%{lib_dirs}/libexec/kf5/kdesud                          root:nogroup      2755
 
 #
 # amanda
@@ -186,18 +185,14 @@
 # anyone else, therefore the strange permissions 4554 are required
 # for operation. (#67032, #594393)
 #
-/usr/lib/news/bin/rnews                                 news:uucp         4550
-/usr/libexec/news/bin/rnews                             news:uucp         4550
-/usr/lib/news/bin/inews                                 news:news         2555
-/usr/libexec/news/bin/inews                             news:news         2555
-/usr/lib/news/bin/innbind                               root:news         4550
-/usr/libexec/news/bin/innbind                           root:news         4550
+%{libexec_dirs}/news/bin/rnews                          news:uucp         4550
+%{libexec_dirs}/news/bin/inews                          news:news         2555
+%{libexec_dirs}/news/bin/innbind                        root:news         4550
 
 #
 # sendfax
 #
-/usr/lib/mgetty+sendfax/faxq-helper                     fax:trusted       4750
-/usr/libexec/mgetty+sendfax/faxq-helper                 fax:trusted       4750
+%{libexec_dirs}/mgetty+sendfax/faxq-helper              fax:trusted       4750
 /var/spool/fax/outgoing/                                fax:root          0755
 
 #
@@ -224,21 +219,15 @@
 /usr/bin/newrole                                        root:root         0755
 
 # VirtualBox (#429725, bsc#1120650)
-/usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
-/usr/libexec/virtualbox/VirtualBoxVM                    root:vboxusers    0750
-/usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
-/usr/libexec/virtualbox/VBoxHeadless                    root:vboxusers    0755
-/usr/lib/virtualbox/VBoxSDL                             root:vboxusers    0755
-/usr/libexec/virtualbox/VBoxSDL                         root:vboxusers    0755
+%{libexec_dirs}/virtualbox/VirtualBoxVM                 root:vboxusers    0750
+%{libexec_dirs}/virtualbox/VBoxHeadless                 root:vboxusers    0755
+%{libexec_dirs}/virtualbox/VBoxSDL                      root:vboxusers    0755
 # (bnc#533550)
-/usr/lib/virtualbox/VBoxNetAdpCtl                       root:vboxusers    0755
-/usr/libexec/virtualbox/VBoxNetAdpCtl                   root:vboxusers    0755
+%{libexec_dirs}/virtualbox/VBoxNetAdpCtl                root:vboxusers    0755
 # bnc#669055
-/usr/lib/virtualbox/VBoxNetDHCP                         root:vboxusers    0755
-/usr/libexec/virtualbox/VBoxNetDHCP                     root:vboxusers    0755
+%{libexec_dirs}/virtualbox/VBoxNetDHCP                  root:vboxusers    0755
 # bsc#1033425
-/usr/lib/virtualbox/VBoxNetNAT                          root:vboxusers    0755
-/usr/libexec/virtualbox/VBoxNetNAT                      root:vboxusers    0755
+%{libexec_dirs}/virtualbox/VBoxNetNAT                   root:vboxusers    0755
 
 
 # open-vm-tools (bnc#474285)
@@ -310,18 +299,14 @@
 
 # usbauth (bsc#1066877)
 /usr/bin/usbauth-npriv                                  root:usbauth    04750
-/usr/lib/usbauth-notifier/                              root:usbauth-notifier  0750
-/usr/libexec/usbauth-notifier/                          root:usbauth-notifier  0750
-/usr/lib/usbauth-notifier/usbauth-notifier              root:usbauth    02755
-/usr/libexec/usbauth-notifier/usbauth-notifier          root:usbauth    02755
+%{libexec_dirs}/usbauth-notifier/                       root:usbauth-notifier  0750
+%{libexec_dirs}/usbauth-notifier/usbauth-notifier       root:usbauth    02755
 
 # spice-gtk (bsc#1101420)
 /usr/bin/spice-client-glib-usb-acl-helper               root:kvm        04750
 
 # smc-tools (bsc#1102956)
-/usr/lib/libsmc-preload.so                              root:root       04755
-/usr/libexec/libsmc-preload.so                          root:root       04755
-/usr/lib64/libsmc-preload.so                            root:root       04755
+%{lib_dirs}/libsmc-preload.so                           root:root       04755
 
 # lxc (bsc#988348)
 /usr/libexec/lxc/lxc-user-nic                           root:kvm        04750
@@ -330,8 +315,7 @@
 /usr/bin/firejail                                       root:firejail   04750
 
 # authbind (bsc#1111251)
-/usr/lib/authbind/helper                                root:root       04755
-/usr/libexec/authbind/helper                            root:root       04755
+%{libexec_dirs}/authbind/helper                         root:root       04755
 
 # fuse3 (bsc#1111230)
 /usr/bin/fusermount3                                    root:trusted    04750
@@ -344,19 +328,14 @@
 /var/spool/nagios/                                      nagios:nagcmd   2775
 
 # ksysguard network helper (bsc#1151190)
-/usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
- +capabilities cap_net_raw=ep
-/usr/lib64/libexec/ksysguard/ksgrd_network_helper           root:root       0755
+%{lib_dirs}/libexec/ksysguard/ksgrd_network_helper      root:root       0755
  +capabilities cap_net_raw=ep
 
 # mariadb auth_pam_tool (bsc#1160285)
-/usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool       root:root         4755
-/usr/libexec/mysql/plugin/auth_pam_tool_dir/auth_pam_tool   root:root         4755
-/usr/lib64/mysql/plugin/auth_pam_tool_dir/auth_pam_tool     root:root         4755
+%{lib_libexec_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool       root:root         4755
 
 # Workload Memory Protection (bsc#1161335)
-/usr/lib/sapwmp/sapwmp-capture                           root:sapsys    4750
-/usr/libexec/sapwmp/sapwmp-capture                       root:sapsys    4750
+%{libexec_dirs}/sapwmp/sapwmp-capture                   root:sapsys    4750
 
 # s390-tools log directory for ts-shell (bsc#1167163)
 /var/log/ts-shell/                                      root:ts-shell     2770
@@ -365,8 +344,7 @@
 /usr/libexec/cockpit-session                            root:cockpit-wsinstance  4750
 
 # binary that launches texlive tools with group "mktex" (bsc#1171686)
-/usr/lib/mktex/public                                   root:mktex 2755
-/usr/libexec/mktex/public                               root:mktex 2755
+%{libexec_dirs}/mktex/public                            root:mktex 2755
 
 # enlightenment privileged desktop operations (bsc#1169238)
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
