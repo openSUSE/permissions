@@ -80,8 +80,6 @@
 /var/cache/squid/                                       squid:root        0750
 /var/log/squid/                                         squid:root        0750
 /usr/libexec/squid/pinger                               root:squid        0750
-/usr/lib/squid/pinger                                   root:squid        0750
-/usr/lib64/squid/pinger                                 root:squid        0750
 
 
 #

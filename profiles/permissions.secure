@@ -105,10 +105,6 @@
 /var/log/squid/                                         squid:root        0750
 /usr/libexec/squid/pinger                               root:squid        0750
  +capabilities cap_net_raw=ep
-/usr/lib64/squid/pinger                                 root:squid        0750
- +capabilities cap_net_raw=ep
-/usr/lib/squid/pinger                                   root:squid        0750
- +capabilities cap_net_raw=ep
 
 #
 # mixed section: most of it is disabled in this permissions.secure:
