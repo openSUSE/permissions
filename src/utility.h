@@ -20,7 +20,7 @@
  *     SwitchArg that can be programmatically set
  * \details
  *     TCLAP::SwitchArg doesn't offer a public API to programmatically change
- *     the switch's value. Therefore this specializations provides an
+ *     the switch's value. Therefore this specialization provides an
  *     additional method to make this possible.
  **/
 class SwitchArgRW :
@@ -41,6 +41,42 @@ public:
         // this is used for isSet(), _value only for getValue(), so
         // sync both.
         _alreadySet = val;
+    }
+};
+
+/**
+ * \brief
+ *  ValueArg with sane const semantics
+ * \details
+ *  The TCLAP::ValueArg is missing accessors that allow access the contained
+ *  value in const contexts. Sadly there was no release of TCLAP in a long
+ *  time, the upstream master branch contains suitable fixes already, however.
+ *  This is just a small wrapper to fix this situation.
+ **/
+template <typename T>
+class SaneValueArg :
+    public TCLAP::ValueArg<T>
+{
+public:
+    SaneValueArg(
+        const std::string &flag,
+        const std::string &name,
+        const std::string &desc,
+        bool req,
+        T value,
+        const std::string &typeDesc,
+        TCLAP::CmdLineInterface &parser) :
+        TCLAP::ValueArg<T>(flag, name, desc, req, value, typeDesc, parser)
+    {}
+
+    const T& getValue() const
+    {
+        return this->_value;
+    }
+
+    T& getValue()
+    {
+        return this->_value;
     }
 };
 

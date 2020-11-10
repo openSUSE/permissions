@@ -134,6 +134,16 @@ protected: // functions
         return m_files_to_check.find(path) != m_files_to_check.end();
     }
 
+    std::string getUsrRoot() const
+    {
+        return m_config_root_path.getValue() + "/usr/share/permissions";
+    }
+
+    std::string getEtcRoot() const
+    {
+        return m_config_root_path.getValue() + "/etc";
+    }
+
     bool parseSysconfig();
 
     bool checkFsCapsSupport() const;
@@ -172,13 +182,13 @@ protected: // functions
      *      Parses extra "+capabilities" lines in permission profiles
      * \param[in] line
      *      The input line from a profile file that starts with "+"
-     * \param[inout] entry
-     *      The last ProfileEntry that was previously parsed from the profile
-     *      file. Can be nullptr for corrupt files.
+     * \param[input] active_paths
+     *      The paths that the capabiliy line applies to. It is expected that
+     *      these paths already have entries in m_profile_entries.
      * \return
      *      Whether the line could successfully be parsed
      **/
-    bool parseExtraProfileLine(const std::string &line, ProfileEntry &entry);
+    bool parseCapabilityLine(const std::string &line, const std::vector<std::string> &active_paths);
 
     /**
      * \brief
@@ -250,6 +260,28 @@ protected: // functions
      **/
     std::string getPathFromProc(const FileDesc &fd) const;
 
+    /**
+     * \brief
+     *      Parses the variables.conf file and fills m_variable_expansions
+     **/
+    void loadVariableExpansions();
+
+    /**
+     * \brief
+     *      Expand possible variables in profile path specifications
+     * \details
+     *      Profile paths can contain %{variable} syntax that will expand to
+     *      one or more alternative values. This function performs this
+     *      expansion and returns the individual paths the profile entry
+     *      corresponds to. It is possible that only a single entry results
+     *      from the expansion or that no expansion is necessary at all, in
+     *      which case only a single entry will be returned in \c paths.
+     *  \return
+     *      In case any unrecoverable parsing error is encountered \c false is
+     *      returned and the profile entry should be ignored entirely.
+     **/
+    bool expandProfilePaths(const std::string &path, std::vector<std::string> &expansions);
+
 protected: // data
 
     const int m_argc = 0;
@@ -264,6 +296,7 @@ protected: // data
     TCLAP::SwitchArg m_only_warn;
     SwitchArgRW m_no_header;
     TCLAP::SwitchArg m_verbose;
+    TCLAP::SwitchArg m_print_variables;
 
     // NOTE: previously chkstat allowed multiple specifications of value
     // switches like --level and --root but actually only used the last
@@ -274,10 +307,10 @@ protected: // data
     TCLAP::ValueArg<std::string> m_force_level_list;
     TCLAP::MultiArg<std::string> m_file_lists;
 
-    TCLAP::ValueArg<std::string> m_root_path;
+    SaneValueArg<std::string> m_root_path;
     //! alternate config root directory relative to which config files are
     //! looked up
-    TCLAP::ValueArg<std::string> m_config_root_path;
+    SaneValueArg<std::string> m_config_root_path;
 
     //! positional input arguments: either the files to check for --system
     //! mode or the profiles to parse for non-system mode.
@@ -301,12 +334,16 @@ protected: // data
     //! a mapping of file paths to ProfileEntry, denotes the entry to apply
     //! for each path
     std::map<std::string, ProfileEntry> m_profile_entries;
+
     /**
      * \brief
      *   A collection of the basenames of packages that have already been
      *   processed by collectPackageProfilePaths()
      **/
     std::set<std::string> m_package_profiles_seen;
+
+    //! collected variable expansion mappings from the variables.conf file
+    std::map<std::string, std::vector<std::string>> m_variable_expansions;
 
     //! the effective user ID we're running as
     const uid_t m_euid;
