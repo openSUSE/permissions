@@ -48,14 +48,14 @@
 # #66303
 /usr/bin/opiepasswd                                     root:root         4755
 # #331020
-/sbin/mount.nfs                                         root:root         4755
+%{sbin_dirs}/mount.nfs                                  root:root         4755
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
 # needs setuid root when using shadow via NIS:
 # #216816
-/sbin/unix_chkpwd                                       root:shadow       4755
-/sbin/unix2_chkpwd                                      root:shadow       4755
+%{sbin_dirs}/unix_chkpwd                                root:shadow       4755
+%{sbin_dirs}/unix2_chkpwd                               root:shadow       4755
 
 # squid changes from bnc#891268
 # - adjusted paths in bsc#1171569
@@ -78,7 +78,7 @@
 /usr/bin/makeweb                                        root:www          2755
 # pcmcia:
 # Needs setuid to eject cards (#100120)
-/sbin/pccardctl                                         root:trusted      4755
+%{sbin_dirs}/pccardctl                                  root:trusted      4755
 
 # libgnomesu (#75823, #175616)
 /usr/libexec/libgnomesu/gnomesu-pam-backend             root:root         4755
@@ -198,7 +198,7 @@
 /usr/sbin/hawk_invoke                                   root:haclient     4750
 
 # ecryptfs-utils (bnc#740110)
-/sbin/mount.ecryptfs_private				root:root         4755
+%{sbin_dirs}/mount.ecryptfs_private                     root:root         4755
 
 # wireshark (bsc#957624)
 /usr/bin/dumpcap					root:wireshark	  0750
