@@ -1,4 +1,4 @@
-REQUIRED_CXXFLAGS=-std=c++17 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
+REQUIRED_CXXFLAGS=-std=c++17 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
 ifdef CXXFLAGS
 CXXFLAGS:=$(REQUIRED_CXXFLAGS) $(CXXFLAGS)
 else
