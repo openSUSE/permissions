@@ -208,8 +208,7 @@
 
 
 # polkit new (bnc#523377)
-/usr/lib/polkit-1/polkit-agent-helper-1                 root:root         4755
-/usr/libexec/polkit-1/polkit-agent-helper-1             root:root         4755
+%{libexec_dirs}/polkit-1/polkit-agent-helper-1          root:root         4755
 /usr/bin/pkexec                                         root:root         4755
 
 # dbus-1 (#333361 #1056764, bsc#1171164)
