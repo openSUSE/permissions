@@ -513,3 +513,9 @@
 
 # enlightenment privileged desktop operations (bsc#1169238)
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
+
+# ksysguard network helper (bsc#1151190)
+/usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+ +capabilities cap_net_raw=ep
+/usr/lib64/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+ +capabilities cap_net_raw=ep
