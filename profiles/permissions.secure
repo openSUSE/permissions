@@ -297,7 +297,7 @@
 /run/icinga2/cmd/					icinga:icingacmd 2750
 
 # usbauth (bsc#1066877)
-/usr/bin/usbauth-npriv                                  root:usbauth    04750
+/usr/libexec/usbauth-npriv                              root:usbauth    04750
 %{libexec_dirs}/usbauth-notifier/                       root:usbauth-notifier  0750
 %{libexec_dirs}/usbauth-notifier/usbauth-notifier       root:usbauth    02755
 
