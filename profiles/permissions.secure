@@ -185,9 +185,9 @@
 # anyone else, therefore the strange permissions 4554 are required
 # for operation. (#67032, #594393)
 #
-%{libexec_dirs}/news/bin/rnews                          news:uucp         4550
-%{libexec_dirs}/news/bin/inews                          news:news         2555
-%{libexec_dirs}/news/bin/innbind                        root:news         4550
+/usr/libexec/news/bin/rnews                             news:uucp         4550
+/usr/libexec/news/bin/inews                             news:news         2555
+/usr/libexec/news/bin/innbind                           root:news         4550
 
 #
 # sendfax
