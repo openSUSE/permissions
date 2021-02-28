@@ -259,8 +259,8 @@
 
 # usbauth (bsc#1066877)
 /usr/libexec/usbauth-npriv                              root:usbauth    04750
-%{libexec_dirs}/usbauth-notifier/                       root:usbauth-notifier  0750
-%{libexec_dirs}/usbauth-notifier/usbauth-notifier       root:usbauth    02755
+/usr/libexec/usbauth-notifier/                          root:usbauth-notifier  0750
+/usr/libexec/usbauth-notifier/usbauth-notifier          root:usbauth    02755
 
 # spice-gtk (bsc#1101420)
 /usr/bin/spice-client-glib-usb-acl-helper               root:kvm        04750
