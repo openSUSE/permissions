@@ -312,7 +312,7 @@
 /usr/libexec/cockpit-session                            root:cockpit-wsinstance  0750
 
 # binary that launches texlive tools with group "mktex" (bsc#1171686)
-%{libexec_dirs}/mktex/public                            root:mktex 0755
+/usr/libexec/mktex/public                               root:mktex 0755
 
 # enlightenment privileged desktop operations (bsc#1169238)
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  0755
