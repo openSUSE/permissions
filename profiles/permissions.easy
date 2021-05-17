@@ -307,7 +307,7 @@
 %{libexec_dirs}/mktex/public                            root:mktex 2755
 
 # enlightenment privileged desktop operations (bsc#1169238)
-/usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
+%{lib_dirs}/enlightenment/utils/enlightenment_system     root:root  4755
 
 # physlock (bsc#1175720, not suited for world access)
 /usr/bin/physlock                                       root:trusted 04750
