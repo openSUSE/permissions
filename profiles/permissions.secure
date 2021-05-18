@@ -353,3 +353,7 @@
 
 # xorg-x11-server (bsc#1175867)
 /usr/bin/Xorg.wrap                                      root:root 4755
+
+# please (bsc#1183669)
+/usr/bin/please                                         root:root 4755
+/usr/bin/pleaseedit                                     root:root 4755
