@@ -159,9 +159,9 @@
 # anyone else, therefore the strange permissions 4554 are required
 # for operation. (#67032, #594393)
 #
-%{libexec_dirs}/news/bin/rnews                          news:uucp         0555
-%{libexec_dirs}/news/bin/inews                          news:news         0555
-%{libexec_dirs}/news/bin/innbind                        root:news         0555
+/usr/libexec/news/bin/rnews                             news:uucp         0555
+/usr/libexec/news/bin/inews                             news:news         0555
+/usr/libexec/news/bin/innbind                           root:news         0555
 
 #
 # sendfax
@@ -181,7 +181,7 @@
 /usr/libexec/uucp/uuxqt                                 uucp:uucp         0555
 
 # polkit new (bnc#523377)
-%{libexec_dirs}/polkit-1/polkit-agent-helper-1          root:root         0755
+/usr/libexec/polkit-1/polkit-agent-helper-1             root:root         0755
 /usr/bin/pkexec                                         root:root         0755
 
 # dbus-1 (#333361, #1056764, bsc#1171164)
@@ -285,7 +285,7 @@
 /usr/bin/firejail                                       root:firejail   0750
 
 # authbind (bsc#1111251)
-%{libexec_dirs}/authbind/helper                         root:root       0755
+/usr/libexec/authbind/helper                            root:root       0755
 
 # fuse3 (bsc#1111230)
 /usr/bin/fusermount3                                    root:trusted    0755
@@ -312,7 +312,7 @@
 /usr/libexec/cockpit-session                            root:cockpit-wsinstance  0750
 
 # binary that launches texlive tools with group "mktex" (bsc#1171686)
-%{libexec_dirs}/mktex/public                            root:mktex 0755
+/usr/libexec/mktex/public                               root:mktex 0755
 
 # enlightenment privileged desktop operations (bsc#1169238)
 %{lib_dirs}/enlightenment/utils/enlightenment_system     root:root  0755
