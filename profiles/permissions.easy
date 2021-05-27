@@ -275,7 +275,7 @@
 /usr/bin/firejail                                       root:firejail   04750
 
 # authbind (bsc#1111251)
-%{libexec_dirs}/authbind/helper                         root:root       04755
+/usr/libexec/authbind/helper                            root:root       04755
 
 # fuse3 (bsc#1111230)
 /usr/bin/fusermount3                                    root:trusted    04755
