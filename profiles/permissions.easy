@@ -290,7 +290,7 @@
  +capabilities cap_net_raw=ep
 
 # mariadb auth_pam_tool (bsc#1160285)
-%{lib_libexec_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool root:root         4755
+%{lib_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool root:root      4755
 
 # Workload Memory Protection (bsc#1161335)
 %{libexec_dirs}/sapwmp/sapwmp-capture                   root:sapsys    4750

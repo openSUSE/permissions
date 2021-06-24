@@ -298,7 +298,7 @@
 %{lib_dirs}/libexec/ksysguard/ksgrd_network_helper      root:root       0755
 
 # mariadb auth_pam_tool (bsc#1160285)
-%{lib_libexec_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool       root:root         0755
+%{lib_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool root:root      0755
 
 # Workload Memory Protection (bsc#1161335)
 %{libexec_dirs}/sapwmp/sapwmp-capture                   root:sapsys    0750
