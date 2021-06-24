@@ -176,15 +176,15 @@
 /usr/bin/newrole                                        root:root         4755
 
 # VirtualBox (#429725, bsc#1120650)
-%{libexec_dirs}/virtualbox/VirtualBoxVM                 root:vboxusers    4750
-%{libexec_dirs}/virtualbox/VBoxHeadless                 root:vboxusers    4750
-%{libexec_dirs}/virtualbox/VBoxSDL                      root:vboxusers    4750
+/usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    4750
+/usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    4750
+/usr/lib/virtualbox/VBoxSDL                             root:vboxusers    4750
 # (bnc#533550)
-%{libexec_dirs}/virtualbox/VBoxNetAdpCtl                root:vboxusers    4750
+/usr/lib/virtualbox/VBoxNetAdpCtl                       root:vboxusers    4750
 # bnc#669055
-%{libexec_dirs}/virtualbox/VBoxNetDHCP                  root:vboxusers    4750
+/usr/lib/virtualbox/VBoxNetDHCP                         root:vboxusers    4750
 # bsc#1033425
-%{libexec_dirs}/virtualbox/VBoxNetNAT                   root:vboxusers    4750
+/usr/lib/virtualbox/VBoxNetNAT                          root:vboxusers    4750
 
 # open-vm-tools (bnc#474285)
 /usr/bin/vmware-user-suid-wrapper			root:root         4755
