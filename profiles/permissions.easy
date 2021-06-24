@@ -53,8 +53,8 @@
 /usr/bin/fusermount                                     root:trusted      4755
 # needs setuid root when using shadow via NIS:
 # #216816
-%{sbin_dirs}/unix_chkpwd                                root:shadow       4755
-%{sbin_dirs}/unix2_chkpwd                               root:shadow       4755
+/usr/sbin/unix_chkpwd                                   root:shadow       4755
+/usr/sbin/unix2_chkpwd                                  root:shadow       4755
 
 # squid changes from bnc#891268
 # - adjusted paths in bsc#1171569
@@ -196,7 +196,7 @@
 /usr/sbin/hawk_chkpwd                                   root:haclient     4750
 
 # ecryptfs-utils (bnc#740110)
-%{sbin_dirs}/mount.ecryptfs_private                     root:root         4755
+/usr/sbin/mount.ecryptfs_private                        root:root         4755
 
 # wireshark (bsc#957624)
 /usr/bin/dumpcap					root:wireshark	  0750
