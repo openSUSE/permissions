@@ -62,7 +62,6 @@
 /etc/ftpusers                                           root:root          644
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          600
-/etc/ssh/sshd_config                                    root:root          600
 # we might want to tighten that up in the future in this profile (remove the
 # ability for others to read/enter)
 /etc/cron.d/                                            root:root          755
@@ -96,8 +95,8 @@
 /usr/bin/fusermount                                     root:trusted      4750
 # needs setuid root when using shadow via NIS:
 # #216816
-%{sbin_dirs}/unix_chkpwd                                root:shadow       4755
-%{sbin_dirs}/unix2_chkpwd                               root:shadow       4755
+/usr/sbin/unix_chkpwd                                   root:shadow       4755
+/usr/sbin/unix2_chkpwd                                  root:shadow       4755
 
 # squid changes from bnc#891268
 # - adjusted paths in bsc#1171569
@@ -218,15 +217,15 @@
 /usr/bin/newrole                                        root:root         0755
 
 # VirtualBox (#429725, bsc#1120650)
-%{libexec_dirs}/virtualbox/VirtualBoxVM                 root:vboxusers    0750
-%{libexec_dirs}/virtualbox/VBoxHeadless                 root:vboxusers    0755
-%{libexec_dirs}/virtualbox/VBoxSDL                      root:vboxusers    0755
+/usr/lib/virtualbox/VirtualBoxVM                        root:vboxusers    0750
+/usr/lib/virtualbox/VBoxHeadless                        root:vboxusers    0755
+/usr/lib/virtualbox/VBoxSDL                             root:vboxusers    0755
 # (bnc#533550)
-%{libexec_dirs}/virtualbox/VBoxNetAdpCtl                root:vboxusers    0755
+/usr/lib/virtualbox/VBoxNetAdpCtl                       root:vboxusers    0755
 # bnc#669055
-%{libexec_dirs}/virtualbox/VBoxNetDHCP                  root:vboxusers    0755
+/usr/lib/virtualbox/VBoxNetDHCP                         root:vboxusers    0755
 # bsc#1033425
-%{libexec_dirs}/virtualbox/VBoxNetNAT                   root:vboxusers    0755
+/usr/lib/virtualbox/VBoxNetNAT                          root:vboxusers    0755
 
 
 # open-vm-tools (bnc#474285)
@@ -239,7 +238,7 @@
 /usr/sbin/hawk_chkpwd                                   root:haclient     4750
 
 # ecryptfs-utils (bnc#740110)
-%{sbin_dirs}/mount.ecryptfs_private                     root:root         0755
+/usr/sbin/mount.ecryptfs_private                        root:root         0755
 
 # wireshark (bsc#957624)
 /usr/bin/dumpcap					root:wireshark	  0750
@@ -330,7 +329,7 @@
  +capabilities cap_net_raw=ep
 
 # mariadb auth_pam_tool (bsc#1160285)
-%{lib_libexec_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool       root:root         4755
+%{lib_dirs}/mysql/plugin/auth_pam_tool_dir/auth_pam_tool root:root      4755
 
 # Workload Memory Protection (bsc#1161335)
 %{libexec_dirs}/sapwmp/sapwmp-capture                   root:sapsys    4750
