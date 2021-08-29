@@ -136,6 +136,7 @@
 
 # kdesud (bsc#872276)
 %{lib_dirs}/libexec/kf5/kdesud                          root:nogroup      0755
+/usr/libexec/kf5/kdesud                                 root:nogroup      0755
 
 #
 # amanda
