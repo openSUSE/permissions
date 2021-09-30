@@ -358,3 +358,7 @@
 # please (bsc#1183669)
 /usr/bin/please                                         root:root 4755
 /usr/bin/pleaseedit                                     root:root 4755
+
+# prometheus-blackbox_exporter
+/usr/bin/blackbox_exporter                              root:root 0755
+ +capabilities cap_net_raw=ep
