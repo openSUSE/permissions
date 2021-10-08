@@ -192,7 +192,7 @@
 #
 # sendfax
 #
-%{libexec_dirs}/mgetty+sendfax/faxq-helper              fax:trusted       4750
+/usr/libexec/mgetty+sendfax/faxq-helper                 fax:trusted       4750
 /var/spool/fax/outgoing/                                fax:root          0755
 
 #
