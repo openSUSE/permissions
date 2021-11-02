@@ -444,3 +444,7 @@
 # smc-tools (bsc#1102956)
 /usr/lib/libsmc-preload.so                              root:root       04755
 /usr/lib64/libsmc-preload.so                            root:root       04755
+
+# prometheus-blackbox_exporter (bsc#1191194)
+/usr/bin/blackbox_exporter                              root:root       0755
+ +capabilities cap_net_raw=ep
