@@ -52,9 +52,9 @@ def callCheckstat():
     # instead redirect stdout to stderr, this should end up in the zypper log
     # instead.
 
-    # --set is not required when passing --system, as long CHECK_PERMISSIONS
+    # --set is not required when passing --system, as long as CHECK_PERMISSIONS
     # is not disabled in /etc/sysconfig/security. If it is then the admin
-    # hopefuly knows what he's doing on its own.
+    # hopefuly knows what they are doing on their own.
     res = subprocess.call(
             ['/usr/bin/chkstat', '--system'],
             shell = False,
