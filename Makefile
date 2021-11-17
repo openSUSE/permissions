@@ -27,7 +27,7 @@ DESTDIR=
 LDLIBS=-lcap
 prefix=/usr
 sysconfdir=/etc
-permissionsdir=/usr/share/permissions
+permissionsdir=/etc
 bindir=$(prefix)/bin
 fillupdir=/var/adm/fillup-templates
 datadir=$(prefix)/share
@@ -43,15 +43,17 @@ all: src/chkstat
 	@if grep -n -o -P '\t' src/*.cpp src/*.h; then echo "error: source has mixed tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
 
 install: all
-	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(permissionsdir) $(zypp_commit_plugins); \
+	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(zypp_commit_plugins); \
 		do install -d -m 755 $(DESTDIR)$$i; done
 	@install -m 755 src/chkstat $(DESTDIR)$(bindir)
 	@install -m 644 man/chkstat.8 $(DESTDIR)$(man8dir)
 	@install -m 644 man/permissions.5 $(DESTDIR)$(man5dir)
 	@install -m 644 etc/sysconfig.security $(DESTDIR)$(fillupdir)
 	@install -m 755 zypper-plugin/permissions.py $(DESTDIR)$(zypp_commit_plugins)
-	@for i in etc/variables.conf etc/permissions profiles/permissions.*; \
+	@for i in etc/permissions profiles/permissions.*; \
 		do install -m 644 $$i $(DESTDIR)$(permissionsdir); done
+	@install -d -m 755 $(DESTDIR)/usr/share/permissions
+	@install -m 644 etc/variables.conf $(DESTDIR)/usr/share/permissions
 	@install -m 644 etc/permissions.local $(DESTDIR)$(sysconfdir)
 
 %.o: src/%.cpp
