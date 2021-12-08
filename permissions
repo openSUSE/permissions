@@ -38,52 +38,23 @@
 # root directories:
 #
 
-/                                                       root:root          755
-/root/                                                  root:root          700
 /tmp/                                                   root:root         1777
 /tmp/.X11-unix/                                         root:root         1777
 /tmp/.ICE-unix/                                         root:root         1777
-/dev/                                                   root:root          755
-/bin/                                                   root:root          755
-/sbin/                                                  root:root          755
-/lib/                                                   root:root          755
-/etc/                                                   root:root          755
-/home/                                                  root:root          755
-/boot/                                                  root:root          755
-/opt/                                                   root:root          755
-/usr/                                                   root:root          755
 
 #
 # /var:
 #
 
 /var/tmp/                                               root:root         1777
-/var/log/                                               root:root          755
-/var/spool/                                             root:root          755
 /var/spool/mqueue/                                      root:root          700
 /var/spool/news/                                        news:news          775
 /var/spool/uucp/                                        uucp:uucp          755
 /var/spool/voice/                                       root:root          755
 /var/spool/mail/                                        root:root         1777
-/var/adm/                                               root:root          755
-/var/adm/backup/                                        root:root          700
-/var/cache/                                             root:root          755
 /var/yp/                                                root:root          755
 /var/run/nscd/socket					root:root	   666
 /run/nscd/socket					root:root	   666
-/var/run/sudo/                                          root:root          700
-/run/sudo/                                          	root:root          700
-
-#
-# some device files
-#
-
-/dev/zero                                               root:root          666
-/dev/null                                               root:root          666
-/dev/full                                               root:root          666
-/dev/ip                                                 root:root          660
-/dev/initrd                                             root:disk          660
-/dev/kmem                                               root:kmem          640
 
 #
 # /etc
@@ -91,9 +62,7 @@
 /etc/lilo.conf                                          root:root          600
 /etc/passwd                                             root:root          644
 /etc/shadow                                             root:shadow        640
-/etc/init.d/                                            root:root          755
 /etc/HOSTNAME                                           root:root          644
-/etc/hosts                                              root:root          644
 # Changing the hosts_access(5) files causes trouble with services
 # that do not run as root!
 /etc/hosts.allow                                        root:root          644
@@ -168,49 +137,3 @@
 # wodim is not allowed setuid root as cd burning does not strictly require
 # it (bnc#882035)
 /usr/bin/wodim                                          root:root         0755
-
-# we no longer make rpm build dirs 1777
-/usr/src/packages/SOURCES/                              root:root         0755
-/usr/src/packages/BUILD/                                root:root         0755
-/usr/src/packages/BUILDROOT/                            root:root         0755
-/usr/src/packages/RPMS/                                 root:root         0755
-/usr/src/packages/RPMS/alphaev56/                       root:root         0755
-/usr/src/packages/RPMS/alphaev67/                       root:root         0755
-/usr/src/packages/RPMS/alphaev6/                        root:root         0755
-/usr/src/packages/RPMS/alpha/                           root:root         0755
-/usr/src/packages/RPMS/amd64/                           root:root         0755
-/usr/src/packages/RPMS/arm4l/                           root:root         0755
-/usr/src/packages/RPMS/armv4l/                          root:root         0755
-/usr/src/packages/RPMS/armv5tejl/                       root:root         0755
-/usr/src/packages/RPMS/armv5tejvl/                      root:root         0755
-/usr/src/packages/RPMS/armv5tel/                        root:root         0755
-/usr/src/packages/RPMS/armv5tevl/                       root:root         0755
-/usr/src/packages/RPMS/armv6l/                          root:root         0755
-/usr/src/packages/RPMS/armv6vl/                         root:root         0755
-/usr/src/packages/RPMS/armv7l/                          root:root         0755
-/usr/src/packages/RPMS/athlon/                          root:root         0755
-/usr/src/packages/RPMS/geode/                           root:root         0755
-/usr/src/packages/RPMS/hppa2.0/                         root:root         0755
-/usr/src/packages/RPMS/hppa/                            root:root         0755
-/usr/src/packages/RPMS/i386/                            root:root         0755
-/usr/src/packages/RPMS/i486/                            root:root         0755
-/usr/src/packages/RPMS/i586/                            root:root         0755
-/usr/src/packages/RPMS/i686/                            root:root         0755
-/usr/src/packages/RPMS/ia32e/                           root:root         0755
-/usr/src/packages/RPMS/ia64/                            root:root         0755
-/usr/src/packages/RPMS/mips/                            root:root         0755
-/usr/src/packages/RPMS/noarch/                          root:root         0755
-/usr/src/packages/RPMS/pentium3/                        root:root         0755
-/usr/src/packages/RPMS/pentium4/                        root:root         0755
-/usr/src/packages/RPMS/powerpc64/                       root:root         0755
-/usr/src/packages/RPMS/powerpc/                         root:root         0755
-/usr/src/packages/RPMS/ppc64/                           root:root         0755
-/usr/src/packages/RPMS/ppc/                             root:root         0755
-/usr/src/packages/RPMS/s390/                            root:root         0755
-/usr/src/packages/RPMS/s390x/                           root:root         0755
-/usr/src/packages/RPMS/sparc64/                         root:root         0755
-/usr/src/packages/RPMS/sparc/                           root:root         0755
-/usr/src/packages/RPMS/sparcv9/                         root:root         0755
-/usr/src/packages/RPMS/x86_64/                          root:root         0755
-/usr/src/packages/SPECS/                                root:root         0755
-/usr/src/packages/SRPMS/                                root:root         0755
