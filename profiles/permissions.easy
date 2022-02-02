@@ -47,7 +47,7 @@
 # #66303
 /usr/bin/opiepasswd                                     root:root         4755
 # #331020
-%{sbin_dirs}/mount.nfs                                  root:root         4755
+/usr/sbin/mount.nfs                                     root:root         4755
 #
 # #133657
 /usr/bin/fusermount                                     root:trusted      4755
