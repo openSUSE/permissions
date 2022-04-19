@@ -94,7 +94,7 @@
 /usr/bin/makeweb                                        root:www          0750
 # pcmcia:
 # Needs setuid to eject cards (#100120)
-%{sbin_dirs}/pccardctl                                  root:trusted      0755
+/usr/sbin/pccardctl                                     root:trusted      0755
 
 # libgnomesu (#75823, #175616)
 /usr/libexec/libgnomesu/gnomesu-pam-backend             root:root         0755
