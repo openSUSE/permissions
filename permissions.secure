@@ -394,6 +394,9 @@
 # singularity version 3 (bsc#1128598)
 /usr/lib/singularity/bin/starter-suid                   root:singularity  4750
 
+# apptainer (Singularity successor) (bsc#1196145)
+/usr/libexec/apptainer/bin/starter-suid                 root:apptainer    4750
+
 #
 # XXX: / -> /usr merge and sbin -> bin merge
 # XXX: duplicated entries need to be cleaned up before 12.2
