@@ -135,7 +135,6 @@
 /usr/bin/jfbterm                                        root:tty          0755
 
 # kdesud (bsc#872276)
-%{lib_dirs}/libexec/kf5/kdesud                          root:nogroup      0755
 /usr/libexec/kf5/kdesud                                 root:nogroup      0755
 
 #
@@ -299,7 +298,6 @@
 /var/spool/nagios/                                      nagios:nagcmd   0770
 
 # ksysguard network helper (bsc#1151190)
-%{lib_dirs}/libexec/ksysguard/ksgrd_network_helper      root:root       0755
 /usr/libexec/ksysguard/ksgrd_network_helper             root:root       0755
 
 # mariadb auth_pam_tool (bsc#1160285)

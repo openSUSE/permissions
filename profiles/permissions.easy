@@ -121,7 +121,6 @@
 /usr/bin/jfbterm                                        root:tty          6755
 
 # kdesud (bsc#872276)
-%{lib_dirs}/libexec/kf5/kdesud                          root:nogroup      2755
 /usr/libexec/kf5/kdesud                                 root:nogroup      2755
 
 #
@@ -290,8 +289,6 @@
 /var/spool/nagios/                                      nagios:nagcmd   2775
 
 # ksysguard network helper (bsc#1151190)
-%{lib_dirs}/libexec/ksysguard/ksgrd_network_helper      root:root       0755
- +capabilities cap_net_raw=ep
 /usr/libexec/ksysguard/ksgrd_network_helper             root:root       0755
  +capabilities cap_net_raw=ep
 
