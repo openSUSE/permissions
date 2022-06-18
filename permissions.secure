@@ -513,3 +513,7 @@
 
 # enlightenment privileged desktop operations (bsc#1169238)
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
+
+# please (bsc#1183669)
+/usr/bin/please                                         root:root 4755
+/usr/bin/pleaseedit                                     root:root 4755
