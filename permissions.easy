@@ -477,3 +477,6 @@
 
 # enlightenment privileged desktop operations (bsc#1169238)
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
+
+# postfix (bsc#1201385)
+/usr/sbin/postlog                                       root:maildrop 2755
