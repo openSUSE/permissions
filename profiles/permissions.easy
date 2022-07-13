@@ -319,3 +319,6 @@
 # please (bsc#1183669)
 /usr/bin/please                                         root:root 4755
 /usr/bin/pleaseedit                                     root:root 4755
+
+# postfix (bsc#1201385)
+/usr/sbin/postlog                                       root:maildrop 2755
