@@ -488,3 +488,6 @@
 # ksysguard network helper (bsc#1151190)
 /usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
 /usr/lib64/libexec/ksysguard/ksgrd_network_helper             root:root       0755
+
+# postfix (bsc#1201385)
+/usr/sbin/postlog                                       root:maildrop 0755
