@@ -606,6 +606,9 @@ class TestUnexpectedPathOwner(TestBase):
 
     def run(self):
 
+        if self.complainOnMissingSubIdSupport():
+            return
+
         testdir = self.createAndGetTestDir(0o755)
         baddir = os.path.join(testdir, "dir")
         badfile = os.path.join(testdir, "file")
@@ -625,24 +628,17 @@ class TestUnexpectedPathOwner(TestBase):
         }
 
         self.addProfileEntries(entries)
-        # for creating the mixed ownership we need to resort to bind
-        # mounts, since we're not really root and can't chown()
-        # (at least not without sub*id support)
-        self.m_main_test_instance.bindMount("/bin/bash", badfile)
-        self.m_main_test_instance.bindMount("/usr/bin", baddir)
+        os.chown(badfile, 1, 1, follow_symlinks=False)
+        os.chown(baddir, 1, 1, follow_symlinks=False)
         orig_file_mode = self.getMode(badfile)
         orig_dir_mode = self.getMode(baddir)
 
-        try:
-            self.switchSystemProfile(testprofile)
-            code, lines = self.applySystemProfile()
-            # make sure modes actually didn't change
-            # before bind mounts are removed
-            self.assertMode(badfile, orig_file_mode)
-            self.assertMode(baddir, orig_dir_mode)
-        finally:
-            self.m_main_test_instance.unmount(badfile)
-            self.m_main_test_instance.unmount(baddir)
+        self.switchSystemProfile(testprofile)
+        code, lines = self.applySystemProfile()
+        # make sure modes actually didn't change
+        # before bind mounts are removed
+        self.assertMode(badfile, orig_file_mode)
+        self.assertMode(baddir, orig_dir_mode)
 
         found_dir_reject = False
         found_file_reject = False
@@ -654,6 +650,78 @@ class TestUnexpectedPathOwner(TestBase):
         # refused to do anything
         messages = self.extractMessagesFromChkstat(lines, [baddir, badfile])
         needle = "unexpected owner"
+
+        for message in messages[baddir]:
+            if message.find(needle) != -1:
+                found_dir_reject = True
+                break
+        for message in messages[badfile]:
+            if message.find(needle) != -1:
+                found_file_reject = True
+                break
+
+        print(baddir, "rejected =", found_dir_reject)
+        print(badfile, "rejected =", found_file_reject)
+
+        if found_dir_reject and found_file_reject:
+            # all fine
+            return
+
+        self.printError("bad directory and/or bad file were not rejected")
+
+
+class TestUnexpectedPathGroup(TestBase):
+
+    def __init__(self):
+
+        super().__init__("checks whether changes are rejected when a group controlled path is involved")
+
+    def run(self):
+
+        if self.complainOnMissingSubIdSupport():
+            return
+
+        testdir = self.createAndGetTestDir(0o755)
+        baddir = os.path.join(testdir, "dir")
+        badfile = os.path.join(testdir, "file")
+
+        self.createTestFile(badfile, 0o664)
+        self.createTestDir(baddir, 0o775)
+
+        testprofile = "easy"
+
+        entries = {
+            testprofile: (
+                # add a trailing slash to express that we want
+                # a directory here
+                self.buildProfileLine(baddir + "/", 0o500),
+                self.buildProfileLine(badfile, 0o600)
+            )
+        }
+
+        self.addProfileEntries(entries)
+        os.chown(badfile, 0, 1, follow_symlinks=False)
+        os.chown(baddir, 0, 1, follow_symlinks=False)
+        orig_file_mode = self.getMode(badfile)
+        orig_dir_mode = self.getMode(baddir)
+
+        self.switchSystemProfile(testprofile)
+        code, lines = self.applySystemProfile()
+        # make sure modes actually didn't change
+        # before bind mounts are removed
+        self.assertMode(badfile, orig_file_mode)
+        self.assertMode(baddir, orig_dir_mode)
+
+        found_dir_reject = False
+        found_file_reject = False
+
+        # we can't evaluate the exit code in this case, even if the
+        # modes aren't corrected chkstat returns 0.
+        #
+        # instead parse chkstat's output to determine it correctly
+        # refused to do anything
+        messages = self.extractMessagesFromChkstat(lines, [baddir, badfile])
+        needle = "unexpected group"
 
         for message in messages[baddir]:
             if message.find(needle) != -1:
@@ -726,58 +794,59 @@ class TestRejectInsecurePath(TestBase):
 
     def run(self):
 
-        # to construct this we need a deeper directory hierarchy
-        # constructed via bind-mounts, since we can't directly chown()
-        # anything (at least not without sub*-id support)
+        if self.complainOnMissingSubIdSupport():
+            return
 
-        bind_mountpoints = []
         testroot = self.createAndGetTestDir(0o755)
-        testpath = os.path.join(testroot, "middle")
+        testpath = os.path.join(testroot, "badowner")
         self.createTestDir(testpath, 0o755)
-        # this will make the path seemingly owned by "nobody"
-        self.m_main_test_instance.bindMount("/usr/share", testpath)
-        bind_mountpoints.append(testpath)
-        # now get our own tmp directory into the game again, seemingly
-        # owned by "root"
-        testpath = os.path.join(testpath, "man")
-        self.m_main_test_instance.bindMount("/tmp", testpath)
-        bind_mountpoints.append(testpath)
+        os.chown(testpath, 1, 0)
+        testpath = os.path.join(testpath, "middle2")
+        self.createTestDir(testpath, 0o755)
         testpath = os.path.join(testpath, "somefile")
         self.createTestFile(testpath, 0o644)
+        somefile1 = testpath
+
+        testpath = os.path.join(testroot, "badgroup")
+        self.createTestDir(testpath, 0o775)
+        os.chown(testpath, 0, 1)
+        testpath = os.path.join(testpath, "middle2")
+        self.createTestDir(testpath, 0o755)
+        testpath = os.path.join(testpath, "somefile")
+        self.createTestFile(testpath, 0o644)
+        somefile2 = testpath
 
         testprofile = "easy"
 
         entries = {
             testprofile: (
-                self.buildProfileLine(testpath, 0o400),
+                self.buildProfileLine(somefile1, 0o400),
+                self.buildProfileLine(somefile2, 0o400),
             )
         }
 
-        try:
-            self.addProfileEntries(entries)
-            self.switchSystemProfile(testprofile)
-            code, lines = self.applySystemProfile()
-            # make sure the mode really didn't change, before bind
-            # mounts are removed again
-            self.assertMode(testpath, 0o644)
-        finally:
-            bind_mountpoints.reverse()
-            for mp in bind_mountpoints:
-                self.m_main_test_instance.unmount(mp)
+        self.addProfileEntries(entries)
+        self.switchSystemProfile(testprofile)
+        code, lines = self.applySystemProfile()
+        # make sure the mode really didn't change
+        self.assertMode(somefile1, 0o644)
+        self.assertMode(somefile2, 0o644)
 
-        messages = self.extractMessagesFromChkstat(lines, testpath)
+        messages = self.extractMessagesFromChkstat(lines, [somefile1, somefile2])
         needle = "on an insecure path"
-        found_rejection = False
 
-        for message in messages[testpath]:
-            if message.find(needle) != -1:
-                found_rejection = True
-                print("found rejection message")
-                break
+        for insecure in (somefile1, somefile2):
+            found_rejection = False
 
-        if not found_rejection:
-            self.printError("insecure path", testpath, "was not rejected")
-            return
+            for message in messages[insecure]:
+                if message.find(needle) != -1:
+                    found_rejection = True
+                    print("found rejection message for", insecure)
+                    break
+
+            if not found_rejection:
+                self.printError("insecure path", insecure, "was not rejected")
+                return
 
 
 class TestUnknownOwnership(TestBase):
@@ -1256,6 +1325,7 @@ tests = (
     TestFilesSwitch,
     TestCapabilities,
     TestUnexpectedPathOwner,
+    TestUnexpectedPathGroup,
     TestRejectWorldWritable,
     TestRejectInsecurePath,
     TestUnknownOwnership,
