@@ -1027,9 +1027,10 @@ bool Chkstat::safeOpen(EntryContext &ctx)
         path_rest = path_rest.substr(component.length() + 1);
         // path_rest is empty when we reach the final path element
         is_final_path_element = path_rest.empty() || path_rest == "/";
+        const bool is_parent_element = !is_final_path_element;
 
         // multiple consecutive slashes: ignore
-        if (!is_final_path_element && component.empty())
+        if (is_parent_element && component.empty())
             continue;
 
         // never move up from the configured root directory (using the stat result from the previous loop iteration)
@@ -1056,12 +1057,12 @@ bool Chkstat::safeOpen(EntryContext &ctx)
         // as we have no way to verify file contents
         //
         // for euid != 0 it is also ok if the owner is euid
-        if (ctx.status.st_uid && ctx.status.st_uid != m_euid && !is_final_path_element)
+        if (ctx.status.st_uid && ctx.status.st_uid != m_euid && is_parent_element)
         {
             ctx.traversed_insecure = true;
         }
         // path is in a world-writable directory
-        else if (!ctx.status.isLink() && ctx.status.isWorldWritable() && !is_final_path_element)
+        else if (!ctx.status.isLink() && ctx.status.isWorldWritable() && is_parent_element)
         {
             ctx.traversed_insecure = true;
         }
