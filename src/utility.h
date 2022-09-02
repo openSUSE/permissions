@@ -284,6 +284,26 @@ public:
         return this->st_uid == uid && this->st_gid == gid;
     }
 
+    bool hasNonRootOwner() const
+    {
+        return this->st_uid != 0;
+    }
+
+    bool hasNonRootGroup() const
+    {
+        return this->st_gid != 0;
+    }
+
+    bool matchesOwner(uid_t user) const
+    {
+        return this->st_uid == user;
+    }
+
+    bool matchesGroup(gid_t group) const
+    {
+        return this->st_gid == group;
+    }
+
     //! returns whether this file status and the other file status refer to
     //! the same file object (based on device and inode identification)
     bool sameObject(const struct ::stat &other) const
@@ -294,6 +314,11 @@ public:
     bool isWorldWritable() const
     {
         return (this->st_mode & S_IWOTH) != 0;
+    }
+
+    bool isGroupWritable() const
+    {
+        return (this->st_mode & S_IWGRP) != 0;
     }
 
     bool fstat(const FileDesc &fd)

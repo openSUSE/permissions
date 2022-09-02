@@ -1055,20 +1055,23 @@ bool Chkstat::safeOpen(EntryContext &ctx)
 
         // owner of directories must be trusted for setuid/setgid/capabilities
         // as we have no way to verify file contents
-        //
-        // for euid != 0 it is also ok if the owner is euid
-        if (ctx.status.st_uid && ctx.status.st_uid != m_euid && is_parent_element)
+        if (is_parent_element)
         {
-            ctx.traversed_insecure = true;
-        }
-        // path is in a world-writable directory
-        else if (!ctx.status.isLink() && ctx.status.isWorldWritable() && is_parent_element)
-        {
-            ctx.traversed_insecure = true;
+            // the owner needs to be root or our effective UID
+            if (ctx.status.hasNonRootOwner() && !ctx.status.matchesOwner(m_euid))
+            {
+                ctx.traversed_insecure = true;
+            }
+            // path is in a world-writable directory
+            else if (!ctx.status.isLink() && ctx.status.isWorldWritable())
+            {
+                ctx.traversed_insecure = true;
+            }
         }
 
-        // if parent directory is not owned by root, the file owner must match the owner of parent
-        if (ctx.status.st_uid && ctx.status.st_uid != ctx.uid && ctx.status.st_uid != m_euid)
+        // if the object is not owned by root, the file owner must match the
+        // target user or effective user
+        if (ctx.status.hasNonRootOwner() && !ctx.status.matchesOwner(ctx.uid) && !ctx.status.matchesOwner(m_euid))
         {
             if (is_final_path_element)
             {
@@ -1094,7 +1097,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
             // of the link, but we're going the simple route for now.
-            if (ctx.status.st_uid && ctx.status.st_uid != m_euid)
+            if (ctx.status.hasNonRootOwner() && !ctx.status.matchesOwner(m_euid))
             {
                 const auto path = getPathFromProc(pathfd);
                 std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;
