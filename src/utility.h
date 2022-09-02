@@ -11,6 +11,7 @@
 // C++
 #include <cctype>
 #include <cstring>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -289,9 +290,43 @@ public:
         return this->st_uid != 0;
     }
 
+    bool hasRootOwner() const
+    {
+        return !hasNonRootOwner();
+    }
+
     bool hasNonRootGroup() const
     {
         return this->st_gid != 0;
+    }
+
+    bool hasRootGroup() const
+    {
+        return !hasNonRootGroup();
+    }
+
+    bool hasSafeOwner(const std::initializer_list<uid_t> &safe_uids) const {
+        if (hasRootOwner())
+           return true;
+
+        for (const auto &uid: safe_uids) {
+            if (matchesOwner(uid))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool hasSafeGroup(const std::initializer_list<gid_t> &safe_gids) const {
+        if (!isGroupWritable() || hasRootGroup())
+           return true;
+
+        for (const auto &gid: safe_gids) {
+            if (matchesGroup(gid))
+                return true;
+        }
+
+        return false;
     }
 
     bool matchesOwner(uid_t user) const
