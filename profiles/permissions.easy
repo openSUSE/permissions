@@ -208,9 +208,17 @@
 # apptainer (Singularity successor) (bsc#1196145)
 /usr/libexec/apptainer/bin/starter-suid                 root:apptainer    4750
 
+# util-linux
 /usr/bin/su                                             root:root         4755
 /usr/bin/mount                                          root:root         4755
 /usr/bin/umount                                         root:root         4755
+# util-linux-mini
+/usr/libexec/build/staging/bin/su                       root:root         4755
+/usr/libexec/build/staging/bin/mount                    root:root         4755
+/usr/libexec/build/staging/bin/umount                   root:root         4755
+/usr/libexec/build/staging/bin/wall                     root:tty          2755
+/usr/libexec/build/staging/bin/write                    root:tty          2755
+
 
 # cdrecord of cdrtools from Joerg Schilling (bnc#550021)
 # Please note that additional capabilities are provided only for reliable
