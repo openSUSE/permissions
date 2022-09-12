@@ -347,6 +347,8 @@ protected: // data
 
     //! the effective user ID we're running as
     const uid_t m_euid;
+    //! the effective group ID we're running as
+    const gid_t m_egid;
 
     mutable ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
 };

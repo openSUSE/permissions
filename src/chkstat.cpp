@@ -66,7 +66,8 @@ Chkstat::Chkstat(int argc, const char **argv) :
     m_root_path("r", "root", "check files relative to the given root directory", false, "", "PATH", m_parser),
     m_config_root_path("", "config-root", "lookup configuration files relative to the given root directory", false, "", "PATH", m_parser),
     m_input_args("args", "in --system mode a list of paths to check, otherwise a list of profiles to parse", false, "PATH", m_parser),
-    m_euid(geteuid())
+    m_euid(geteuid()),
+    m_egid(getegid())
 {
 }
 
@@ -1027,9 +1028,10 @@ bool Chkstat::safeOpen(EntryContext &ctx)
         path_rest = path_rest.substr(component.length() + 1);
         // path_rest is empty when we reach the final path element
         is_final_path_element = path_rest.empty() || path_rest == "/";
+        const bool is_parent_element = !is_final_path_element;
 
         // multiple consecutive slashes: ignore
-        if (!is_final_path_element && component.empty())
+        if (is_parent_element && component.empty())
             continue;
 
         // never move up from the configured root directory (using the stat result from the previous loop iteration)
@@ -1054,20 +1056,29 @@ bool Chkstat::safeOpen(EntryContext &ctx)
 
         // owner of directories must be trusted for setuid/setgid/capabilities
         // as we have no way to verify file contents
-        //
-        // for euid != 0 it is also ok if the owner is euid
-        if (ctx.status.st_uid && ctx.status.st_uid != m_euid && !is_final_path_element)
+        if (is_parent_element)
         {
-            ctx.traversed_insecure = true;
-        }
-        // path is in a world-writable directory
-        else if (!ctx.status.isLink() && ctx.status.isWorldWritable() && !is_final_path_element)
-        {
-            ctx.traversed_insecure = true;
+            // the owner needs to be root or our effective UID
+            if (!ctx.status.hasSafeOwner({m_euid}))
+            {
+                ctx.traversed_insecure = true;
+            }
+            // if the dir is group-writable then require the root group or our
+            // effective GID.
+            else if (!ctx.status.hasSafeGroup({m_egid}))
+            {
+                ctx.traversed_insecure = true;
+            }
+            // path is in a world-writable directory
+            else if (!ctx.status.isLink() && ctx.status.isWorldWritable())
+            {
+                ctx.traversed_insecure = true;
+            }
         }
 
-        // if parent directory is not owned by root, the file owner must match the owner of parent
-        if (ctx.status.st_uid && ctx.status.st_uid != ctx.uid && ctx.status.st_uid != m_euid)
+        // if the object is owned by non-root, the owner must match the target
+        // user (from the profile entry) or our effective user
+        if (!ctx.status.hasSafeOwner({ctx.uid,m_euid}))
         {
             if (is_final_path_element)
             {
@@ -1078,6 +1089,22 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             {
                 const auto path = getPathFromProc(pathfd);
                 std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;
+                return false;
+            }
+        }
+
+        // same goes for the group, if it is writable
+        if(!ctx.status.hasSafeGroup({ctx.gid, m_egid}))
+        {
+            if (is_final_path_element)
+            {
+                std::cerr << ctx.subpath << ": is group-writable and has unexpected group (" << ctx.status.st_gid << "). refusing to correct due to unknown integrity." << std::endl;
+                return false;
+            }
+            else
+            {
+                const auto path = getPathFromProc(pathfd);
+                std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root group that could tamper with the file." << std::endl;
                 return false;
             }
         }
@@ -1093,7 +1120,7 @@ bool Chkstat::safeOpen(EntryContext &ctx)
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
             // of the link, but we're going the simple route for now.
-            if (ctx.status.st_uid && ctx.status.st_uid != m_euid)
+            if (!ctx.status.hasSafeOwner({m_euid}) || !ctx.status.hasSafeGroup({m_egid}))
             {
                 const auto path = getPathFromProc(pathfd);
                 std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;

@@ -11,6 +11,7 @@
 // C++
 #include <cctype>
 #include <cstring>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -284,6 +285,60 @@ public:
         return this->st_uid == uid && this->st_gid == gid;
     }
 
+    bool hasNonRootOwner() const
+    {
+        return this->st_uid != 0;
+    }
+
+    bool hasRootOwner() const
+    {
+        return !hasNonRootOwner();
+    }
+
+    bool hasNonRootGroup() const
+    {
+        return this->st_gid != 0;
+    }
+
+    bool hasRootGroup() const
+    {
+        return !hasNonRootGroup();
+    }
+
+    bool hasSafeOwner(const std::initializer_list<uid_t> &safe_uids) const {
+        if (hasRootOwner())
+           return true;
+
+        for (const auto &uid: safe_uids) {
+            if (matchesOwner(uid))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool hasSafeGroup(const std::initializer_list<gid_t> &safe_gids) const {
+        if (!isGroupWritable() || hasRootGroup())
+           return true;
+
+        for (const auto &gid: safe_gids) {
+            if (matchesGroup(gid))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool matchesOwner(uid_t user) const
+    {
+        return this->st_uid == user;
+    }
+
+    bool matchesGroup(gid_t group) const
+    {
+        return this->st_gid == group;
+    }
+
     //! returns whether this file status and the other file status refer to
     //! the same file object (based on device and inode identification)
     bool sameObject(const struct ::stat &other) const
@@ -294,6 +349,11 @@ public:
     bool isWorldWritable() const
     {
         return (this->st_mode & S_IWOTH) != 0;
+    }
+
+    bool isGroupWritable() const
+    {
+        return (this->st_mode & S_IWGRP) != 0;
     }
 
     bool fstat(const FileDesc &fd)

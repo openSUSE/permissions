@@ -34,8 +34,9 @@
 # we have to blindly call chkstat at the end of each transaction that adds one
 # or more packages.
 
-import os, sys
+import sys
 import zypp_plugin
+
 
 def log(*args, **kwargs):
     args = ("permissions-zypp-plugin:",) + args
@@ -43,6 +44,7 @@ def log(*args, **kwargs):
     print(*args, **kwargs)
     # not sure why sometimes log lines do not appear in zypper.log?
     sys.stderr.flush()
+
 
 def callCheckstat():
     import subprocess
@@ -56,14 +58,15 @@ def callCheckstat():
     # is not disabled in /etc/sysconfig/security. If it is then the admin
     # hopefuly knows what they are doing on their own.
     res = subprocess.call(
-            ['/usr/bin/chkstat', '--system'],
-            shell = False,
-            close_fds = True,
-            stdout = sys.stderr
+        ['/usr/bin/chkstat', '--system'],
+        shell=False,
+        close_fds=True,
+        stdout=sys.stderr
     )
 
     if res != 0:
         log("chkstat failed with exit code", res)
+
 
 class PermissionsPlugin(zypp_plugin.Plugin):
 
@@ -97,7 +100,7 @@ class PermissionsPlugin(zypp_plugin.Plugin):
                         log("malformed line encountered in", path + ":", line)
                         continue
                     permset.add(parts[0])
-        except:
+        except Exception:
             log("Failed to parse", path)
 
     def COMMITEND(self, headers, body):
@@ -113,7 +116,7 @@ class PermissionsPlugin(zypp_plugin.Plugin):
 
             _type = step.get("type", None)
             # we're only looking for new packages being installed (this also
-	    # covers updates).
+            # covers updates).
             if not _type or _type != "+":
                 continue
 
@@ -135,6 +138,7 @@ class PermissionsPlugin(zypp_plugin.Plugin):
 
     def PLUGINEND(self, headers, body):
         self.ack()
+
 
 plugin = PermissionsPlugin()
 plugin.main()
