@@ -54,6 +54,7 @@ struct perm *permlist;
 char **checklist;
 size_t nchecklist;
 uid_t euid;
+gid_t egid;
 char *root;
 size_t rootl;
 size_t nlevel;
@@ -550,7 +551,7 @@ mkdtemp_fail:
 
 
 int
-safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecure)
+safe_open(char *path, struct stat *stb, uid_t target_uid, gid_t target_gid, bool *traversed_insecure)
 {
   char pathbuf[PATH_MAX];
   char *path_rest;
@@ -619,9 +620,13 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
       /* for euid != 0 it is also ok if the owner is euid */
       if (stb->st_uid && stb->st_uid != euid && !is_final_path_element)
         *traversed_insecure = true;
+      // if the dir is group-writable then require the root group or our effective GID.
+      if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWGRP) && stb->st_gid && stb->st_gid != egid && !is_final_path_element)
+        *traversed_insecure = true;
       // path is in a world-writable directory, or file is world-writable itself.
       if (!S_ISLNK(stb->st_mode) && (stb->st_mode & S_IWOTH) && !is_final_path_element)
         *traversed_insecure = true;
+
       // if parent directory is not owned by root, the file owner must match the owner of parent
       if (stb->st_uid && stb->st_uid != target_uid && stb->st_uid != euid)
         {
@@ -635,6 +640,14 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
             goto fail_insecure_path;
         }
 
+      // same goes for the group, if it is writable
+      if (stb->st_gid && stb->st_gid != target_gid && stb->st_gid != egid)
+        {
+          if (!is_final_path_element)
+            goto fail_insecure_path;
+        }
+
+
       if (S_ISLNK(stb->st_mode))
         {
           // If the path configured in the permissions configuration is a symlink, we don't follow it.
@@ -646,6 +659,9 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, bool *traversed_insecu
           // In theory, we could also trust symlinks where the owner of the target matches the owner
           // of the link, but we're going the simple route for now.
           if (stb->st_uid && stb->st_uid != euid)
+            goto fail_insecure_path;
+          // same goes for ownership by regular groups.
+          else if (stb->st_gid && stb->st_gid != egid)
             goto fail_insecure_path;
 
           char linkbuf[PATH_MAX];
@@ -1084,6 +1100,7 @@ main(int argc, char **argv)
     }
 
   euid = geteuid();
+  egid = getegid();
   for (e = permlist; e; e = e->next)
     {
       if (use_checklist && !in_checklist(e->file+rootl))
@@ -1102,7 +1119,7 @@ main(int argc, char **argv)
           fd = -1;
         }
 
-      fd = safe_open(e->file, &stb, uid, &traversed_insecure);
+      fd = safe_open(e->file, &stb, uid, gid, &traversed_insecure);
       if (fd < 0)
         continue;
       if (S_ISLNK(stb.st_mode))
