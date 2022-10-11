@@ -625,7 +625,7 @@ safe_open(char *path, struct stat *stb, uid_t target_uid, gid_t target_gid, bool
         }
 
       // same goes for the group, if it is writable
-      if (stb->st_gid && stb->st_gid != target_gid && stb->st_gid != egid)
+      if ((stb->st_mode & S_IWGRP) && stb->st_gid && stb->st_gid != target_gid && stb->st_gid != egid)
         {
           if (!is_final_path_element)
             goto fail_insecure_path;
