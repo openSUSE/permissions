@@ -477,6 +477,7 @@
 /usr/lib/mktex/public                                   root:mktex 2755
 
 # enlightenment privileged desktop operations (bsc#1169238)
+/usr/lib/enlightenment/utils/enlightenment_system       root:root  4755
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
 
 # setuid bit for cockpit (bsc#1169614)
