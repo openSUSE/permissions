@@ -134,9 +134,6 @@
 # framebuffer terminal emulator (japanese).
 /usr/bin/jfbterm                                        root:tty          0755
 
-# kdesud (bsc#872276)
-/usr/libexec/kf5/kdesud                                 root:nogroup      0755
-
 #
 # amanda
 #
@@ -218,9 +215,6 @@
 
 # singularity version 3 (bsc#1128598)
 /usr/libexec/singularity/bin/starter-suid               root:singularity  0750
-
-# apptainer (Singularity successor) (bsc#1196145)
-/usr/libexec/apptainer/bin/starter-suid                 root:apptainer    0750
 
 /usr/bin/su                                             root:root         0755
 /usr/bin/mount                                          root:root         0755
