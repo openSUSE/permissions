@@ -482,3 +482,6 @@
 
 # setuid bit for cockpit (bsc#1169614)
 /usr/lib/cockpit-session                                root:cockpit-wsinstance  0750
+
+# postfix (bsc#1206738 bsc#1201385)
+/usr/sbin/postlog                                       root:maildrop 0755
