@@ -316,3 +316,10 @@
 
 # postfix (bsc#1201385)
 /usr/sbin/postlog                                       root:maildrop 2755
+
+# kismet (bsc#1200954, bsc#1207654)
+/usr/bin/kismet_cap_linux_bluetooth                     root:kismet 0750
+ +capabilities cap_net_raw,cap_net_admin=ep
+
+/usr/bin/kismet_cap_linux_wifi                          root:kismet 0750
+ +capabilities cap_net_raw,cap_net_admin=ep
