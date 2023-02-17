@@ -277,9 +277,11 @@
 #
 /usr/sbin/suexec             				root:root       0755
 
-# newgidmap / newuidmap (bsc#979282, bsc#1048645)
-/usr/bin/newgidmap					root:shadow	4755
-/usr/bin/newuidmap					root:shadow	4755
+# newgidmap / newuidmap (bsc#979282, bsc#1048645, bsc#1208309)
+/usr/bin/newgidmap					root:root	0755
+ +capabilities cap_setgid=ep
+/usr/bin/newuidmap					root:root	0755
+ +capabilities cap_setuid=ep
 
 # kwayland (bsc#1062182)
 /usr/bin/kwin_wayland					root:root	0755
