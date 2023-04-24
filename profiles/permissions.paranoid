@@ -61,9 +61,6 @@
 /usr/bin/expiry                                         root:shadow       0755
 /usr/bin/sudo                                           root:root         0755
 /usr/sbin/su-wrapper                                    root:root         0755
-# opie password system
-# #66303
-/usr/bin/opiepasswd                                     root:root         0755
 # #331020
 /usr/sbin/mount.nfs                                     root:root         0755
 #
