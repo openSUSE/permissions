@@ -39,3 +39,6 @@
 
 # ceph log directory (bsc#1150366)
 /var/log/ceph/                                          ceph:ceph         3770
+
+# icingaweb2 (bsc#1211314)
+/etc/icingaweb2/enabledModules/                         root:icingaweb2   2770
