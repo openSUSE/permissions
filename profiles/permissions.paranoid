@@ -107,12 +107,6 @@
 /usr/sbin/exim                                          root:root         0755
 
 #
-# dialup networking programs
-#
-/usr/sbin/pppoe-wrapper                                 root:dialout      0750
-
-
-#
 # linux text console utilities
 #
 # setuid needed on the text console to set the terminal content on ctrl-o
