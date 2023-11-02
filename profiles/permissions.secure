@@ -59,7 +59,6 @@
 /etc/crontab                                            root:root          600
 /etc/exports                                            root:root          644
 /etc/fstab                                              root:root          644
-/etc/ftpusers                                           root:root          644
 /var/lib/nfs/rmtab                                      root:root          644
 /etc/syslog.conf                                        root:root          600
 # we might want to tighten that up in the future in this profile (remove the
