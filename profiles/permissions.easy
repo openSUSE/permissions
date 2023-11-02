@@ -176,9 +176,6 @@
 # open-vm-tools (bnc#474285)
 /usr/bin/vmware-user-suid-wrapper			root:root         4755
 
-# lockdev (bnc#588325)
-/usr/sbin/lockdev                                       root:lock         2755
-
 # hawk (bnc#665045)
 /usr/sbin/hawk_chkpwd                                   root:haclient     4750
 
