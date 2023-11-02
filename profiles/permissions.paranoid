@@ -37,7 +37,6 @@
 /etc/crontab                                            root:root          600
 /etc/exports                                            root:root          600
 /etc/fstab                                              root:root          600
-/etc/ftpusers                                           root:root          600
 /var/lib/nfs/rmtab                                      root:root          600
 /etc/syslog.conf                                        root:root          600
 /etc/cron.d/                                            root:root          700
@@ -191,9 +190,6 @@
 
 # open-vm-tools (bnc#474285)
 /usr/bin/vmware-user-suid-wrapper			root:root         0755
-
-# lockdev (bnc#588325)
-/usr/sbin/lockdev                                       root:lock         0755
 
 # hawk (bnc#665045)
 /usr/sbin/hawk_chkpwd                                   root:haclient     0755
