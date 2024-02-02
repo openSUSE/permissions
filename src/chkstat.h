@@ -11,9 +11,11 @@
 #include <tclap/CmdLine.h>
 
 // C++
+#include <fstream>
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 /// Represents a single permissions profile entry.
@@ -126,7 +128,8 @@ protected: // functions
     /// Collects all configured profiles.
     /**
      * Collects all profiles configured in m_profiles from /usr and /etc
-     * system directories and stores their paths in m_profile_paths.
+     * system directories and stores their paths and streams in
+     * m_profile_streams.
      **/
     void collectProfilePaths();
 
@@ -134,7 +137,7 @@ protected: // functions
     void collectPackageProfilePaths(const std::string &dir);
 
     /// Parses the given profile file and stores the according entries in m_profile_entries.
-    bool parseProfile(const std::string &path);
+    void parseProfile(const std::string &path, std::ifstream &fs);
 
     /// Parses extra "+capabilities" lines in permission profiles.
     /**
@@ -216,6 +219,9 @@ protected: // functions
      **/
     bool expandProfilePaths(const std::string &path, std::vector<std::string> &expansions);
 
+    /// Attempt to open the given profile path and add it to m_profile_streams.
+    bool tryOpenProfile(const std::string &path);
+
 protected: // data
 
     const int m_argc = 0;
@@ -267,8 +273,8 @@ protected: // data
     /// Permission profile names in the order they should be applied.
     std::vector<std::string> m_profiles;
 
-    /// Permission profile paths in the order they should be applied.
-    std::vector<std::string> m_profile_paths;
+    /// Permission profile paths and their opened streams in the order they should be applied.
+    std::vector<std::pair<std::string, std::ifstream>> m_profile_streams;
 
     /// A mapping of file paths to ProfileEntry, denotes the entry to apply for each path.
     std::map<std::string, ProfileEntry> m_profile_entries;

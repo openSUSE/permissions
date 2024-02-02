@@ -130,18 +130,6 @@ bool matchesAny(const T &val, const SEQ &seq) {
     return false;
 }
 
-/// Performs a file existence test for the given path.
-/**
- * This check only returns `true` if the given file or directory exists and
- * the current process has read access permissions for it.
- **/
-bool existsFile(const std::string &path);
-
-template <typename T1, typename T2>
-void appendContainer(T1 &container, const T2 &sequence) {
-    container.insert(container.end(), sequence.begin(), sequence.end());
-}
-
 /// Splits up the `input` string into whitespace separated words and stores them in `words`.
 void splitWords(const std::string &input, std::vector<std::string> &words);
 

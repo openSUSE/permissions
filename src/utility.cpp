@@ -14,10 +14,6 @@
 #include <sstream>
 #include <string>
 
-bool existsFile(const std::string &path) {
-    return access(path.c_str(), R_OK) == 0;
-}
-
 void splitWords(const std::string &input, std::vector<std::string> &words) {
     std::stringstream ss;
     std::string word;
