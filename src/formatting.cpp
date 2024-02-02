@@ -9,10 +9,8 @@
 #include <iomanip>
 #include <ostream>
 
-void FormattedInt::applyBase(std::ostream &o) const
-{
-    switch(m_base)
-    {
+void FormattedInt::applyBase(std::ostream &o) const {
+    switch(m_base) {
     default:
         break;
     case NumberBase::OCT:
@@ -24,8 +22,7 @@ void FormattedInt::applyBase(std::ostream &o) const
     }
 }
 
-std::ostream& operator<<(std::ostream &o, const FormattedInt &fi)
-{
+std::ostream& operator<<(std::ostream &o, const FormattedInt &fi) {
     // NOTE: if a stream has exceptions enabled then this approach can throw
     // exceptions, because the stream has no rdbuf.
     //
@@ -43,28 +40,21 @@ std::ostream& operator<<(std::ostream &o, const FormattedInt &fi)
     return o;
 }
 
-std::ostream& operator<<(std::ostream &o, const FileOwnership &fo)
-{
+std::ostream& operator<<(std::ostream &o, const FileOwnership &fo) {
     const struct passwd *pwd = ::getpwuid(fo.getUid());
     const struct group *grp = ::getgrgid(fo.getGid());;
 
-    if (pwd)
-    {
+    if (pwd) {
         o << pwd->pw_name;
-    }
-    else
-    {
+    } else {
         o << fo.getUid();
     }
 
     o << ":";
 
-    if (grp)
-    {
+    if (grp) {
         o << grp->gr_name;
-    }
-    else
-    {
+    } else {
         o << fo.getGid();
     }
 
