@@ -46,7 +46,6 @@
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <utility>
 
 Chkstat::Chkstat(int argc, const char **argv) :
         m_argc{argc},
@@ -271,6 +270,16 @@ void Chkstat::addProfile(const std::string &name) {
     m_profiles.push_back(name);
 }
 
+bool Chkstat::tryOpenProfile(const std::string &path) {
+    std::ifstream stream{path};
+
+    if (!stream.is_open())
+        return false;
+
+    m_profile_streams.emplace_back(std::make_pair(path, std::move(stream)));
+    return true;
+}
+
 void Chkstat::collectProfilePaths() {
     /*
      * Since configuration files are in the process of being separated between
@@ -281,20 +290,12 @@ void Chkstat::collectProfilePaths() {
     const auto usr_root = getUsrRoot();
     const auto etc_root = getEtcRoot();
 
-    // TODO: the current code only checks for an existing and readable file
-    // object in a racy fashion. The logic would also continue if the file
-    // objects are actually directories. It would be cleaner and more robust
-    // to open the paths right away and `fstat()` them, keeping the open file
-    // descriptors around for future processing.
-
     // first add the central fixed permissions file
     for (const auto &dir: {usr_root, etc_root}) {
         const auto path = dir + "/permissions";
-        if (existsFile(path)) {
-            m_profile_paths.push_back(path);
+        if (tryOpenProfile(path))
             // only use the first one found
             break;
-        }
     }
 
     // continue with predefined well-known profiles
@@ -306,9 +307,7 @@ void Chkstat::collectProfilePaths() {
 
         for (const auto &dir: {usr_root, etc_root}) {
             std::string path = dir + base;
-
-            if (existsFile(path)) {
-                m_profile_paths.push_back(path);
+            if (tryOpenProfile(path)) {
                 // only use the first one found
                 break;
             }
@@ -345,9 +344,7 @@ void Chkstat::collectProfilePaths() {
 
         const auto profile_path = etc_root + "/permissions." + profile;
 
-        if (existsFile(profile_path)) {
-            m_profile_paths.push_back(profile_path);
-        }
+        tryOpenProfile(profile_path);
     }
 }
 
@@ -379,8 +376,7 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
         files.insert(basename);
     }
 
-    // now add the sorted set of files to the profile paths to process later
-    // on
+    // now add the sorted set of files to the profile paths to process later on
     for (const auto &file: files) {
         if (file.find_first_of('.') != file.npos)
             // we're only interested in base profiles
@@ -396,18 +392,17 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
 
         const auto path = dir + "/" + file;
 
-        m_profile_paths.push_back(path);
+        tryOpenProfile(path);
 
         /*
          * this is a bit of strange logic here, because we need to add the per
-         * package profile files in the order as the profiles appear in
-         * m_profiles.
+         * package profile files in the order as the profiles appear in m_profiles.
          */
         for (const auto &profile: m_profiles) {
             const auto profile_basename = file + "." + profile;
 
             if (files.find(profile_basename) != files.end()) {
-                m_profile_paths.push_back(path + "." + profile);
+                tryOpenProfile(path + "." + profile);
             }
         }
     }
@@ -474,15 +469,7 @@ bool Chkstat::parseCapabilityLine(const std::string &line, const std::vector<std
     return ret;
 }
 
-bool Chkstat::parseProfile(const std::string &path) {
-    std::ifstream fs(path);
-
-    if (!fs) {
-        // the file disappeared in the meantime
-        std::cerr << path << ": " << std::strerror(errno) << std::endl;
-        return false;
-    }
-
+void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
     size_t linenr = 0;
     std::vector<std::string> active_keys;
     std::string line;
@@ -575,8 +562,6 @@ bool Chkstat::parseProfile(const std::string &path) {
             active_keys.push_back(exp_path);
         }
     }
-
-    return true;
 }
 
 bool Chkstat::expandProfilePaths(const std::string &path, std::vector<std::string> &expansions) {
@@ -653,8 +638,8 @@ void Chkstat::printHeader() {
 
     std::cout << "Checking permissions and ownerships - using the permissions files" << std::endl;
 
-    for (const auto &profile_path: m_profile_paths) {
-        std::cout << "\t" << profile_path << "\n";
+    for (const auto &pair: m_profile_streams) {
+        std::cout << "\t" << pair.first << "\n";
     }
 
     if (!m_root_path.getValue().empty()) {
@@ -1168,7 +1153,9 @@ int Chkstat::run() {
         collectProfilePaths();
     } else {
         // only process the profiles specified on the command line
-        appendContainer(m_profile_paths, m_input_args.getValue());
+        for (const auto &path: m_input_args.getValue()) {
+            tryOpenProfile(path);
+        }
     }
 
     // apply possible command line overrides to force en-/disable fscaps
@@ -1182,10 +1169,8 @@ int Chkstat::run() {
         std::cerr << "Warning: running kernel does not support fscaps" << std::endl;
     }
 
-    for (const auto &profile_path: m_profile_paths) {
-        if (!parseProfile(profile_path)) {
-            return 1;
-        }
+    for (auto &pair: m_profile_streams) {
+        parseProfile(pair.first, pair.second);
     }
 
     // check whether explicitly listed files are actually configured in
