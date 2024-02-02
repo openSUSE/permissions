@@ -14,13 +14,11 @@
 #include <sstream>
 #include <string>
 
-bool existsFile(const std::string &path)
-{
+bool existsFile(const std::string &path) {
     return access(path.c_str(), R_OK) == 0;
 }
 
-void splitWords(const std::string &input, std::vector<std::string> &words)
-{
+void splitWords(const std::string &input, std::vector<std::string> &words) {
     std::stringstream ss;
     std::string word;
 
@@ -28,40 +26,33 @@ void splitWords(const std::string &input, std::vector<std::string> &words)
     ss.str(input);
 
     // read whitespace separated words
-    while (!ss.fail())
-    {
+    while (!ss.fail()) {
         ss >> word;
 
-        if (!ss.fail())
-        {
+        if (!ss.fail()) {
             words.emplace_back(word);
         }
     }
 }
 
-void FileDesc::close()
-{
+void FileDesc::close() {
     if (!valid())
         return;
 
-    if (::close(m_fd) != 0)
-    {
+    if (::close(m_fd) != 0) {
         std::cerr << "Closing FD " << m_fd << ": " << strerror(errno) << std::endl;
     }
 
     invalidate();
 }
 
-FileCapabilities::~FileCapabilities()
-{
-    if (valid())
-    {
+FileCapabilities::~FileCapabilities() {
+    if (valid()) {
         destroy();
     }
 }
 
-bool FileCapabilities::operator==(const FileCapabilities &other) const
-{
+bool FileCapabilities::operator==(const FileCapabilities &other) const {
     if (!valid() && !other.valid())
         // if both are invalid compare to true
         return true;
@@ -73,29 +64,25 @@ bool FileCapabilities::operator==(const FileCapabilities &other) const
     return cap_compare(m_caps, other.m_caps) == 0;
 }
 
-void FileCapabilities::destroy()
-{
+void FileCapabilities::destroy() {
     if (!valid())
         return;
 
 
-    if (cap_free(m_caps) != 0)
-    {
+    if (cap_free(m_caps) != 0) {
         std::cerr << "Freeing file capabilities: " << strerror(errno) << std::endl;
     }
 
     invalidate();
 }
 
-void FileCapabilities::setFromText(const std::string &text)
-{
+void FileCapabilities::setFromText(const std::string &text) {
     destroy();
 
     m_caps = cap_from_text(text.c_str());
 }
 
-std::string FileCapabilities::toText() const
-{
+std::string FileCapabilities::toText() const {
     if (!valid())
         return "";
 
@@ -111,17 +98,14 @@ std::string FileCapabilities::toText() const
     return ret;
 }
 
-void FileCapabilities::setFromFile(const std::string &path)
-{
+void FileCapabilities::setFromFile(const std::string &path) {
     destroy();
 
     m_caps = cap_get_file(path.c_str());
 }
 
-bool FileCapabilities::applyToFD(int fd) const
-{
-    if (cap_set_fd(fd, m_caps) != 0)
-    {
+bool FileCapabilities::applyToFD(int fd) const {
+    if (cap_set_fd(fd, m_caps) != 0) {
         return false;
     }
 

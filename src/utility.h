@@ -16,28 +16,24 @@
 #include <string_view>
 #include <vector>
 
+/// SwitchArg that can be programmatically set.
 /**
- * \brief
- *     SwitchArg that can be programmatically set
- * \details
- *     TCLAP::SwitchArg doesn't offer a public API to programmatically change
- *     the switch's value. Therefore this specialization provides an
- *     additional method to make this possible.
+ * TCLAP::SwitchArg doesn't offer a public API to programmatically change the
+ * switch's value. Therefore this specialization provides an additional method
+ * to make this possible.
  **/
 class SwitchArgRW :
-    public TCLAP::SwitchArg
-{
+        public TCLAP::SwitchArg {
 public:
     SwitchArgRW(
-        const std::string &flag,
-        const std::string &name,
-        const std::string &desc,
-        TCLAP::CmdLineInterface &parser) :
-        TCLAP::SwitchArg(flag, name, desc, parser)
-    {}
+            const std::string &flag,
+            const std::string &name,
+            const std::string &desc,
+            TCLAP::CmdLineInterface &parser) :
+            TCLAP::SwitchArg{flag, name, desc, parser} {
+    }
 
-    void setValue(bool val)
-    {
+    void setValue(bool val) {
         _value = val;
         // this is used for isSet(), _value only for getValue(), so
         // sync both.
@@ -45,59 +41,49 @@ public:
     }
 };
 
+/// ValueArg with sane const semantics.
 /**
- * \brief
- *  ValueArg with sane const semantics
- * \details
- *  The TCLAP::ValueArg is missing accessors that allow access the contained
- *  value in const contexts. Sadly there was no release of TCLAP in a long
- *  time, the upstream master branch contains suitable fixes already, however.
- *  This is just a small wrapper to fix this situation.
+ * The TCLAP::ValueArg is missing accessors that allow access the contained
+ * value in const contexts. Sadly there was no release of TCLAP in a long
+ * time, the upstream master branch contains suitable fixes already, however.
+ * This is just a small wrapper to fix this situation.
  **/
 template <typename T>
 class SaneValueArg :
-    public TCLAP::ValueArg<T>
-{
+        public TCLAP::ValueArg<T> {
 public:
     SaneValueArg(
-        const std::string &flag,
-        const std::string &name,
-        const std::string &desc,
-        bool req,
-        T value,
-        const std::string &typeDesc,
-        TCLAP::CmdLineInterface &parser) :
-        TCLAP::ValueArg<T>(flag, name, desc, req, value, typeDesc, parser)
-    {}
+            const std::string &flag,
+            const std::string &name,
+            const std::string &desc,
+            bool req,
+            T value,
+            const std::string &typeDesc,
+            TCLAP::CmdLineInterface &parser) :
+            TCLAP::ValueArg<T>{flag, name, desc, req, value, typeDesc, parser} {
+    }
 
-    const T& getValue() const
-    {
+    const T& getValue() const {
         return this->_value;
     }
 
-    T& getValue()
-    {
+    T& getValue() {
         return this->_value;
     }
 };
 
-// isspace has overloads which gives trouble with template argument deduction,
-// therefore provide a wrapper
+/// `isspace()` has overloads which gives trouble with template argument deduction, therefore provide a wrapper.
 inline bool chkspace(char c) { return std::isspace(c); }
 
 inline bool chkslash(char c) { return c == '/'; }
 
-//! remove certain leading characters from the given string (by default
-//! whitespace characters)
+/// Remove certain leading characters from the given string (by default whitespace characters).
 template <typename UNARY = bool(char)>
-inline void lstrip(std::string &s, UNARY f = chkspace)
-{
+inline void lstrip(std::string &s, UNARY f = chkspace) {
     auto nonmatch_it = s.end();
 
-    for( auto it = s.begin(); it != s.end(); it++ )
-    {
-        if( !f(*it) )
-        {
+    for (auto it = s.begin(); it != s.end(); it++) {
+        if (!f(*it)) {
             nonmatch_it = it;
             break;
         }
@@ -106,45 +92,37 @@ inline void lstrip(std::string &s, UNARY f = chkspace)
     s = s.substr(static_cast<size_t>(nonmatch_it - s.begin()));
 }
 
-//! remove certain trailing characters from the given string (by default
-//! whitespace characters)
+/// Remove certain trailing characters from the given string (by default: whitespace characters).
 template <typename UNARY = bool(char)>
-inline void rstrip(std::string &s, UNARY f = chkspace)
-{
-    while( !s.empty() && f(*s.rbegin()) )
+inline void rstrip(std::string &s, UNARY f = chkspace) {
+    while (!s.empty() && f(*s.rbegin()))
         s.pop_back();
 }
 
-//! remove certain leading and trailing characters from the given string (by
-//! default whitespace characters)
+/// Remove certain leading and trailing characters from the given string (by default: whitespace characters).
 template <typename UNARY = bool(char)>
-void strip(std::string &s, UNARY f = chkspace)
-{
+void strip(std::string &s, UNARY f = chkspace) {
     lstrip(s, f);
     rstrip(s, f);
 }
 
-//! checks whether the given string has the given prefix
-inline bool hasPrefix(const std::string &s, const std::string &prefix)
-{
+/// Checks whether the given string has the given prefix.
+inline bool hasPrefix(const std::string &s, const std::string &prefix) {
     return s.substr(0, prefix.length()) == prefix;
 }
 
-//! checks whether the given string has the given suffix
-inline bool hasSuffix(const std::string_view &s, const std::string &suffix)
-{
+/// Checks whether the given string has the given suffix.
+inline bool hasSuffix(const std::string_view &s, const std::string &suffix) {
     if (suffix.length() > s.length())
         return false;
 
     return s.substr(s.length() - suffix.length()) == suffix;
 }
 
-//! returns whether the given iterable sequence contains the given element \c val
+/// Returns whether the given iterable sequence contains the given element `val`.
 template <typename T, typename SEQ>
-bool matchesAny(const T &val, const SEQ &seq)
-{
-    for (const auto &e: seq)
-    {
+bool matchesAny(const T &val, const SEQ &seq) {
+    for (const auto &e: seq) {
         if (val == e)
             return true;
     }
@@ -152,66 +130,54 @@ bool matchesAny(const T &val, const SEQ &seq)
     return false;
 }
 
+/// Performs a file existence test for the given path.
 /**
- * \brief
- *  Performs a file existence test for the given path
- * \details
- *  This check only returns \c true if the given file or directory exists and
- *  the current process has read access permissions for it.
+ * This check only returns `true` if the given file or directory exists and
+ * the current process has read access permissions for it.
  **/
 bool existsFile(const std::string &path);
 
 template <typename T1, typename T2>
-void appendContainer(T1 &container, const T2 &sequence)
-{
+void appendContainer(T1 &container, const T2 &sequence) {
     container.insert(container.end(), sequence.begin(), sequence.end());
 }
 
-//! splits up the \c input string into whitespace separated words and stores
-//! them in \c words
+/// Splits up the `input` string into whitespace separated words and stores them in `words`.
 void splitWords(const std::string &input, std::vector<std::string> &words);
 
 template <typename T>
-bool stringToUnsigned(const std::string &s, T &out, const int base = 10)
-{
+bool stringToUnsigned(const std::string &s, T &out, const int base = 10) {
     char *end = nullptr;
     out = static_cast<T>(std::strtoul(s.c_str(), &end, base));
-    if (end && *end != '\0')
-    {
+    if (end && *end != '\0') {
         return false;
     }
 
     return true;
 }
 
+/// Helper class that wraps a plain POSIX file descriptor.
 /**
- * \brief
- *  Helper class that wraps a plain POSIX file descriptor
- * \details
- *  This wrapper takes care of closing the file descriptor upon destruction
- *  time.
+ * This wrapper takes care of closing the file descriptor upon destruction
+ * time.
  **/
-class FileDesc
-{
+class FileDesc {
 public:
 
     explicit FileDesc(int fd = -1) :
-        m_fd(fd)
-    {}
+            m_fd{fd} {
+    }
 
     FileDesc(FileDesc &&other) :
-        FileDesc()
-    {
+            FileDesc{} {
         // steal the rvalue's file descriptor so we take over ownership, while
         // the other doesn't close it during destruction. This allows to keep
         // this non-copyable type in containers.
         steal(other);
     }
 
-    ~FileDesc()
-    {
-        if (valid())
-        {
+    ~FileDesc() {
+        if (valid()) {
             close();
         }
     }
@@ -221,18 +187,15 @@ public:
 
     int get() const { return m_fd; }
 
-    void set(int fd)
-    {
-        if (valid())
-        {
+    void set(int fd) {
+        if (valid()) {
             close();
         }
 
         m_fd = fd;
     }
 
-    void steal(FileDesc &other)
-    {
+    void steal(FileDesc &other) {
         set(other.get());
         other.invalidate();
     }
@@ -241,7 +204,7 @@ public:
     bool invalid() const { return !valid(); }
     void invalidate() { m_fd = -1; }
 
-    //! explicitly close and invalidate() the currently stored file descriptor
+    /// Explicitly close and invalidate() the currently stored file descriptor.
     void close();
 
 protected:
@@ -249,25 +212,21 @@ protected:
     int m_fd = -1;
 };
 
-//! C++ wrapper around the POSIX struct stat
+/// C++ wrapper around the POSIX struct stat.
 class FileStatus :
-    public ::stat
-{
+        public ::stat {
 public:
 
     FileStatus() :
-        // zero initialize the `struct stat` using aggregate initialization
-        // of the base class
-        ::stat{}
-    {}
+            // zero initialize the `struct stat` using aggregate initialization of the base class
+            ::stat{} {
+    }
 
-    FileStatus(const FileStatus &other)
-    {
+    FileStatus(const FileStatus &other) {
         *this = other;
     }
 
-    FileStatus& operator=(const FileStatus &other)
-    {
+    FileStatus& operator=(const FileStatus &other) {
         *static_cast<struct stat*>(this) = other;
         return *this;
     }
@@ -276,32 +235,30 @@ public:
     bool isRegular() const { return S_ISREG(this->st_mode); }
     bool isDirectory() const { return S_ISDIR(this->st_mode); }
 
-    //! returns the file mode bits portion consisting of the permission bits
-    //! plus any special bits like setXid but not the file type bits
+    /// Returns the file mode bits only.
+    /**
+     * This includes the permission bits any special bits like setXid but not
+     * the file type bits
+     **/
     auto getModeBits() const { return this->st_mode & ALLPERMS; }
 
-    bool matchesOwnership(const uid_t uid, const gid_t gid) const
-    {
+    bool matchesOwnership(const uid_t uid, const gid_t gid) const {
         return this->st_uid == uid && this->st_gid == gid;
     }
 
-    bool hasNonRootOwner() const
-    {
+    bool hasNonRootOwner() const {
         return this->st_uid != 0;
     }
 
-    bool hasRootOwner() const
-    {
+    bool hasRootOwner() const {
         return !hasNonRootOwner();
     }
 
-    bool hasNonRootGroup() const
-    {
+    bool hasNonRootGroup() const {
         return this->st_gid != 0;
     }
 
-    bool hasRootGroup() const
-    {
+    bool hasRootGroup() const {
         return !hasNonRootGroup();
     }
 
@@ -329,50 +286,45 @@ public:
         return false;
     }
 
-    bool matchesOwner(uid_t user) const
-    {
+    bool matchesOwner(uid_t user) const {
         return this->st_uid == user;
     }
 
-    bool matchesGroup(gid_t group) const
-    {
+    bool matchesGroup(gid_t group) const {
         return this->st_gid == group;
     }
 
-    //! returns whether this file status and the other file status refer to
-    //! the same file object (based on device and inode identification)
-    bool sameObject(const struct ::stat &other) const
-    {
+    /// Checks whether both stat objects refer to the file object.
+    /**
+     * This compares device and inode identification to determine whether the
+     * status refers to the same file system object.
+     **/
+    bool sameObject(const struct ::stat &other) const {
         return this->st_dev == other.st_dev && this->st_ino == other.st_ino;
     }
 
-    bool isWorldWritable() const
-    {
+    bool isWorldWritable() const {
         return (this->st_mode & S_IWOTH) != 0;
     }
 
-    bool isGroupWritable() const
-    {
+    bool isGroupWritable() const {
         return (this->st_mode & S_IWGRP) != 0;
     }
 
-    bool fstat(const FileDesc &fd)
-    {
+    bool fstat(const FileDesc &fd) {
         return ::fstat(fd.get(), this) == 0;
     }
 };
 
-//! a wrapper around the native cap_t type to ease memory management
-class FileCapabilities
-{
+/// A wrapper around the native `cap_t` type to ease memory management.
+class FileCapabilities {
 public:
 
     explicit FileCapabilities() {}
 
     ~FileCapabilities();
 
-    FileCapabilities(FileCapabilities &&other)
-    {
+    FileCapabilities(FileCapabilities &&other) {
         // steal the rvalue's caps so we take over ownership, while
         // the other doesn't free them during destruction. This allows to keep
         // this non-copyable type in containers.
@@ -384,14 +336,13 @@ public:
     FileCapabilities& operator=(const FileCapabilities &other) = delete;
 
     bool operator==(const FileCapabilities &other) const;
-    bool operator!=(const FileCapabilities &other) const
-    {
+    bool operator!=(const FileCapabilities &other) const {
         return !(*this == other);
     }
 
     // TODO: the code currently inconsistently uses `valid()` for testing for
-    // emptyness in a lot of spots. But `valid()` can mean both: no
-    // capabilities existing or an other error occured. `errno` needs to be
+    // emptiness in a lot of spots. But `valid()` can mean both: no
+    // capabilities existing or an other error occurred. `errno` needs to be
     // inspected for this to correctly differentiate.
     // This class's API and the client code should be adjusted to make the
     // difference clear and the logic robust.
@@ -402,34 +353,24 @@ public:
 
     cap_t raw() { return m_caps; }
 
+    /// Set new capability data from a textual representation.
     /**
-     * \brief
-     *  set new capability data from a textual representation
-     * \details
-     *  If the operation fails then after return valid() will return \c false.
+     *  If the operation fails then after return valid() will return `false`.
      **/
     void setFromText(const std::string &text);
 
+    /// Set new capability data from the given file path.
     /**
-     * \brief
-     *  set new capability data from the given file path
-     * \details
-     *  If the operation fails then after return valid() will return \c false.
+     *  If the operation fails then after return valid() will return `false`.
      **/
     void setFromFile(const std::string &path);
 
-    /**
-     * \brief
-     *  Applies the currently stored capability data to the given file
-     *  descriptors
-     **/
+    /// Applies the currently stored capability data to the given file descriptors.
     bool applyToFD(int fd) const;
 
+    /// Returns a human readable string describing the current capability data.
     /**
-     * \brief
-     *  Returns a human readable string describing the current capability data
-     * \return
-     *  The human readable string on success, an empty string on error.
+     *  \return The human readable string on success, an empty string on error.
      **/
     std::string toText() const;
 

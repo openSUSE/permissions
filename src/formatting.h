@@ -7,17 +7,14 @@
 // C++
 #include <iosfwd>
 
-enum class NumberBase
-{
+enum class NumberBase {
     OCT,
     DEC,
     HEX
 };
 
-//! just a type for wrapping integers for outputting them easily in a
-//! formatted manner on std::ostream
-class FormattedInt
-{
+/// A type for wrapping integers for outputting them easily in a formatted manner on std::ostream.
+class FormattedInt {
 public:
 
     /**
@@ -27,8 +24,8 @@ public:
      *  Minimum field width the number string will be padded to
      **/
     explicit FormattedInt(size_t val) :
-        m_val(val)
-    {}
+            m_val{val} {
+    }
 
     size_t getVal() const { return m_val; }
     size_t getWidth() const { return m_width; }
@@ -51,12 +48,10 @@ protected:
 
 //! helper type to output a file mode in octal nicely formatted onto an ostream
 class FileModeInt :
-    public FormattedInt
-{
+        public FormattedInt {
 public:
     explicit FileModeInt(size_t val) :
-        FormattedInt(val)
-    {
+            FormattedInt{val} {
         setBase(NumberBase::OCT);
         setWidth(4);
     }
@@ -65,16 +60,17 @@ public:
 std::ostream& operator<<(std::ostream &o, const FormattedInt &fi);
 
 //! helper type for outputting file ownership on a stream
-class FileOwnership
-{
+class FileOwnership {
 public:
     FileOwnership(uid_t uid, gid_t gid) :
-        m_uid(uid), m_gid(gid)
-    {}
+            m_uid{uid},
+            m_gid{gid} {
+    }
 
     explicit FileOwnership(const FileStatus &fs) :
-        m_uid(fs.st_uid), m_gid(fs.st_gid)
-    {}
+            m_uid{fs.st_uid},
+            m_gid{fs.st_gid} {
+    }
 
     uid_t getUid() const { return m_uid; }
     gid_t getGid() const { return m_gid; }
