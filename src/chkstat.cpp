@@ -878,17 +878,23 @@ bool Chkstat::safeOpen(EntryContext &ctx) {
             // component is an empty string for trailing slashes, open again with different open_flags.
             auto child = component.empty() ? "." : component.c_str();
             int tmpfd = openat(pathfd.get(), child, O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-            // TODO: shouldn't there be some error handling here? ENOENT is
-            // probably to be tolerated when packages aren't installed, but
-            // what about e.g. EACCES or other errors?
-            if (tmpfd == -1)
+            if (tmpfd == -1) {
+                if (errno != ENOENT) {
+                    const auto path = getPathFromProc(pathfd) + "/" + child;
+                    std::cerr << "warning: skipping " << ctx.subpath << ": " << path << ": openat(): "
+                        << std::strerror(errno) << std::endl;
+                }
                 return false;
+            }
             pathfd.set(tmpfd);
         }
 
-        if (!ctx.status.fstat(pathfd))
-            // TODO: this is also a strange case, should be complained about
+        if (!ctx.status.fstat(pathfd)) {
+            const auto path = getPathFromProc(pathfd);
+            std::cerr << "warning: skipping  " << ctx.subpath << ": " << path << ": fstat(): "
+                << std::strerror(errno) << std::endl;
             return false;
+        }
 
         // owner of directories must be trusted for setuid/setgid/capabilities
         // as we have no way to verify file contents
@@ -936,9 +942,13 @@ bool Chkstat::safeOpen(EntryContext &ctx) {
         if (ctx.status.isLink()) {
             // If the path configured in the permissions configuration is a symlink, we don't follow it.
             // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
-            if (is_final_path_element || ++link_count >= 256)
-                // TODO: would an excess link count not warrant a complaint?
+            if (is_final_path_element)
+               return false;
+            else if (++link_count >= 256) {
+                const auto path = getPathFromProc(pathfd);
+                std::cerr << ctx.subpath << ": excess link count stopping at " << path << "." << std::endl;
                 return false;
+            }
 
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
@@ -952,9 +962,11 @@ bool Chkstat::safeOpen(EntryContext &ctx) {
             std::string link(PATH_MAX, '\0');
             const auto len = ::readlinkat(pathfd.get(), "", &link[0], link.size());
 
-            if (len <= 0 || static_cast<size_t>(len) >= link.size())
-                // TODO: would an error read the link not warrant a complaint?
+            if (len <= 0 || static_cast<size_t>(len) >= link.size()) {
+                auto path = getPathFromProc(pathfd);
+                std::cerr << ctx.subpath << ": " << path << ": readlink(): " << std::strerror(errno) << std::endl;
                 return false;
+            }
 
             link.resize(static_cast<size_t>(len));
             stripTrailingSlashes(link);
