@@ -339,8 +339,8 @@ void Chkstat::collectProfilePaths() {
         // synchronized with rpmlint-checks, however.
         try {
             collectPackageProfilePaths(dir + "/permissions.d");
-        } catch( const std::filesystem::filesystem_error &ex ) {
-            if( ex.code().value() != ENOENT ) {
+        } catch (const std::filesystem::filesystem_error &ex) {
+            if (ex.code().value() != ENOENT) {
                 throw;
             }
         }
@@ -988,19 +988,19 @@ bool Chkstat::safeOpen(EntryContext &ctx) {
                 if (parentfd.invalid()) {
                     pathfd.close();
                 } else {
-                    pathfd.set( dup(parentfd.get()) );
+                    pathfd.set(dup(parentfd.get()));
                 }
 
                 // prefix the path with a slash to fulfill the expectations of
                 // the loop body (see assert above)
-                link.insert( link.begin(), '/' );
+                link.insert(link.begin(), '/');
             }
 
             path_rest = link + path_rest;
         } else if (ctx.status.isDirectory()) {
             // parentfd is only needed to find the parent of a symlink.
             // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
-            parentfd.set( dup(pathfd.get()) );
+            parentfd.set(dup(pathfd.get()));
         }
     }
 
@@ -1021,7 +1021,7 @@ std::string Chkstat::getPathFromProc(const FileDesc &fd) const {
 
     ssize_t l = readlink(procpath.c_str(), &linkpath[0], linkpath.size());
     if (l > 0) {
-        linkpath.resize( std::min(static_cast<size_t>(l), linkpath.size()) );
+        linkpath.resize(std::min(static_cast<size_t>(l), linkpath.size()));
     } else {
         linkpath = "ancestor";
     }
