@@ -316,3 +316,6 @@
 /usr/bin/kismet_cap_linux_bluetooth                     root:kismet 0750
 
 /usr/bin/kismet_cap_linux_wifi                          root:kismet 0750
+
+# libgtop(bsc#1218921)
+/usr/libexec/libgtop_server2                            root:root 0755
