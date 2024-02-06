@@ -351,3 +351,6 @@
 
 /usr/bin/kismet_cap_linux_wifi                          root:kismet 0750
  +capabilities cap_net_raw,cap_net_admin=ep
+
+# libgtop(bsc#1218921)
+/usr/libexec/libgtop_server2                            root:root 4755
