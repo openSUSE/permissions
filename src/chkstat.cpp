@@ -333,12 +333,15 @@ void Chkstat::collectProfilePaths() {
     // consider both locations. The /usr location is preferred, though, i.e.
     // if a package has files in /usr then possible duplicate conflicting
     // files in /etc are ignored by collectPackageProfilePaths().
-    for (const auto &dir: {usr_root, etc_root}) {
-        // TODO: consider changing the /usr path to something more catchy like
-        // "packages.d" or "package-overrides.d". A change needs to be
-        // synchronized with rpmlint-checks, however.
+    for (const auto &dir: {
+            // this should be used for newly added files
+            usr_root + "/packages.d",
+            // legacy using a bad name
+            usr_root + "/permissions.d",
+            // legacy still in /etc
+            etc_root + "/permissions.d"}) {
         try {
-            collectPackageProfilePaths(dir + "/permissions.d");
+            collectPackageProfilePaths(dir);
         } catch (const std::filesystem::filesystem_error &ex) {
             if (ex.code().value() != ENOENT) {
                 throw;
