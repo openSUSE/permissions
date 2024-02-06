@@ -4,7 +4,7 @@
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
 #
-# 
+#
 # See /usr/share/permissions/permissions for general hints on how to use
 # this file.
 #
@@ -26,7 +26,7 @@
 # and wtmp any more, which renders who(1) and finger(1) useless.
 #
 # Please always keep in mind that your system listens on network sockets
-# in the default configuration. Change this by disabling the services that 
+# in the default configuration. Change this by disabling the services that
 # you do not need or by restricting access to them using packet filters
 # or tcp wrappers (see hosts_access(5)) to gain a higher level of security
 # in your system.
