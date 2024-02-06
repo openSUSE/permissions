@@ -47,6 +47,14 @@
 #include <string>
 #include <string_view>
 
+namespace {
+
+    inline void stripTrailingSlashes(std::string &s) {
+        rstrip(s, [](char c) { return c == '/'; });
+    }
+
+}
+
 Chkstat::Chkstat(int argc, const char **argv) :
         m_argc{argc},
         m_argv{argv},
@@ -115,7 +123,7 @@ bool Chkstat::validateArguments() {
         }
 
         // remove trailing slashes to normalize arguments
-        rstrip(path, chkslash);
+        stripTrailingSlashes(path);
     }
 
     return ret;
@@ -123,7 +131,7 @@ bool Chkstat::validateArguments() {
 
 bool Chkstat::processArguments() {
     for (auto path: m_examine_paths.getValue()) {
-        rstrip(path, chkslash);
+        stripTrailingSlashes(path);
         m_files_to_check.insert(path);
     }
 
@@ -140,7 +148,7 @@ bool Chkstat::processArguments() {
         while (std::getline(fs, line)) {
             if (line.empty())
                 continue;
-            rstrip(line, chkslash);
+            stripTrailingSlashes(line);
             m_files_to_check.insert(line);
         }
     }
@@ -823,10 +831,6 @@ bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) c
     return ret;
 }
 
-static inline void stripTrailingSlashes(std::string &s) {
-    rstrip(s, [](char c) { return c == '/'; });
-}
-
 bool Chkstat::safeOpen(EntryContext &ctx) {
     size_t link_count = 0;
     FileDesc pathfd;
@@ -1161,7 +1165,7 @@ int Chkstat::run() {
         addProfile("local");
 
         for (auto path: m_input_args.getValue()) {
-            rstrip(path, chkslash);
+            stripTrailingSlashes(path);
             m_files_to_check.insert(path);
         }
 
