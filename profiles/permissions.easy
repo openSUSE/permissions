@@ -3,7 +3,7 @@
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
 #
-# 
+#
 # See /usr/share/permissions/permissions for general hints on how to use this
 # file.
 #
@@ -12,7 +12,7 @@
 # Some of the settings might be considered somewhat lax from the security
 # standpoint. These aspects are handled differently in the permissions.secure
 # file.
-# 
+#
 
 #
 # /etc
