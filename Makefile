@@ -29,6 +29,7 @@ prefix=/usr
 sysconfdir=/etc
 permissionsdir=/usr/share/permissions
 permissionsddir=$(permissionsdir)/permissions.d
+packagesdir=$(permissionsdir)/packages.d
 bindir=$(prefix)/bin
 fillupdir=/var/adm/fillup-templates
 datadir=$(prefix)/share
@@ -44,7 +45,7 @@ all: src/chkstat
 	@if grep -n -o -P '\t' src/*.cpp src/*.h; then echo "error: source has mixed tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
 
 install: all
-	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(permissionsdir) $(permissionsddir) $(zypp_commit_plugins); \
+	@for i in $(bindir) $(man8dir) $(man5dir) $(fillupdir) $(sysconfdir) $(permissionsdir) $(permissionsddir) $(packagesdir) $(zypp_commit_plugins); \
 		do install -d -m 755 $(DESTDIR)$$i; done
 	@install -m 755 src/chkstat $(DESTDIR)$(bindir)
 	@install -m 644 man/chkstat.8 $(DESTDIR)$(man8dir)
