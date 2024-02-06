@@ -122,7 +122,8 @@ bool Chkstat::validateArguments() {
 }
 
 bool Chkstat::processArguments() {
-    for (const auto &path: m_examine_paths.getValue()) {
+    for (auto path: m_examine_paths.getValue()) {
+        rstrip(path, chkslash);
         m_files_to_check.insert(path);
     }
 
@@ -139,6 +140,7 @@ bool Chkstat::processArguments() {
         while (std::getline(fs, line)) {
             if (line.empty())
                 continue;
+            rstrip(line, chkslash);
             m_files_to_check.insert(line);
         }
     }
@@ -1158,7 +1160,8 @@ int Chkstat::run() {
         // always add the local profile
         addProfile("local");
 
-        for (const auto &path: m_input_args.getValue()) {
+        for (auto path: m_input_args.getValue()) {
+            rstrip(path, chkslash);
             m_files_to_check.insert(path);
         }
 
@@ -1188,12 +1191,6 @@ int Chkstat::run() {
     // check whether explicitly listed files are actually configured in
     // profiles
     for (const auto &path: m_files_to_check) {
-        // TODO: both here and in needToCheck() the command line arguments are
-        // not checked for trailing slashes. For directories the profile
-        // entries require trailing slashes but if a user enters an explicit
-        // path to a directory without the trailing slash then it won't be
-        // recognized. This was this way in the original code already.
-
         auto full_path = path;
 
         // we need to add a potential alternative root directory, since
