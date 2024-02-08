@@ -313,28 +313,27 @@ public:
     ~FileCapabilities();
 
     FileCapabilities(FileCapabilities &&other) {
+        *this = std::move(other);
+    }
+
+    FileCapabilities(const FileCapabilities &other) = delete;
+    FileCapabilities& operator=(const FileCapabilities &other) = delete;
+
+    FileCapabilities& operator=(FileCapabilities &&other) {
         // steal the rvalue's caps so we take over ownership, while
         // the other doesn't free them during destruction. This allows to keep
         // this non-copyable type in containers.
         m_caps = other.m_caps;
         other.invalidate();
+        return *this;
     }
-
-    FileCapabilities(const FileCapabilities &other) = delete;
-    FileCapabilities& operator=(const FileCapabilities &other) = delete;
 
     bool operator==(const FileCapabilities &other) const;
     bool operator!=(const FileCapabilities &other) const {
         return !(*this == other);
     }
 
-    // TODO: the code currently inconsistently uses `valid()` for testing for
-    // emptiness in a lot of spots. But `valid()` can mean both: no
-    // capabilities existing or an other error occurred. `errno` needs to be
-    // inspected for this to correctly differentiate.
-    // This class's API and the client code should be adjusted to make the
-    // difference clear and the logic robust.
-    bool valid() const { return m_caps != nullptr; }
+    bool hasCaps() const { return m_caps != nullptr; }
 
     //! explicitly free and invalidate() the currently stored capabilities
     void destroy();
@@ -343,15 +342,17 @@ public:
 
     /// Set new capability data from a textual representation.
     /**
-     *  If the operation fails then after return valid() will return `false`.
+     *  If the operation fails then `false` is returned.
      **/
-    void setFromText(const std::string &text);
+    bool setFromText(const std::string &text);
 
     /// Set new capability data from the given file path.
     /**
-     *  If the operation fails then after return valid() will return `false`.
+     *  If the operation fails then `false` is returned. Even if it succeeds
+     *  `valid()` can still return `false` if no capabilities are set on the
+     *  file (empty data).
      **/
-    void setFromFile(const std::string &path);
+    bool setFromFile(const std::string &path);
 
     /// Applies the currently stored capability data to the given file descriptors.
     bool applyToFD(int fd) const;
@@ -362,6 +363,9 @@ public:
      **/
     std::string toText() const;
 
+    /// Returns a human readable error text for the last error during setFromFile().
+    std::string lastErrorText() const;
+
 protected: // functions
 
     void invalidate() { m_caps = nullptr; }
@@ -369,6 +373,7 @@ protected: // functions
 protected: // data
 
      cap_t m_caps = nullptr;
+     int m_last_errno = 0;
 };
 
 #endif // inc. guard
