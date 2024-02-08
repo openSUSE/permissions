@@ -26,11 +26,21 @@ struct ProfileEntry {
     mode_t mode = 0;
     FileCapabilities caps;
 
-    bool hasCaps() const { return caps.valid(); }
+    ProfileEntry() = default;
+
+    ProfileEntry(const std::string &p_file, const std::string &p_owner, const std::string &p_group, mode_t p_mode) :
+            file(p_file), owner(p_owner), group(p_group), mode(p_mode) {}
+
+    bool hasCaps() const { return caps.hasCaps(); }
 
     /// Returns whether this profile entry contains a setuid or setgid bit.
     bool hasSetXID() const {
         return (this->mode & (S_ISUID | S_ISGID)) != 0;
+    }
+
+    void dropXID() {
+        const mode_t to_drop = (S_ISUID | S_ISGID);
+        mode &= ~(to_drop);
     }
 };
 

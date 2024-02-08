@@ -431,18 +431,10 @@ Chkstat::addProfileEntry(const std::string &file, const std::string &owner, cons
     }
     path += file;
 
-    // this overwrites an possibly already existing entry
+    // this overwrites a possibly already existing entry
     // this is intended behaviour, hence the order in which profiles are
     // applied is important
-    auto &entry = m_profile_entries[path];
-
-    entry.file = path;
-    entry.owner = owner;
-    entry.group = group;
-    entry.mode = mode;
-    entry.caps.destroy();
-
-    return entry;
+    return m_profile_entries[path] = ProfileEntry{path, owner, group, mode};
 }
 
 static inline void badProfileLine(const std::string &file, const size_t line, const std::string &context) {
@@ -473,8 +465,7 @@ bool Chkstat::parseCapabilityLine(const std::string &line, const std::vector<std
 
         auto &entry = it->second;
 
-        entry.caps.setFromText(cap_text);
-        if (!entry.caps.valid()) {
+        if (!entry.caps.setFromText(cap_text)) {
             ret = false;
         }
     }
@@ -691,9 +682,8 @@ void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContex
         if (need_comma) {
             std::cout << ", ";
         }
-        // TODO: this tests for emptiness rather than validity, should be
-        // adjusted, see FileCapabilities::valid().
-        if (ctx.caps.valid()) {
+
+        if (ctx.caps.hasCaps()) {
             std::cout << "wrong capabilities \"" << ctx.caps.toText() << "\"";
         } else {
             std::cout << "missing capabilities";
@@ -704,37 +694,17 @@ void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContex
 }
 
 bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx) {
-    ctx.caps.setFromFile(ctx.fd_path);
 
-    // TODO: need to differentiate between "no caps existing" and "error
-    // fetching capabilities", see FileCapabilities::valid()
-    if (!ctx.caps.valid()) {
-        if (!entry.hasCaps())
-            return true;
-
-        switch(errno) {
-            default:
-                break;
-            // we get EBADF for files that don't support capabilities,
-            // e.g. sockets or FIFOs
-            case EBADF: {
-                std::cerr << ctx.subpath << ": cannot assign capabilities for this kind of file" << std::endl;
-                entry.caps.destroy();
-                return false;
-            }
-            case EOPNOTSUPP: {
-                std::cerr << ctx.subpath << ": no support for capabilities" << std::endl;
-                entry.caps.destroy();
-                return false;
-            }
-        }
+    if (!ctx.caps.setFromFile(ctx.fd_path)) {
+        std::cerr << ctx.subpath << ": " << ctx.caps.lastErrorText() << std::endl;
+        return false;
     }
 
     if (entry.hasCaps()) {
-        // don't apply any set*id bits in case we apply capabilities
+        // don't apply any set*id bits in case we apply capabilities since
         // capabilities are the safer variant of set*id, the set*id bits
         // are only a fallback.
-        entry.mode &= 0777;
+        entry.dropXID();
     }
 
     return true;
