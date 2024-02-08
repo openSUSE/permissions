@@ -1011,12 +1011,6 @@ int Chkstat::processEntries() {
         m_apply_changes.setValue(false);
     }
 
-    // TODO:
-    // entry needs to be non-const currently, because further below the
-    // getCapabilities() logic is modifying its properties on the fly.
-    //
-    // This should be changed, ProfileEntry should only represent the data
-    // found in the profiles, not data modified by program logic underway.
     for (auto& [path, entry]: m_profile_entries) {
         EntryContext ctx;
         ctx.subpath = entry.file.substr(m_root_path.getValue().length());
