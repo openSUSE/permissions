@@ -28,7 +28,8 @@
 # /etc/sysconfig/security to determine which security level to
 # apply.
 # In addition to the central files listed above the directory
-# /usr/share/permissions/permissions.d/ can contain permission files
+# /usr/share/permissions/permissions.d/ (deprecated) and
+# /usr/share/permissions/packages.d/ can contain permission files
 # that belong to the packages they modify file modes for. These
 # permission files are to switch between conflicting file modes of
 # the same file paths in different packages (popular example:
