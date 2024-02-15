@@ -257,9 +257,9 @@ protected: // data
     TCLAP::ValueArg<std::string> m_force_level_list;
     TCLAP::MultiArg<std::string> m_file_lists;
 
-    SaneValueArg<std::string> m_root_path;
+    TCLAP::ValueArg<std::string> m_root_path;
     /// Alternate config root directory relative to which config files are looked up.
-    SaneValueArg<std::string> m_config_root_path;
+    TCLAP::ValueArg<std::string> m_config_root_path;
 
     /// Positional input arguments
     /**
