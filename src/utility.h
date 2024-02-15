@@ -16,31 +16,6 @@
 #include <string_view>
 #include <vector>
 
-/// SwitchArg that can be programmatically set.
-/**
- * TCLAP::SwitchArg doesn't offer a public API to programmatically change the
- * switch's value. Therefore this specialization provides an additional method
- * to make this possible.
- **/
-class SwitchArgRW :
-        public TCLAP::SwitchArg {
-public:
-    SwitchArgRW(
-            const std::string &flag,
-            const std::string &name,
-            const std::string &desc,
-            TCLAP::CmdLineInterface &parser) :
-            TCLAP::SwitchArg{flag, name, desc, parser} {
-    }
-
-    void setValue(bool val) {
-        _value = val;
-        // this is used for isSet(), _value only for getValue(), so
-        // sync both.
-        _alreadySet = val;
-    }
-};
-
 /// `isspace()` has overloads which gives trouble with template argument deduction, therefore provide a wrapper.
 inline bool chkspace(char c) { return std::isspace(c); }
 
@@ -73,6 +48,10 @@ template <typename UNARY = bool(char)>
 void strip(std::string &s, UNARY f = chkspace) {
     lstrip(s, f);
     rstrip(s, f);
+}
+
+inline void stripTrailingSlashes(std::string &s) {
+    rstrip(s, [](char c) { return c == '/'; });
 }
 
 /// Checks whether the given string has the given prefix.

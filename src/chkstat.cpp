@@ -47,99 +47,24 @@
 #include <string>
 #include <string_view>
 
-namespace {
-
-    inline void stripTrailingSlashes(std::string &s) {
-        rstrip(s, [](char c) { return c == '/'; });
-    }
-
-}
-
-Chkstat::Chkstat(int argc, const char **argv) :
-        m_argc{argc},
-        m_argv{argv},
-        m_parser{"Tool to check and set file permissions"},
-        m_system_mode{"", "system", "system mode, act according to /etc/sysconfig/security", m_parser},
-        m_force_fscaps{"", "fscaps", "force use of file system capabilities", m_parser},
-        m_disable_fscaps{"", "no-fscaps", "disable use of file system capabilities", m_parser},
-        m_apply_changes{"s", "set", "actually apply changes (--system mode may imply this depending on file based configuration)", m_parser},
-        m_only_warn{"", "warn", "only inform about which changes would be performed but don't actually apply them (which is the default, except in --system mode)", m_parser},
-        m_no_header{"n", "noheader", "don't print intro message", m_parser},
-        m_verbose{"v", "verbose", "print additional output that might be useful for diagnosis", m_parser},
-        m_print_variables{"", "print-variables", "print supported profile variable mappings then exit", m_parser},
-        m_examine_paths{"e", "examine", "operate only on the specified path(s)", false, "PATH", m_parser},
-        m_force_level_list{"", "level", "force application of the specified space-separated list of security levels (only supported in --system mode)", false, "", "e.g. \"local paranoid\"", m_parser},
-        m_file_lists{"f", "files", "read newline separated list of files to check (see --examine) from the specified path", false, "PATH", m_parser},
-        m_root_path{"r", "root", "check files relative to the given root directory", false, "", "PATH", m_parser},
-        m_config_root_path{"", "config-root", "lookup configuration files relative to the given root directory", false, "", "PATH", m_parser},
-        m_input_args{"args", "in --system mode a list of paths to check, otherwise a list of profiles to parse", false, "PATH", m_parser},
-        m_euid{geteuid()},
-        m_egid{getegid()} {
-}
-
-bool Chkstat::validateArguments() {
-    // exits on error/usage
-    m_parser.parse(m_argc, m_argv);
-
-    // in this case ignore all the rest, we'll just print the variables
-    if (m_print_variables.isSet())
-        return true;
-
-    // check all parameters and only then return to provide full diagnostic to
-    // the user, not just bit by bit complaining.
-    bool ret = true;
-
-    // check for mutually exclusive command line arguments
-    const auto xor_args = {
-        std::make_pair(&m_force_fscaps, &m_disable_fscaps),
-        {&m_apply_changes, &m_only_warn}
-    };
-
-    for (const auto &args: xor_args) {
-        auto &arg1 = *args.first;
-        auto &arg2 = *args.second;
-
-        if (arg1.isSet() && arg2.isSet()) {
-            std::cerr << arg1.getName() << " and " << arg2.getName()
-                << " cannot be set at the same time\n";
-            ret = false;
-        }
-    }
-
-    if (!m_system_mode.isSet() && m_input_args.getValue().empty()) {
-        std::cerr << "one or more permission file paths to use are required\n";
-        ret = false;
-    }
-
-    for (const auto arg: {&m_root_path, &m_config_root_path}) {
-        if (!arg->isSet())
-            continue;
-
-        auto &path = arg->getValue();
-
-        if (path.empty() || path[0] != '/') {
-            std::cerr << arg->getName() << " must begin with '/'" << std::endl;
-            ret = false;
-        }
-
-        // remove trailing slashes to normalize arguments
-        stripTrailingSlashes(path);
-    }
-
-    return ret;
+Chkstat::Chkstat(const CmdlineArgs &args) :
+            m_args{args},
+            m_apply_changes{args.apply_changes.getValue()},
+            m_euid{geteuid()},
+            m_egid{getegid()} {
 }
 
 bool Chkstat::processArguments() {
-    for (auto path: m_examine_paths.getValue()) {
+    for (auto path: m_args.examine_paths.getValue()) {
         stripTrailingSlashes(path);
         m_files_to_check.insert(path);
     }
 
-    for (const auto &path: m_file_lists.getValue()) {
+    for (const auto &path: m_args.file_lists.getValue()) {
         std::ifstream fs(path);
 
         if (!fs) {
-            std::cerr << m_file_lists.getName() << ": " << path << ": " << std::strerror(errno) << std::endl;
+            std::cerr << m_args.file_lists.getName() << ": " << path << ": " << std::strerror(errno) << std::endl;
             return false;
         }
 
@@ -161,7 +86,7 @@ static inline void stripQuotes(std::string &s) {
 }
 
 bool Chkstat::parseSysconfig() {
-    const auto file = m_config_root_path.getValue() + "/etc/sysconfig/security";
+    const auto file = m_args.config_root_path.getValue() + "/etc/sysconfig/security";
     std::ifstream fs(file);
 
     if (!fs) {
@@ -195,7 +120,7 @@ bool Chkstat::parseSysconfig() {
         stripQuotes(value);
 
         if (key == "PERMISSION_SECURITY") {
-            if (m_force_level_list.isSet())
+            if (m_args.force_level_list.isSet())
                 // explicit levels are specified on the command line
                 continue;
 
@@ -236,9 +161,9 @@ bool Chkstat::parseSysconfig() {
     }
 
     // apply the complex CHECK_PERMISSIONS logic
-    if (!m_apply_changes.isSet() && !m_only_warn.isSet()) {
+    if (!m_apply_changes && !m_args.only_warn.isSet()) {
         if (check_permissions) {
-            m_apply_changes.setValue(true);
+            m_apply_changes = true;
         } else {
             std::cerr << "permissions handling disabled in " << file << std::endl;
             return false;
@@ -425,7 +350,7 @@ ProfileEntry&
 Chkstat::addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode) {
     // use the full path including a potential alternative root directory as
     // map key
-    std::string path = m_root_path.getValue();
+    std::string path = m_args.root_path.getValue();
     if (!path.empty()) {
         path += '/';
     }
@@ -637,7 +562,7 @@ bool Chkstat::checkHaveProc() const {
 }
 
 void Chkstat::printHeader() {
-    if (m_no_header.isSet())
+    if (m_args.no_header.isSet())
         return;
 
     std::cout << "Checking permissions and ownerships - using the permissions files" << std::endl;
@@ -646,14 +571,14 @@ void Chkstat::printHeader() {
         std::cout << "\t" << pair.first << "\n";
     }
 
-    if (!m_root_path.getValue().empty()) {
-        std::cout << "Using root " << m_root_path.getValue() << "\n";
+    if (!m_args.root_path.getValue().empty()) {
+        std::cout << "Using root " << m_args.root_path.getValue() << "\n";
     }
 }
 
 void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContext &ctx) const {
     std::cout << ctx.subpath << ": "
-        << (m_apply_changes.isSet() ? "setting to " : "should be ")
+        << (m_apply_changes ? "setting to " : "should be ")
         << entry.owner << ":" << entry.group << " "
         << FileModeInt(entry.mode);
 
@@ -722,7 +647,7 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
         // it's a numerical value, lets try it
     } else {
         good = false;
-        if (m_verbose.isSet()) {
+        if (m_args.verbose.isSet()) {
             std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
         }
     }
@@ -733,7 +658,7 @@ bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx
         // it's a numerical value, lets try it
     } else {
         good = false;
-        if (m_verbose.isSet()) {
+        if (m_args.verbose.isSet()) {
             std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
         }
     }
@@ -810,7 +735,7 @@ bool Chkstat::safeOpen(EntryContext &ctx) {
     FileDesc parentfd;
     FileStatus root_status;
     bool is_final_path_element = false;
-    const auto &altroot = m_root_path.getValue();
+    const auto &altroot = m_args.root_path.getValue();
     const auto root = altroot.empty() ? std::string("/") : altroot;
     std::string path_rest = ctx.subpath;
     std::string component;
@@ -1005,15 +930,15 @@ std::string Chkstat::getPathFromProc(const FileDesc &fd) const {
 int Chkstat::processEntries() {
     size_t errors = 0;
 
-    if (m_apply_changes.isSet() && !checkHaveProc()) {
+    if (m_apply_changes && !checkHaveProc()) {
         std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
         errors++;
-        m_apply_changes.setValue(false);
+        m_apply_changes = false;
     }
 
     for (auto& [path, entry]: m_profile_entries) {
         EntryContext ctx;
-        ctx.subpath = entry.file.substr(m_root_path.getValue().length());
+        ctx.subpath = entry.file.substr(m_args.root_path.getValue().length());
 
         if (!needToCheck(ctx.subpath))
             continue;
@@ -1062,7 +987,7 @@ int Chkstat::processEntries() {
          */
         printEntryDifferences(entry, ctx);
 
-        if (!m_apply_changes.isSet())
+        if (!m_apply_changes)
             continue;
 
         if (!isSafeToApply(entry, ctx)) {
@@ -1092,15 +1017,12 @@ int Chkstat::processEntries() {
 }
 
 int Chkstat::run() {
-    if (!validateArguments())
-        return 2;
-
     if (!processArguments())
         return 1;
 
     loadVariableExpansions();
 
-    if (m_print_variables.isSet()) {
+    if (m_args.print_variables.isSet()) {
         for (const auto& [var, values]: m_variable_expansions) {
             std::cout << var << ":\n";
             for (const auto &val: values) {
@@ -1110,14 +1032,14 @@ int Chkstat::run() {
         return 0;
     }
 
-    if (m_system_mode.isSet()) {
+    if (m_args.system_mode.isSet()) {
         if (!parseSysconfig())
             // NOTE: the original code considers this a non-error situation
             return 0;
 
-        if (m_force_level_list.isSet()) {
+        if (m_args.force_level_list.isSet()) {
             std::vector<std::string> profiles;
-            splitWords(m_force_level_list.getValue(), profiles);
+            splitWords(m_args.force_level_list.getValue(), profiles);
 
             for (const auto &profile: profiles) {
                 addProfile(profile);
@@ -1131,7 +1053,7 @@ int Chkstat::run() {
         // always add the local profile
         addProfile("local");
 
-        for (auto path: m_input_args.getValue()) {
+        for (auto path: m_args.input_args.getValue()) {
             stripTrailingSlashes(path);
             m_files_to_check.insert(path);
         }
@@ -1139,15 +1061,15 @@ int Chkstat::run() {
         collectProfilePaths();
     } else {
         // only process the profiles specified on the command line
-        for (const auto &path: m_input_args.getValue()) {
+        for (const auto &path: m_args.input_args.getValue()) {
             tryOpenProfile(path);
         }
     }
 
     // apply possible command line overrides to force en-/disable fscaps
-    if (m_force_fscaps.isSet()) {
+    if (m_args.force_fscaps.isSet()) {
         m_use_fscaps = true;
-    } else if (m_disable_fscaps.isSet()) {
+    } else if (m_args.disable_fscaps.isSet()) {
         m_use_fscaps = false;
     }
 
@@ -1166,8 +1088,8 @@ int Chkstat::run() {
 
         // we need to add a potential alternative root directory, since
         // addProfileEntry stores entries using the full path.
-        if (!m_root_path.getValue().empty()) {
-            full_path = m_root_path.getValue() + '/' + path;
+        if (!m_args.root_path.getValue().empty()) {
+            full_path = m_args.root_path.getValue() + '/' + path;
         }
 
         if (m_profile_entries.find(full_path) == m_profile_entries.end()) {
@@ -1293,7 +1215,13 @@ void Chkstat::loadVariableExpansions() {
 
 int main(int argc, const char **argv) {
     try {
-        Chkstat chkstat(argc, argv);
+        CmdlineArgs args;
+
+        if (auto ret = args.parse(argc, argv); ret != 0) {
+            return ret;
+        }
+
+        Chkstat chkstat{args};
         return chkstat.run();
     } catch (const std::exception &ex) {
         std::cerr << "exception occurred: " << ex.what() << std::endl;

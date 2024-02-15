@@ -3,12 +3,10 @@
 
 // local headers
 #include "utility.h"
+#include "cmdline.h"
 
 // POSIX / Linux
 #include <sys/types.h>
-
-// third party
-#include <tclap/CmdLine.h>
 
 // C++
 #include <fstream>
@@ -50,7 +48,7 @@ struct EntryContext {
     uid_t uid = (uid_t)-1;
     /// The resolved group-id corresponding to the active ProfileEntry.
     gid_t gid = (gid_t)-1;
-    /// The path of the current file to check below a potential m_root_path.
+    /// The path of the current file to check below a potential m_args.root_path.
     std::string subpath;
     /// A path for safely opening the target file (typically in /proc/self/fd/...).
     std::string fd_path;
@@ -99,14 +97,11 @@ enum class ProcMountState {
 class Chkstat {
 public: // functions
 
-    Chkstat(int argc, const char **argv);
+    Chkstat(const CmdlineArgs &args);
 
     int run();
 
 protected: // functions
-
-    /// Validates command line arguments on syntactical and logical level.
-    bool validateArguments();
 
     /// Process the already validated command line arguments.
     bool processArguments();
@@ -121,11 +116,11 @@ protected: // functions
     }
 
     std::string getUsrRoot() const {
-        return m_config_root_path.getValue() + "/usr/share/permissions";
+        return m_args.config_root_path.getValue() + "/usr/share/permissions";
     }
 
     std::string getEtcRoot() const {
-        return m_config_root_path.getValue() + "/etc";
+        return m_args.config_root_path.getValue() + "/etc";
     }
 
     bool parseSysconfig();
@@ -234,39 +229,7 @@ protected: // functions
 
 protected: // data
 
-    const int m_argc = 0;
-    const char **m_argv = nullptr;
-
-    TCLAP::CmdLine m_parser;
-
-    TCLAP::SwitchArg m_system_mode;
-    TCLAP::SwitchArg m_force_fscaps;
-    TCLAP::SwitchArg m_disable_fscaps;
-    SwitchArgRW m_apply_changes;
-    TCLAP::SwitchArg m_only_warn;
-    SwitchArgRW m_no_header;
-    TCLAP::SwitchArg m_verbose;
-    TCLAP::SwitchArg m_print_variables;
-
-    // NOTE: previously chkstat allowed multiple specifications of value
-    // switches like --level and --root but actually only used the last
-    // occurrence on the command line. In theory this is a backward
-    // compatibility break, but it's also kind of a bug.
-
-    TCLAP::MultiArg<std::string> m_examine_paths;
-    TCLAP::ValueArg<std::string> m_force_level_list;
-    TCLAP::MultiArg<std::string> m_file_lists;
-
-    TCLAP::ValueArg<std::string> m_root_path;
-    /// Alternate config root directory relative to which config files are looked up.
-    TCLAP::ValueArg<std::string> m_config_root_path;
-
-    /// Positional input arguments
-    /**
-     * Either the files to check for --system mode or the profiles to parse
-     * for non-system mode.
-     **/
-    TCLAP::UnlabeledMultiArg<std::string> m_input_args;
+    const CmdlineArgs &m_args;
 
     /// Optional explicit set of files to check.
     std::set<std::string> m_files_to_check;
@@ -276,6 +239,13 @@ protected: // data
      * configuration file
      **/
     bool m_use_fscaps = true;
+
+    /// Whether to actually apply changes.
+    /**
+     * This basically defined by command line parameters but can be overridden
+     * by runtime context.
+     **/
+    bool m_apply_changes = false;
 
     /// The predefined profile names shipped with permissions.
     static constexpr const char * const PREDEFINED_PROFILES[] = {"easy", "secure", "paranoid"};
