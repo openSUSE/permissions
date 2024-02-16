@@ -46,11 +46,14 @@ protected: // functions
      * \return
      *      Whether the line could successfully be parsed
      **/
-    bool parseCapabilityLine(const std::string &line, const std::vector<std::string> &active_paths);
+    bool parseCapabilityLine(const std::string &line);
 
-    /// Adds a ProfileEntry to m_entries for the given set of parameters.
-    ProfileEntry&
-    addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode);
+    /// Adds ProfileEntry to m_entries from the current m_parse_context.
+    void addCurrentEntries();
+
+    bool parseOwnership(const std::string &ownership);
+
+    bool parseMode(const std::string &mode);
 
 protected: // data
 
@@ -64,6 +67,20 @@ protected: // data
     const CmdlineArgs &m_args;
 
     const VariableExpansions &m_expansions;
+
+    struct {
+        std::string user;
+        std::string group;
+        mode_t mode;
+        std::vector<std::string> paths;
+
+        void clear() {
+            user.clear();
+            group.clear();
+            paths.clear();
+            mode = 0;
+        }
+    } m_parse_context;
 
     /// A mapping of file paths to ProfileEntry, denotes the entry to apply for each path.
     std::map<std::string, ProfileEntry> m_entries;
