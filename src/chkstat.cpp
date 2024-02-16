@@ -475,6 +475,8 @@ bool Chkstat::expandProfilePaths(const std::string &path, std::vector<std::strin
     expansions.clear();
     expansions.push_back("");
 
+    const auto &varexps = m_variable_expansions.expansions();
+
     // process each path component.
     //
     // we support variables only as individual
@@ -486,9 +488,9 @@ bool Chkstat::expandProfilePaths(const std::string &path, std::vector<std::strin
         if (hasPrefix(part, "%{") && hasSuffix(part, "}")) {
             // variable found
             const auto variable = part.substr(2, part.length() - 3);
-            auto it = m_variable_expansions.find(variable);
+            auto it = varexps.find(variable);
 
-            if (it == m_variable_expansions.end()) {
+            if (it == varexps.end()) {
                 expansions.clear();
                 std::cerr << "Undeclared variable %{" << variable << "} encountered." << std::endl;
                 return false;
@@ -993,10 +995,10 @@ int Chkstat::run() {
     if (!processArguments())
         return 1;
 
-    loadVariableExpansions();
+    m_variable_expansions.load(getUsrRoot());
 
     if (m_args.print_variables.isSet()) {
-        for (const auto& [var, values]: m_variable_expansions) {
+        for (const auto& [var, values]: m_variable_expansions.expansions()) {
             std::cout << var << ":\n";
             for (const auto &val: values) {
                 std::cout << "- " << val << "\n";
@@ -1075,115 +1077,6 @@ int Chkstat::run() {
     printHeader();
 
     return processEntries();
-}
-
-/// Checks that a path variable identifier contains only valid characters.
-static inline bool checkValidVariableIdentifier(const std::string &ident) {
-    for (auto ch: ident) {
-        if (std::isalnum(ch))
-            continue;
-        else if (ch == '_')
-            continue;
-
-        std::cerr << "Invalid characters encountered in variable name '" << ident << "': '" << ch << "'" << std::endl;
-
-        return false;
-    }
-
-    return true;
-}
-
-/// Normalizes the given list of path variable values.
-/**
- *  Unnecessary path separators will be removed from each value.
- **/
-static inline void normalizeVariableValues(std::vector<std::string> &values) {
-    for (auto &value: values) {
-        // remove leading/trailing separators
-        strip(value, chkslash);
-
-        // remove consecutive slashes in two passes:
-        // - identify indices of repeated slashes
-        // - remove indices starting from the end of the string to avoid
-        //   shifting index positions.
-        char prev_char = 0;
-        size_t pos = 0;
-        std::vector<size_t> del_indices;
-
-        for (auto ch: value) {
-            if (ch == '/' && prev_char == '/')
-                del_indices.push_back(pos);
-            else
-                prev_char = ch;
-
-            pos++;
-        }
-
-        for (auto it = del_indices.rbegin(); it != del_indices.rend(); it++) {
-            value.erase(*it, 1);
-        }
-    }
-}
-
-void Chkstat::loadVariableExpansions() {
-    const auto conf_path = getUsrRoot() + "/variables.conf";
-
-    std::ifstream fs(conf_path);
-
-    if (!fs) {
-        std::cerr << "warning: couldn't find variable mapping configuration in " << conf_path << ": " << std::strerror(errno) << std::endl;
-        return;
-    }
-
-    std::vector<std::string> words;
-    size_t linenr = 0;
-    std::string line;
-
-    auto printBadLine = [conf_path, line](const std::string_view context) {
-        std::cerr << conf_path << ":" << line <<
-            ": syntax error in variable configuration (" << context << ")" << std::endl;
-    };
-
-    while (std::getline(fs, line)) {
-        linenr++;
-        strip(line);
-
-        if (line.empty() || line[0] == '#')
-            continue;
-
-        const auto equal_pos = line.find('=');
-
-        if (equal_pos == line.npos) {
-            printBadLine("missing '=' assignment");
-            continue;
-        }
-
-        const auto varname = stripped(line.substr(0, equal_pos));
-        if (!checkValidVariableIdentifier(varname)) {
-            printBadLine("bad variable identifier");
-            continue;
-        }
-
-        const auto values = stripped(line.substr(equal_pos + 1));
-        splitWords(values, words);
-
-        if (words.empty()) {
-            printBadLine("empty assignment");
-            continue;
-        }
-
-        normalizeVariableValues(words);
-
-        // tolerate words.size() == 1, we could emit a warning, but it could
-        // be a valid use case.
-
-        if (m_variable_expansions.find(varname) != m_variable_expansions.end()) {
-            printBadLine("duplicate variable entry, ignoring");
-            continue;
-        }
-
-        m_variable_expansions[varname] = words;
-    }
 }
 
 int main(int argc, const char **argv) {

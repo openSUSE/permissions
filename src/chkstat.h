@@ -4,10 +4,10 @@
 #include "cmdline.h"
 #include "types.h"
 #include "utility.h"
+#include "varexp.h"
 
 // C++
 #include <fstream>
-#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -126,9 +126,6 @@ protected: // functions
     /// Resolves the file system path for the given file descriptor via /proc/self/fd.
     std::string getPathFromProc(const FileDesc &fd) const;
 
-    /// Parses the variables.conf file and fills m_variable_expansions.
-    void loadVariableExpansions();
-
     /// Expand possible variables in profile path specifications.
     /**
      * Profile paths can contain %{variable} syntax that will expand to one or
@@ -182,8 +179,8 @@ protected: // data
     /// A collection of the basenames of packages that have already been processed by collectPackageProfilePaths().
     std::set<std::string> m_package_profiles_seen;
 
-    /// Collected variable expansion mappings from the variables.conf file.
-    std::map<std::string, std::vector<std::string>> m_variable_expansions;
+    /// Access to variable expansion mappings from the variables.conf file.
+    VariableExpansions m_variable_expansions;
 
     /// The effective user ID we're running as.
     const uid_t m_euid;

@@ -39,7 +39,7 @@ man5dir=$(mandir)/man5
 zypp_plugins=$(prefix)/lib/zypp/plugins
 zypp_commit_plugins=$(zypp_plugins)/commit
 
-OBJS = src/chkstat.o src/utility.o src/formatting.o src/cmdline.o
+OBJS = src/chkstat.o src/utility.o src/formatting.o src/cmdline.o src/varexp.o
 
 all: src/chkstat
 	@if grep -n -o -P '\t' src/*.cpp src/*.h; then echo "error: source has mixed tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :
