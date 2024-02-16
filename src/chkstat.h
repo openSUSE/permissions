@@ -1,5 +1,4 @@
-#ifndef CHKSTAT_H
-#define CHKSTAT_H
+#pragma once
 
 // local headers
 #include "utility.h"
@@ -272,7 +271,5 @@ protected: // data
 
     mutable ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
 };
-
-#endif // inc. guard
 
 // vim: et ts=4 sts=4 sw=4 :

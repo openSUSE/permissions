@@ -1,5 +1,4 @@
-#ifndef CHKSTAT_UTILITY_H
-#define CHKSTAT_UTILITY_H
+#pragma once
 
 // POSIX
 #include <sys/capability.h>
@@ -323,7 +322,5 @@ protected: // data
      cap_t m_caps = nullptr;
      int m_last_errno = 0;
 };
-
-#endif // inc. guard
 
 // vim: et ts=4 sts=4 sw=4 :

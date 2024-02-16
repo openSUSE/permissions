@@ -1,5 +1,4 @@
-#ifndef CHKSTAT_FORMATTING_H
-#define CHKSTAT_FORMATTING_H
+#pragma once
 
 // local headers
 #include "utility.h"
@@ -82,7 +81,5 @@ protected:
 };
 
 std::ostream& operator<<(std::ostream &o, const FileOwnership &fo);
-
-#endif // inc. guard
 
 // vim: et ts=4 sts=4 sw=4 :
