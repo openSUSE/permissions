@@ -99,7 +99,6 @@ bool Chkstat::parseSysconfig() {
 
     std::string line;
     size_t linenr = 0;
-    bool check_permissions = true;
 
     while (std::getline(fs, line)) {
         linenr++;
@@ -132,22 +131,7 @@ bool Chkstat::parseSysconfig() {
                     addProfile(profile);
                 }
             }
-        }
-        // REMOVEME:
-        // this setting was last seen in the config file template in SLE-11
-        // but we still support it in the code. The logic behind it is quite
-        // complex since it is interlocked with the command line settings
-        // (also see logic after the while loop).
-        else if (key == "CHECK_PERMISSIONS") {
-            if (value == "set") {
-                check_permissions = true;
-            } else if (value == "no" || value.empty()) {
-                check_permissions = false;
-            } else if (value != "warn") {
-                std::cerr << file << ":" << linenr << ": invalid value for " << key << " (expected 'set', 'no' or 'warn'). Falling back to default value." << std::endl;
-            }
-        }
-        else if (key == "PERMISSION_FSCAPS") {
+        } else if (key == "PERMISSION_FSCAPS") {
             if (value == "yes") {
                 m_use_fscaps = true;
             } else if (value == "no") {
@@ -157,16 +141,6 @@ bool Chkstat::parseSysconfig() {
                 // original code
                 std::cerr << file << ":" << linenr << ": invalid value for " << key << " (expected 'yes' or 'no'). Falling back to default value." << std::endl;
             }
-        }
-    }
-
-    // apply the complex CHECK_PERMISSIONS logic
-    if (!m_apply_changes && !m_args.only_warn.isSet()) {
-        if (check_permissions) {
-            m_apply_changes = true;
-        } else {
-            std::cerr << "permissions handling disabled in " << file << std::endl;
-            return false;
         }
     }
 
@@ -1033,6 +1007,8 @@ int Chkstat::run() {
     }
 
     if (m_args.system_mode.isSet()) {
+        // this overrides --set
+        m_apply_changes = m_args.only_warn.isSet() ? false : true;
         if (!parseSysconfig())
             // NOTE: the original code considers this a non-error situation
             return 0;
