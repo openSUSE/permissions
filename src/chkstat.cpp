@@ -313,10 +313,6 @@ Chkstat::addProfileEntry(const std::string &file, const std::string &owner, cons
     return m_profile_entries[path] = ProfileEntry{path, owner, group, mode};
 }
 
-static inline void badProfileLine(const std::string &file, const size_t line, const std::string &context) {
-    std::cerr << file << ":" << line << ": syntax error in permissions profile (" << context << ")" << std::endl;
-}
-
 bool Chkstat::parseCapabilityLine(const std::string &line, const std::vector<std::string> &active_paths) {
     if (!hasPrefix(line, "+capabilities "))
         return false;
@@ -356,6 +352,10 @@ void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
     std::vector<std::string> parts;
     mode_t mode_int;
 
+    auto printBadLine = [path, linenr](const std::string_view context) {
+        std::cerr << path << ":" << linenr << ": syntax error in permissions profile (" << context << ")" << std::endl;
+    };
+
     // we're parsing lines of the following format here:
     //
     // # comment
@@ -375,14 +375,14 @@ void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
         // profile entry seen.
         if (line[0] == '+') {
             if (active_keys.empty()) {
-                badProfileLine(path, linenr, "lone capability line");
+                printBadLine("lone capability line");
                 continue;
             }
 
             const auto good = parseCapabilityLine(line, active_keys);
 
             if (!good) {
-                badProfileLine(path, linenr, "bad capability spec or bad +keyword");
+                printBadLine("bad capability spec or bad +keyword");
             }
 
             continue;
@@ -396,7 +396,7 @@ void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
         splitWords(line, parts);
 
         if (parts.size() != 3) {
-            badProfileLine(path, linenr, "invalid number of whitespace separated words");
+            printBadLine("invalid number of whitespace separated words");
             continue;
         }
 
@@ -417,7 +417,7 @@ void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
         }
 
         if (user.empty() || group.empty()) {
-            badProfileLine(path, linenr, "bad user:group specification");
+            printBadLine("bad user:group specification");
             continue;
         }
 
@@ -425,13 +425,13 @@ void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
         const auto &mode = parts[2];
 
         if (!stringToUnsigned(mode, mode_int, 8) || mode_int > ALLPERMS) {
-            badProfileLine(path, linenr, "bad mode specification");
+            printBadLine("bad mode specification");
             continue;
         }
 
         std::vector<std::string> expanded;
         if (!m_variable_expansions.expandPath(location, expanded)) {
-            badProfileLine(path, linenr, "bad variable expansions");
+            printBadLine("bad variable expansions");
             continue;
         }
 
