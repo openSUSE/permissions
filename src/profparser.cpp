@@ -82,7 +82,7 @@ bool ProfileParser::parseCapabilityLine(const std::string &line) {
     bool ret = true;
 
     for (const auto &path: m_parse_context.paths) {
-        auto it = m_entries.find(path);
+        auto it = m_entries.find(fullPath(path));
         if (it == m_entries.end()) {
             std::cerr << "No profile entry for path " << path << "???";
             ret = false;

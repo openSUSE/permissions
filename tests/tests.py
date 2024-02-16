@@ -485,8 +485,15 @@ class TestRootSwitch(TestCommandLineBase):
 
     def run(self):
         self.setupTest()
+        caps_file = self.m_testdir_root + "/caps_test"
+        caps_profile = "easy"
+        caps = ["cap_net_admin=ep"]
+        self.createTestFile(caps_file, 0o755)
 
         init_profile = "easy"
+        self.addProfileEntries({
+            caps_profile: [self.buildProfileLine(caps_file, 0o750, caps=caps)]
+        })
         self.switchSystemProfile(init_profile)
         self.applySystemProfile()
         expected_modes = self.m_modes[init_profile] * 2
@@ -510,6 +517,9 @@ class TestRootSwitch(TestCommandLineBase):
             # the alternative root should be accordingly adjusted
             for path, mode in zip(alt_testpaths, self.m_modes[profile] * 2):
                 self.assertMode(path, mode)
+
+            if profile == caps_profile:
+                self.assertHasCaps(alt_root + caps_file, caps)
 
             print()
 
