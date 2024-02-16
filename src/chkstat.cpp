@@ -50,6 +50,7 @@
 Chkstat::Chkstat(const CmdlineArgs &args) :
             m_args{args},
             m_apply_changes{args.apply_changes.getValue()},
+            m_profile_parser{m_args, m_variable_expansions},
             m_euid{geteuid()},
             m_egid{getegid()} {
 }
@@ -133,9 +134,9 @@ bool Chkstat::parseSysconfig() {
             }
         } else if (key == "PERMISSION_FSCAPS") {
             if (value == "yes") {
-                m_use_fscaps = true;
+                m_profile_parser.setUseFsCaps(true);
             } else if (value == "no") {
-                m_use_fscaps = false;
+                m_profile_parser.setUseFsCaps(false);
             } else if (!value.empty()) {
                 // NOTE: this was not a warning/error condition in the original code
                 std::cerr << file << ":" << linenr << ": invalid value for " << key << " (expected 'yes' or 'no'). Falling back to default value." << std::endl;
@@ -297,153 +298,6 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
     }
 }
 
-ProfileEntry&
-Chkstat::addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode) {
-    // use the full path including a potential alternative root directory as
-    // map key
-    std::string path = m_args.root_path.getValue();
-    if (!path.empty()) {
-        path += '/';
-    }
-    path += file;
-
-    // this overwrites a possibly already existing entry
-    // this is intended behaviour, hence the order in which profiles are
-    // applied is important
-    return m_profile_entries[path] = ProfileEntry{path, owner, group, mode};
-}
-
-bool Chkstat::parseCapabilityLine(const std::string &line, const std::vector<std::string> &active_paths) {
-    if (!hasPrefix(line, "+capabilities "))
-        return false;
-    else if (!m_use_fscaps)
-        // ignore the content
-        return true;
-
-    auto cap_text = line.substr(line.find_first_of(' '));
-    if (cap_text.empty())
-        // ignore empty capability specification
-        return true;
-
-    bool ret = true;
-
-    for (const auto &path: active_paths) {
-        auto it = m_profile_entries.find(path);
-        if (it == m_profile_entries.end()) {
-            std::cerr << "No profile entry for path " << path << "???";
-            ret = false;
-            continue;
-        }
-
-        auto &entry = it->second;
-
-        if (!entry.caps.setFromText(cap_text)) {
-            ret = false;
-        }
-    }
-
-    return ret;
-}
-
-void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
-    size_t linenr = 0;
-    std::vector<std::string> active_keys;
-    std::string line;
-    std::vector<std::string> parts;
-    mode_t mode_int;
-
-    auto printBadLine = [path, linenr](const std::string_view context) {
-        std::cerr << path << ":" << linenr << ": syntax error in permissions profile (" << context << ")" << std::endl;
-    };
-
-    // we're parsing lines of the following format here:
-    //
-    // # comment
-    // <path> <user>:<group> <mode>
-    // [+capabilities cap_net_raw=ep]
-
-    while (std::getline(fs, line)) {
-        linenr++;
-        strip(line);
-
-        // don't know exactly why the dollar is also ignored, probably some
-        // dark legacy.
-        if (line.empty() || line[0] == '#' || line[0] == '$')
-            continue;
-
-        // an extra capability line that belongs to the context of the last
-        // profile entry seen.
-        if (line[0] == '+') {
-            if (active_keys.empty()) {
-                printBadLine("lone capability line");
-                continue;
-            }
-
-            const auto good = parseCapabilityLine(line, active_keys);
-
-            if (!good) {
-                printBadLine("bad capability spec or bad +keyword");
-            }
-
-            continue;
-        }
-
-        // only keep the context for one following non-empty/non-comment line
-        // to prevent the context being applied to unintended '+' lines in
-        // case of parsing errors later on.
-        active_keys.clear();
-
-        splitWords(line, parts);
-
-        if (parts.size() != 3) {
-            printBadLine("invalid number of whitespace separated words");
-            continue;
-        }
-
-        const auto &ownership = parts[1];
-        std::string user, group;
-
-        // split up user and group from {user}:{group} string. Two different
-        // separator types are allowed like with `chmod`
-        for (const auto sep: { ':', '.' }) {
-            const auto seppos = ownership.find_first_of(sep);
-            if (seppos == ownership.npos)
-                continue;
-
-            user = ownership.substr(0, seppos);
-            group = ownership.substr(seppos + 1);
-
-            break;
-        }
-
-        if (user.empty() || group.empty()) {
-            printBadLine("bad user:group specification");
-            continue;
-        }
-
-        const auto &location = parts[0];
-        const auto &mode = parts[2];
-
-        if (!stringToUnsigned(mode, mode_int, 8) || mode_int > ALLPERMS) {
-            printBadLine("bad mode specification");
-            continue;
-        }
-
-        std::vector<std::string> expanded;
-        if (!m_variable_expansions.expandPath(location, expanded)) {
-            printBadLine("bad variable expansions");
-            continue;
-        }
-
-        for (const auto &exp_path: expanded) {
-            addProfileEntry(exp_path, user, group, mode_int);
-            // remember the most recently added entries to allow potential '+'
-            // capability lines to be applied to them.
-            active_keys.push_back(exp_path);
-        }
-    }
-}
-
 bool Chkstat::checkHaveProc() const {
     if (m_proc_mount_avail == ProcMountState::UNKNOWN) {
         m_proc_mount_avail = ProcMountState::UNAVAIL;
@@ -516,7 +370,7 @@ void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContex
     std::cout << ")" << std::endl;
 }
 
-bool Chkstat::getCapabilities(ProfileEntry &entry, EntryContext &ctx) {
+bool Chkstat::getCapabilities(const ProfileEntry &entry, EntryContext &ctx) {
 
     if (!ctx.caps.setFromFile(ctx.fd_path)) {
         std::cerr << ctx.subpath << ": " << ctx.caps.lastErrorText() << std::endl;
@@ -834,7 +688,7 @@ int Chkstat::processEntries() {
         m_apply_changes = false;
     }
 
-    for (auto& [path, entry]: m_profile_entries) {
+    for (auto& [path, entry]: m_profile_parser.entries()) {
         EntryContext ctx;
         ctx.subpath = entry.file.substr(m_args.root_path.getValue().length());
 
@@ -968,13 +822,13 @@ int Chkstat::run() {
 
     // apply possible command line overrides to force en-/disable fscaps
     if (m_args.force_fscaps.isSet()) {
-        m_use_fscaps = true;
+        m_profile_parser.setUseFsCaps(true);
     } else if (m_args.disable_fscaps.isSet()) {
-        m_use_fscaps = false;
+        m_profile_parser.setUseFsCaps(false);
     }
 
     for (auto &pair: m_profile_streams) {
-        parseProfile(pair.first, pair.second);
+        m_profile_parser.parse(pair.first, pair.second);
     }
 
     // check whether explicitly listed files are actually configured in
@@ -983,12 +837,12 @@ int Chkstat::run() {
         auto full_path = path;
 
         // we need to add a potential alternative root directory, since
-        // addProfileEntry stores entries using the full path.
+        // ProfileParser stores entries using the full path.
         if (!m_args.root_path.getValue().empty()) {
             full_path = m_args.root_path.getValue() + '/' + path;
         }
 
-        if (m_profile_entries.find(full_path) == m_profile_entries.end()) {
+        if (!m_profile_parser.existsEntry(full_path)) {
             std::cerr << path << ": no configuration entry in active permission profiles found. Cannot check this path." << std::endl;
         }
     }

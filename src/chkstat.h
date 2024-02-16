@@ -2,6 +2,7 @@
 
 // local headers
 #include "cmdline.h"
+#include "profparser.h"
 #include "types.h"
 #include "utility.h"
 #include "varexp.h"
@@ -59,25 +60,6 @@ protected: // functions
     /// Collects configured per-package profiles from the given directory.
     void collectPackageProfilePaths(const std::string &dir);
 
-    /// Parses the given profile file and stores the according entries in m_profile_entries.
-    void parseProfile(const std::string &path, std::ifstream &fs);
-
-    /// Parses extra "+capabilities" lines in permission profiles.
-    /**
-     * \param[in] line
-     *      The input line from a profile file that starts with "+"
-     * \param[input] active_paths
-     *      The paths that the capability line applies to. It is expected that
-     *      these paths already have entries in m_profile_entries.
-     * \return
-     *      Whether the line could successfully be parsed
-     **/
-    bool parseCapabilityLine(const std::string &line, const std::vector<std::string> &active_paths);
-
-    /// Adds a ProfileEntry to m_profile_entries for the given set of parameters.
-    ProfileEntry&
-    addProfileEntry(const std::string &file, const std::string &owner, const std::string &group, mode_t mode);
-
     /// The main profile entry traversal algorithm that carries out required file system operations.
     int processEntries();
 
@@ -110,7 +92,7 @@ protected: // functions
      * indicate whether a capability value could be assigned. Check
      * `ctx.caps.valid()` for this.
      **/
-    bool getCapabilities(ProfileEntry &entry, EntryContext &ctx);
+    bool getCapabilities(const ProfileEntry &entry, EntryContext &ctx);
 
     /// Safely open the target file taking symlinks and insecure constellations into account.
     /**
@@ -133,12 +115,6 @@ protected: // data
 
     /// Optional explicit set of files to check.
     std::set<std::string> m_files_to_check;
-    /// Whether to touch file based capabilities.
-    /**
-     * This is influenced by command line parameters and the sysconfig
-     * configuration file
-     **/
-    bool m_use_fscaps = true;
 
     /// Whether to actually apply changes.
     /**
@@ -156,14 +132,13 @@ protected: // data
     /// Permission profile paths and their opened streams in the order they should be applied.
     std::vector<std::pair<std::string, std::ifstream>> m_profile_streams;
 
-    /// A mapping of file paths to ProfileEntry, denotes the entry to apply for each path.
-    std::map<std::string, ProfileEntry> m_profile_entries;
-
     /// A collection of the basenames of packages that have already been processed by collectPackageProfilePaths().
     std::set<std::string> m_package_profiles_seen;
 
     /// Access to variable expansion mappings from the variables.conf file.
     VariableExpansions m_variable_expansions;
+
+    ProfileParser m_profile_parser;
 
     /// The effective user ID we're running as.
     const uid_t m_euid;
