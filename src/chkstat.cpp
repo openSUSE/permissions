@@ -146,28 +146,6 @@ bool Chkstat::parseSysconfig() {
     return true;
 }
 
-bool Chkstat::checkFsCapsSupport() const {
-    // REMOVEME: this check is really old and should be dropped, today's
-    // kernels all support capabilities.
-
-    /* check kernel capability support /sys/kernel/fscaps, 2.6.39 */
-    std::ifstream fs("/sys/kernel/fscaps");
-
-    if (!fs) {
-        // if the file doesn't exist then there's probably no support for it
-        return false;
-    }
-
-    size_t val = 0;
-    fs >> val;
-
-    if (fs.fail()) {
-        return false;
-    }
-
-    return val == 1;
-}
-
 void Chkstat::addProfile(const std::string &name) {
     for (const auto &profile: m_profiles) {
         if (profile == name)
@@ -993,10 +971,6 @@ int Chkstat::run() {
         m_use_fscaps = true;
     } else if (m_args.disable_fscaps.isSet()) {
         m_use_fscaps = false;
-    }
-
-    if (m_use_fscaps && !checkFsCapsSupport()) {
-        std::cerr << "Warning: running kernel does not support fscaps" << std::endl;
     }
 
     for (auto &pair: m_profile_streams) {

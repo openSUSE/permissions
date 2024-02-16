@@ -45,8 +45,6 @@ protected: // functions
 
     bool parseSysconfig();
 
-    bool checkFsCapsSupport() const;
-
     /// Adds the given profile (suffix) to the list of profiles to be processed.
     void addProfile(const std::string &name);
 
