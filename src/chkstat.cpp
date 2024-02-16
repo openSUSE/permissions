@@ -1077,10 +1077,6 @@ int Chkstat::run() {
     return processEntries();
 }
 
-static inline void badVariablesLine(const std::string &file, const size_t line, const std::string &context) {
-    std::cerr << file << ":" << line << ": syntax error in variable configuration (" << context << ")" << std::endl;
-}
-
 /// Checks that a path variable identifier contains only valid characters.
 static inline bool checkValidVariableIdentifier(const std::string &ident) {
     for (auto ch: ident) {
@@ -1130,7 +1126,7 @@ static inline void normalizeVariableValues(std::vector<std::string> &values) {
 }
 
 void Chkstat::loadVariableExpansions() {
-    auto conf_path = getUsrRoot() + "/variables.conf";
+    const auto conf_path = getUsrRoot() + "/variables.conf";
 
     std::ifstream fs(conf_path);
 
@@ -1143,6 +1139,11 @@ void Chkstat::loadVariableExpansions() {
     size_t linenr = 0;
     std::string line;
 
+    auto printBadLine = [conf_path, line](const std::string_view context) {
+        std::cerr << conf_path << ":" << line <<
+            ": syntax error in variable configuration (" << context << ")" << std::endl;
+    };
+
     while (std::getline(fs, line)) {
         linenr++;
         strip(line);
@@ -1150,27 +1151,24 @@ void Chkstat::loadVariableExpansions() {
         if (line.empty() || line[0] == '#')
             continue;
 
-        auto equal_pos = line.find('=');
+        const auto equal_pos = line.find('=');
 
         if (equal_pos == line.npos) {
-            badVariablesLine(conf_path, linenr, "missing '=' assignment");
+            printBadLine("missing '=' assignment");
             continue;
         }
 
-        auto varname = line.substr(0, equal_pos);
-        strip(varname);
+        const auto varname = stripped(line.substr(0, equal_pos));
         if (!checkValidVariableIdentifier(varname)) {
-            badVariablesLine(conf_path, linenr, "bad variable identifier");
+            printBadLine("bad variable identifier");
             continue;
         }
 
-        auto values = line.substr(equal_pos + 1);
-        strip(values);
-
+        const auto values = stripped(line.substr(equal_pos + 1));
         splitWords(values, words);
 
         if (words.empty()) {
-            badVariablesLine(conf_path, linenr, "empty assignment");
+            printBadLine("empty assignment");
             continue;
         }
 
@@ -1180,7 +1178,7 @@ void Chkstat::loadVariableExpansions() {
         // be a valid use case.
 
         if (m_variable_expansions.find(varname) != m_variable_expansions.end()) {
-            badVariablesLine(conf_path, linenr, "duplicate variable entry, ignoring");
+            printBadLine("duplicate variable entry, ignoring");
             continue;
         }
 

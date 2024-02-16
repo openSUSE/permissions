@@ -49,6 +49,12 @@ void strip(std::string &s, UNARY f = chkspace) {
     rstrip(s, f);
 }
 
+template <typename UNARY = bool(char)>
+std::string stripped(std::string s, UNARY f = chkspace) {
+    strip(s, f);
+    return s;
+}
+
 inline void stripTrailingSlashes(std::string &s) {
     rstrip(s, [](char c) { return c == '/'; });
 }
