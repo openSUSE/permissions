@@ -81,16 +81,17 @@ bool Chkstat::processArguments() {
     return true;
 }
 
-static inline void stripQuotes(std::string &s) {
-    strip(s, [](char c) { return c == '"' || c == '\''; });
-}
-
 bool Chkstat::parseSysconfig() {
+    auto stripQuotes = [](std::string s) -> std::string {
+        strip(s, [](char c) { return c == '"' || c == '\''; });
+        return s;
+    };
+
     const auto file = m_args.config_root_path.getValue() + "/etc/sysconfig/security";
     std::ifstream fs(file);
 
     if (!fs) {
-        // NOTE: the original code tolerated this situation and continued
+        // NOTE: the original code tolerated this situation and continued.
         // A system would need to be very broken to get here, therefore make
         // it an error condition instead.
         std::cerr << "error opening " << file << ": " << std::strerror(errno) << std::endl;
@@ -114,9 +115,8 @@ bool Chkstat::parseSysconfig() {
             continue;
         }
 
-        auto key = line.substr(0, sep);
-        auto value = line.substr(sep + 1);
-        stripQuotes(value);
+        const auto key = line.substr(0, sep);
+        const auto value = stripQuotes(line.substr(sep + 1));
 
         if (key == "PERMISSION_SECURITY") {
             if (m_args.force_level_list.isSet())
@@ -137,8 +137,7 @@ bool Chkstat::parseSysconfig() {
             } else if (value == "no") {
                 m_use_fscaps = false;
             } else if (!value.empty()) {
-                // NOTE: this was not a warning/error condition in the
-                // original code
+                // NOTE: this was not a warning/error condition in the original code
                 std::cerr << file << ":" << linenr << ": invalid value for " << key << " (expected 'yes' or 'no'). Falling back to default value." << std::endl;
             }
         }
