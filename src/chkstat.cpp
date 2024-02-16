@@ -831,18 +831,9 @@ int Chkstat::run() {
         m_profile_parser.parse(pair.first, pair.second);
     }
 
-    // check whether explicitly listed files are actually configured in
-    // profiles
+    // check whether explicitly listed files are actually configured in profiles
     for (const auto &path: m_files_to_check) {
-        auto full_path = path;
-
-        // we need to add a potential alternative root directory, since
-        // ProfileParser stores entries using the full path.
-        if (!m_args.root_path.getValue().empty()) {
-            full_path = m_args.root_path.getValue() + '/' + path;
-        }
-
-        if (!m_profile_parser.existsEntry(full_path)) {
+        if (!m_profile_parser.existsEntry(path)) {
             std::cerr << path << ": no configuration entry in active permission profiles found. Cannot check this path." << std::endl;
         }
     }

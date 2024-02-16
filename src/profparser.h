@@ -31,7 +31,7 @@ public: // functions
     }
 
     bool existsEntry(const std::string &path) const {
-        return m_entries.find(path) != m_entries.end();
+        return m_entries.find(fullPath(path)) != m_entries.end();
     }
 
 protected: // functions
@@ -54,6 +54,9 @@ protected: // functions
     bool parseOwnership(const std::string &ownership);
 
     bool parseMode(const std::string &mode);
+
+    /// Returns the full path for `path` considering any configured root path
+    std::string fullPath(const std::string &path) const;
 
 protected: // data
 

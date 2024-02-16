@@ -100,14 +100,8 @@ bool ProfileParser::parseCapabilityLine(const std::string &line) {
 }
 
 void ProfileParser::addCurrentEntries() {
-    // use the full path including a potential alternative root directory as map key
-    std::string root = m_args.root_path.getValue();
-    if (!root.empty()) {
-        root += '/';
-    }
-
     for (auto path: m_parse_context.paths) {
-        path = root + path;
+        path = fullPath(path);
 
         // this overwrites a possibly already existing entry
         // this is intended behaviour, hence the order in which profiles are
@@ -144,6 +138,16 @@ bool ProfileParser::parseMode(const std::string &mode) {
     }
 
     return true;
+}
+
+std::string ProfileParser::fullPath(const std::string &path) const {
+    // use the full path including a potential alternative root directory as map key
+    std::string root = m_args.root_path.getValue();
+
+    if (root.empty())
+        return path;
+
+    return root + '/' + path;
 }
 
 // vim: et ts=4 sts=4 sw=4 :
