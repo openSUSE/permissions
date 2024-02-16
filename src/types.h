@@ -14,7 +14,7 @@ struct ProfileEntry {
     std::string file;
     std::string owner;
     std::string group;
-    mode_t mode = 0;
+    mutable mode_t mode = 0;
     FileCapabilities caps;
 
     ProfileEntry() = default;
@@ -29,7 +29,8 @@ struct ProfileEntry {
         return (this->mode & (S_ISUID | S_ISGID)) != 0;
     }
 
-    void dropXID() {
+    // NOTE: this is currently mutable due to the somewhat unfortunate logic in Chkstat::getCapabilities().
+    void dropXID() const {
         const mode_t to_drop = (S_ISUID | S_ISGID);
         mode &= ~(to_drop);
     }
