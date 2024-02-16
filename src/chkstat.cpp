@@ -451,74 +451,19 @@ void Chkstat::parseProfile(const std::string &path, std::ifstream &fs) {
             continue;
         }
 
-        std::vector<std::string> expansions;
-        if (!expandProfilePaths(location, expansions)) {
+        std::vector<std::string> expanded;
+        if (!m_variable_expansions.expandPath(location, expanded)) {
             badProfileLine(path, linenr, "bad variable expansions");
             continue;
         }
 
-        for (const auto &exp_path: expansions) {
+        for (const auto &exp_path: expanded) {
             addProfileEntry(exp_path, user, group, mode_int);
             // remember the most recently added entries to allow potential '+'
             // capability lines to be applied to them.
             active_keys.push_back(exp_path);
         }
     }
-}
-
-bool Chkstat::expandProfilePaths(const std::string &path, std::vector<std::string> &expansions) {
-    std::stringstream ss;
-    ss.str(path);
-    std::string part;
-
-    // the initial entry
-    expansions.clear();
-    expansions.push_back("");
-
-    const auto &varexps = m_variable_expansions.expansions();
-
-    // process each path component.
-    //
-    // we support variables only as individual
-    // path components i.e. something like %{myvar}stuff/suffix is not
-    // allowed, only %{myvar}/suffix.
-    //
-    // multiple variable components in the same path are supported
-    while (std::getline(ss, part, '/')) {
-        if (hasPrefix(part, "%{") && hasSuffix(part, "}")) {
-            // variable found
-            const auto variable = part.substr(2, part.length() - 3);
-            auto it = varexps.find(variable);
-
-            if (it == varexps.end()) {
-                expansions.clear();
-                std::cerr << "Undeclared variable %{" << variable << "} encountered." << std::endl;
-                return false;
-            }
-
-            // now we need to create additional entries for each possible
-            // value of the variable
-            std::vector<std::string> new_expansions;
-
-            for (const auto &element: expansions) {
-                for (const auto &var_value: it->second) {
-                    new_expansions.push_back(element + "/" + var_value);
-                }
-            }
-
-            expansions = new_expansions;
-        } else if (part.empty()) {
-            // leading slash, ignore
-            continue;
-        } else {
-            // regular fixed string
-            for (auto &element: expansions) {
-                element = element + "/" + part;
-            }
-        }
-    }
-
-    return true;
 }
 
 bool Chkstat::checkHaveProc() const {

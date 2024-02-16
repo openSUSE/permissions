@@ -110,4 +110,59 @@ void VariableExpansions::normalizeValues(std::vector<std::string> &values) {
     }
 }
 
+bool VariableExpansions::expandPath(const std::string &path, std::vector<std::string> &expanded) const {
+    std::stringstream ss;
+    ss.str(path);
+    std::string part;
+
+    // the initial entry
+    expanded.clear();
+    expanded.push_back("");
+
+    // we support variables only as individual
+    // path components i.e. something like %{myvar}stuff/suffix is not
+    // allowed, only %{myvar}/suffix.
+    //
+    // multiple variable components in the same path are supported
+
+    // process each path component.
+    // we add fixed strings plainly to each entry in `expanded` and for each
+    // variable we encounter we add new path variants to `expanded` as
+    // necessary.
+    while (std::getline(ss, part, '/')) {
+        if (hasPrefix(part, "%{") && hasSuffix(part, "}")) {
+            // variable found
+            const auto variable = part.substr(2, part.length() - 3);
+            auto it = m_expansions.find(variable);
+
+            if (it == m_expansions.end()) {
+                expanded.clear();
+                std::cerr << "Undeclared variable %{" << variable << "} encountered." << std::endl;
+                return false;
+            }
+
+            // now we need to create additional entries for each possible value of the variable
+            std::vector<std::string> new_expanded;
+
+            for (const auto &element: expanded) {
+                for (const auto &var_value: it->second) {
+                    new_expanded.push_back(element + "/" + var_value);
+                }
+            }
+
+            expanded = new_expanded;
+        } else if (part.empty()) {
+            // leading slash, ignore
+            continue;
+        } else {
+            // regular fixed string
+            for (auto &element: expanded) {
+                element = element + "/" + part;
+            }
+        }
+    }
+
+    return true;
+}
+
 // vim: et ts=4 sts=4 sw=4 :

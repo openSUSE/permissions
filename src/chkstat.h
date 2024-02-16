@@ -126,21 +126,6 @@ protected: // functions
     /// Resolves the file system path for the given file descriptor via /proc/self/fd.
     std::string getPathFromProc(const FileDesc &fd) const;
 
-    /// Expand possible variables in profile path specifications.
-    /**
-     * Profile paths can contain %{variable} syntax that will expand to one or
-     * more alternative values. This function performs this expansion and
-     * returns the individual paths the profile entry corresponds to. It is
-     * possible that only a single entry results from the expansion or that no
-     * expansion is necessary at all, in which case only a single entry will
-     * be returned in `paths`.
-     *
-     * \return
-     *      In case any unrecoverable parsing error is encountered `false` is
-     *      returned and the profile entry should be ignored entirely.
-     **/
-    bool expandProfilePaths(const std::string &path, std::vector<std::string> &expansions);
-
     /// Attempt to open the given profile path and add it to m_profile_streams.
     bool tryOpenProfile(const std::string &path);
 

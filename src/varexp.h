@@ -4,7 +4,12 @@
 #include <map>
 #include <string>
 
-/// Processing of variables.conf
+/// Processing of variables.conf and handling of profile path expansions.
+/**
+ * Profile paths can contain %{variable} syntax that will expand to one or
+ * more alternative values. This class parses the variable configuration file
+ * and performs necessary expansions on individual profile entry paths.
+ **/
 class VariableExpansions {
 public: // functions
 
@@ -15,6 +20,18 @@ public: // functions
     const auto& expansions() const {
         return m_expansions;
     }
+
+    /// Expand possible variables in profile path specifications.
+    /**
+     * Returns the expanded paths for the given profile entry path. It is
+     * possible that only a single entry results from the expansion or that no
+     * expansion is necessary at all, in which case only a single entry will
+     * be returned in `expanded`.
+     *
+     * \return In case any unrecoverable parsing error is encountered `false` is
+     *         returned and the profile entry should be ignored entirely.
+     **/
+    bool expandPath(const std::string &path, std::vector<std::string> &expanded) const;
 
 protected: // functions
 
