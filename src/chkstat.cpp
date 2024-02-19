@@ -692,7 +692,7 @@ int Chkstat::processEntries() {
         m_apply_changes = false;
     }
 
-    for (auto& [path, entry]: m_profile_parser.entries()) {
+    for (const auto& [path, entry]: m_profile_parser.entries()) {
         EntryContext ctx;
         ctx.subpath = entry.file.substr(m_args.root_path.getValue().length());
 
