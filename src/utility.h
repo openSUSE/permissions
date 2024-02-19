@@ -148,6 +148,9 @@ public:
     /// Explicitly close and invalidate() the currently stored file descriptor.
     void close();
 
+    /// Resolves the file system path of the file descriptor via /proc/self/fd - for display purposes.
+    std::string path() const;
+
 protected:
 
     int m_fd = -1;

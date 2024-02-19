@@ -18,25 +18,19 @@
  ****************************************************************
  */
 
-#include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <grp.h>
-#include <limits.h>
 #include <linux/magic.h>
-#include <pwd.h>
 #include <sys/param.h>
-#include <sys/stat.h>
 #include <sys/vfs.h>
 #include <unistd.h>
 
 // local headers
 #include "chkstat.h"
+#include "entryproc.h"
 #include "formatting.h"
 #include "utility.h"
 
 // C++
-#include <cassert>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -47,9 +41,7 @@
 Chkstat::Chkstat(const CmdlineArgs &args) :
             m_args{args},
             m_apply_changes{args.apply_changes.getValue()},
-            m_profile_parser{m_args, m_variable_expansions},
-            m_euid{geteuid()},
-            m_egid{getegid()} {
+            m_profile_parser{m_args, m_variable_expansions} {
 }
 
 bool Chkstat::processArguments() {
@@ -327,357 +319,6 @@ void Chkstat::printHeader() {
     }
 }
 
-void Chkstat::printEntryDifferences(const ProfileEntry &entry, const EntryContext &ctx) const {
-    std::cout << ctx.subpath << ": "
-        << (m_apply_changes ? "setting to " : "should be ")
-        << entry.owner << ":" << entry.group << " "
-        << FileModeInt(entry.mode);
-
-    if (ctx.need_fix_caps && entry.hasCaps()) {
-        std::cout << " \"" << entry.caps.toText() << "\".";
-    }
-
-    bool need_comma = false;
-
-    std::cout << " (";
-
-    if (ctx.need_fix_ownership) {
-        std::cout << "wrong owner/group " << FileOwnership(ctx.status);
-        need_comma = true;
-    }
-
-    if (ctx.need_fix_perms) {
-        if (need_comma) {
-            std::cout << ", ";
-        }
-        std::cout << "wrong permissions " << FileModeInt(ctx.status.getModeBits());
-        need_comma = true;
-    }
-
-    if (ctx.need_fix_caps) {
-        if (need_comma) {
-            std::cout << ", ";
-        }
-
-        if (ctx.caps.hasCaps()) {
-            std::cout << "wrong capabilities \"" << ctx.caps.toText() << "\"";
-        } else {
-            std::cout << "missing capabilities";
-        }
-    }
-
-    std::cout << ")" << std::endl;
-}
-
-bool Chkstat::getCapabilities(const ProfileEntry &entry, EntryContext &ctx) {
-
-    if (!ctx.caps.setFromFile(ctx.fd_path)) {
-        std::cerr << ctx.subpath << ": " << ctx.caps.lastErrorText() << std::endl;
-        return false;
-    }
-
-    if (entry.hasCaps()) {
-        // don't apply any set*id bits in case we apply capabilities since
-        // capabilities are the safer variant of set*id, the set*id bits
-        // are only a fallback.
-        entry.dropXID();
-    }
-
-    return true;
-}
-
-bool Chkstat::resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx) {
-    struct passwd *pwd = getpwnam(entry.owner.c_str());
-    struct group *grp = getgrnam(entry.group.c_str());
-
-    bool good = true;
-
-    if (pwd) {
-        ctx.uid = pwd->pw_uid;
-    } else if (stringToUnsigned(entry.owner, ctx.uid)) {
-        // it's a numerical value, lets try it
-    } else {
-        good = false;
-        if (m_args.verbose.isSet()) {
-            std::cerr << ctx.subpath << ": unknown user " << entry.owner << ". ignoring entry." << std::endl;
-        }
-    }
-
-    if (grp) {
-        ctx.gid = grp->gr_gid;
-    } else if (stringToUnsigned(entry.group, ctx.gid)) {
-        // it's a numerical value, lets try it
-    } else {
-        good = false;
-        if (m_args.verbose.isSet()) {
-            std::cerr << ctx.subpath << ": unknown group " << entry.group << ". ignoring entry." << std::endl;
-        }
-    }
-
-    return good;
-}
-
-bool Chkstat::isSafeToApply(const ProfileEntry &entry, const EntryContext &ctx) const {
-    // don't allow high privileges for unusual file types
-    if ((entry.hasCaps() || entry.hasSetXID()) && !ctx.status.isRegular() && !ctx.status.isDirectory()) {
-        std::cerr << ctx.subpath << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
-        return false;
-    }
-
-    // don't give high privileges to files controlled by non-root users
-    if (ctx.traversedInsecure()) {
-        if (entry.hasCaps() || (entry.mode & S_ISUID) || ((entry.mode & S_ISGID) && ctx.status.isRegular())) {
-            std::cerr << ctx.subpath << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool Chkstat::applyChanges(const ProfileEntry &entry, const EntryContext &ctx) const {
-    bool ret = true;
-
-    if (ctx.need_fix_ownership) {
-        if (chown(ctx.fd_path.c_str(), ctx.uid, ctx.gid) != 0) {
-            std::cerr << ctx.subpath << ": chown: " << std::strerror(errno) << std::endl;
-            ret = false;
-        }
-    }
-
-    // also re-apply the mode if we had to change ownership and a setXid
-    // bit was set before, since this resets the setXid bit.
-    if (ctx.need_fix_perms || (ctx.need_fix_ownership && entry.hasSetXID())) {
-        if (chmod(ctx.fd_path.c_str(), entry.mode) != 0) {
-            std::cerr << ctx.subpath << ": chmod: " << std::strerror(errno) << std::endl;
-            ret = false;
-        }
-    }
-
-    // chown and - depending on the file system - chmod clear existing capabilities
-    // so apply the intended caps even if they were correct previously
-    if (entry.hasCaps() || ctx.need_fix_caps) {
-        if (ctx.status.isRegular()) {
-            // cap_set_file() tries to be helpful and does an lstat() to check that it isn't called on
-            // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-            FileDesc cap_fd{open(ctx.fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY)};
-            if (!cap_fd.valid()) {
-                std::cerr << ctx.subpath << ": open() for changing capabilities: " << std::strerror(errno) << std::endl;
-                ret = false;
-            } else if (!entry.caps.applyToFD(cap_fd.get())) {
-                // ignore ENODATA when clearing caps - it just means there were no caps to remove
-                if (errno != ENODATA || entry.hasCaps()) {
-                    std::cerr << ctx.subpath << ": cap_set_fd: " << std::strerror(errno) << std::endl;
-                    ret = false;
-                }
-            }
-        } else {
-            std::cerr << ctx.subpath << ": cannot set capabilities: not a regular file" << std::endl;
-            ret = false;
-        }
-    }
-
-    return ret;
-}
-
-bool Chkstat::safeOpen(EntryContext &ctx) {
-    size_t link_count = 0;
-    FileDesc pathfd;
-    FileDesc parentfd;
-    FileStatus root_status;
-    bool is_final_path_element = false;
-    const auto &altroot = m_args.root_path.getValue();
-    const auto root = altroot.empty() ? std::string("/") : altroot;
-    std::string path_rest = ctx.subpath;
-    std::string component;
-
-    ctx.traversed_insecure = false;
-    ctx.fd.close();
-
-    while (!is_final_path_element) {
-        if (pathfd.invalid()) {
-            pathfd.set(open(root.c_str(), O_PATH | O_CLOEXEC));
-
-            if (pathfd.invalid()) {
-                std::cerr << root << ": failed to open root directory: " << std::strerror(errno) << std::endl;
-                return false;
-            }
-
-            if (!root_status.fstat(pathfd)) {
-                std::cerr << root << ": failed to fstat root directory: " << root << std::endl;
-                return false;
-            }
-            // status and pathfd must be in sync for the root-escape check below
-            ctx.status = root_status;
-        }
-
-        // make out the leading path component
-        assert(path_rest[0] == '/');
-        auto sep = path_rest.find_first_of('/', 1);
-        component = path_rest.substr(1, sep - 1);
-        // strip the leading path component
-        path_rest = path_rest.substr(component.length() + 1);
-        // path_rest is empty when we reach the final path element
-        is_final_path_element = path_rest.empty() || path_rest == "/";
-        const bool is_parent_element = !is_final_path_element;
-
-        // multiple consecutive slashes: ignore
-        if (is_parent_element && component.empty())
-            continue;
-
-        // never move up from the configured root directory (using the stat result from the previous loop iteration)
-        if (component == ".." && !altroot.empty() && ctx.status.sameObject(root_status))
-            continue;
-
-        {
-            // component is an empty string for trailing slashes, open again with different open_flags.
-            auto child = component.empty() ? "." : component.c_str();
-            int tmpfd = openat(pathfd.get(), child, O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-            if (tmpfd == -1) {
-                if (errno != ENOENT) {
-                    const auto path = getPathFromProc(pathfd) + "/" + child;
-                    std::cerr << "warning: skipping " << ctx.subpath << ": " << path << ": openat(): "
-                        << std::strerror(errno) << std::endl;
-                }
-                return false;
-            }
-            pathfd.set(tmpfd);
-        }
-
-        if (!ctx.status.fstat(pathfd)) {
-            const auto path = getPathFromProc(pathfd);
-            std::cerr << "warning: skipping  " << ctx.subpath << ": " << path << ": fstat(): "
-                << std::strerror(errno) << std::endl;
-            return false;
-        }
-
-        // owner of directories must be trusted for setuid/setgid/capabilities
-        // as we have no way to verify file contents
-        if (is_parent_element) {
-            // the owner needs to be root or our effective UID
-            if (!ctx.status.hasSafeOwner({m_euid})) {
-                ctx.traversed_insecure = true;
-            // if the dir is group-writable then require the root group or our
-            // effective GID.
-            } else if (!ctx.status.hasSafeGroup({m_egid})) {
-                ctx.traversed_insecure = true;
-            }
-            // path is in a world-writable directory
-            else if (!ctx.status.isLink() && ctx.status.isWorldWritable()) {
-                ctx.traversed_insecure = true;
-            }
-        }
-
-        // if the object is owned by non-root, the owner must match the target
-        // user (from the profile entry) or our effective user
-        if (!ctx.status.hasSafeOwner({ctx.uid,m_euid})) {
-            if (is_final_path_element) {
-                std::cerr << ctx.subpath << ": has unexpected owner (" << ctx.status.st_uid << "). refusing to correct due to unknown integrity." << std::endl;
-                return false;
-            } else {
-                const auto path = getPathFromProc(pathfd);
-                std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;
-                return false;
-            }
-        }
-
-        // same goes for the group, if it is writable
-        if(!ctx.status.hasSafeGroup({ctx.gid, m_egid})) {
-            if (is_final_path_element) {
-                std::cerr << ctx.subpath << ": is group-writable and has unexpected group (" << ctx.status.st_gid << "). refusing to correct due to unknown integrity." << std::endl;
-                return false;
-            }
-            else {
-                const auto path = getPathFromProc(pathfd);
-                std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root group that could tamper with the file." << std::endl;
-                return false;
-            }
-        }
-
-        if (ctx.status.isLink()) {
-            // If the path configured in the permissions configuration is a symlink, we don't follow it.
-            // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
-            if (is_final_path_element)
-               return false;
-            else if (++link_count >= 256) {
-                const auto path = getPathFromProc(pathfd);
-                std::cerr << ctx.subpath << ": excess link count stopping at " << path << "." << std::endl;
-                return false;
-            }
-
-            // Don't follow symlinks owned by regular users.
-            // In theory, we could also trust symlinks where the owner of the target matches the owner
-            // of the link, but we're going the simple route for now.
-            if (!ctx.status.hasSafeOwner({m_euid}) || !ctx.status.hasSafeGroup({m_egid})) {
-                const auto path = getPathFromProc(pathfd);
-                std::cerr << ctx.subpath << ": on an insecure path - " << path << " has different non-root owner who could tamper with the file." << std::endl;
-                return false;
-            }
-
-            std::string link(PATH_MAX, '\0');
-            const auto len = ::readlinkat(pathfd.get(), "", &link[0], link.size());
-
-            if (len <= 0 || static_cast<size_t>(len) >= link.size()) {
-                auto path = getPathFromProc(pathfd);
-                std::cerr << ctx.subpath << ": " << path << ": readlink(): " << std::strerror(errno) << std::endl;
-                return false;
-            }
-
-            link.resize(static_cast<size_t>(len));
-            stripTrailingSlashes(link);
-
-            if (link[0] == '/') {
-                // absolute link, need to continue from a new root
-                pathfd.close();
-            } else {
-                // relative link: continue relative to the parent directory
-
-                // we encountered a link directly below /, simply continue
-                // from the root again
-                if (parentfd.invalid()) {
-                    pathfd.close();
-                } else {
-                    pathfd.set(dup(parentfd.get()));
-                }
-
-                // prefix the path with a slash to fulfill the expectations of
-                // the loop body (see assert above)
-                link.insert(link.begin(), '/');
-            }
-
-            path_rest = link + path_rest;
-        } else if (ctx.status.isDirectory()) {
-            // parentfd is only needed to find the parent of a symlink.
-            // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
-            parentfd.set(dup(pathfd.get()));
-        }
-    }
-
-    // world-writable file: error out due to unknown file integrity
-    if (ctx.status.isRegular() && ctx.status.isWorldWritable()) {
-        std::cerr << ctx.subpath << ": file has insecure permissions (world-writable)" << std::endl;
-        return false;
-    }
-
-    ctx.fd.steal(pathfd);
-
-    return true;
-}
-
-std::string Chkstat::getPathFromProc(const FileDesc &fd) const {
-    std::string linkpath(PATH_MAX, '\0');
-    auto procpath = std::string("/proc/self/fd/") + std::to_string(fd.get());
-
-    ssize_t l = readlink(procpath.c_str(), &linkpath[0], linkpath.size());
-    if (l > 0) {
-        linkpath.resize(std::min(static_cast<size_t>(l), linkpath.size()));
-    } else {
-        linkpath = "ancestor";
-    }
-
-    return linkpath;
-}
-
 int Chkstat::processEntries() {
     size_t errors = 0;
 
@@ -690,75 +331,13 @@ int Chkstat::processEntries() {
     }
 
     for (const auto& [path, entry]: m_profile_parser.entries()) {
-        EntryContext ctx;
-        ctx.subpath = entry.file.substr(m_args.root_path.getValue().length());
+        EntryProcessor processor{entry, m_args, m_apply_changes};
 
-        if (!needToCheck(ctx.subpath))
+        if (!needToCheck(processor.path()))
             continue;
 
-        if (!resolveEntryOwnership(entry, ctx))
-            continue;
-
-        if (!safeOpen(ctx))
-            continue;
-
-        if (!ctx.fd.valid())
-            continue;
-        else if (ctx.status.isLink())
-            continue;
-
-        // fd is opened with O_PATH, file operations like cap_get_fd() and fchown() don't work with it.
-        //
-        // We also don't want to do a proper open() of the file, since that doesn't even work for sockets
-        // and might have side effects for pipes or devices.
-        //
-        // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
-        // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-        if (haveProc()) {
-            ctx.fd_path = std::string("/proc/self/fd/") + std::to_string(ctx.fd.get());
-        } else {
-            // fall back to plain path-access for read-only operation. (this
-            // much is fine)
-            // we only report errors below, m_apply_changes is set to false by
-            // the logic above.
-            ctx.fd_path = entry.file;
-        }
-
-        if (!getCapabilities(entry, ctx)) {
+        if (!processor.process(haveProc()))
             errors++;
-        }
-
-        ctx.check(entry);
-
-        if (!ctx.needsFixing())
-            // nothing to do
-            continue;
-
-        /*
-         * first explain the differences between the encountered state of the
-         * file and the desired state of the file
-         */
-        printEntryDifferences(entry, ctx);
-
-        if (!m_apply_changes)
-            continue;
-
-        if (!isSafeToApply(entry, ctx)) {
-            errors++;
-            continue;
-        }
-
-        if (m_euid != 0) {
-            // only attempt to change the owner if we're actually privileged
-            // to do so (chkstat also supports to run as a regular user within
-            // certain limits)
-            ctx.need_fix_ownership = false;
-        }
-
-        if (!applyChanges(entry, ctx)) {
-            errors++;
-            continue;
-        }
     }
 
     if (errors) {

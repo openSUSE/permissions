@@ -29,7 +29,7 @@ struct ProfileEntry {
         return (this->mode & (S_ISUID | S_ISGID)) != 0;
     }
 
-    // NOTE: this is currently mutable due to the somewhat unfortunate logic in Chkstat::getCapabilities().
+    // NOTE: this is currently mutable due to the somewhat unfortunate logic in EntryProcessor::getCapabilities().
     void dropXID() const {
         const mode_t to_drop = (S_ISUID | S_ISGID);
         mode &= ~(to_drop);
@@ -70,6 +70,10 @@ struct EntryContext {
 
     bool needsFixing() const {
         return need_fix_perms || need_fix_caps || need_fix_ownership;
+    }
+
+    bool fetchCapabilities() {
+        return caps.setFromFile(fd_path);
     }
 
     bool needFixPerms() const { return need_fix_perms; }

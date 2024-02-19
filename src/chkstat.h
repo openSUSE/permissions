@@ -63,9 +63,6 @@ protected: // functions
     /// The main profile entry traversal algorithm that carries out required file system operations.
     int processEntries();
 
-    /// Resolves the textual user:group in `entry` and stores the result in `ctx`.
-    bool resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx);
-
     /// Tests whether /proc is available in a caching manner.
     ProcMountState procState() const;
 
@@ -75,40 +72,6 @@ protected: // functions
 
     /// Prints an introductory text describing the active configuration.
     void printHeader();
-
-    /// Print differences between configuration and reality.
-    /**
-     * This outputs the operations that will (or should) be performed to
-     * arrive at the ProfileEntry configuration.
-     **/
-    void printEntryDifferences(const ProfileEntry &entry, const EntryContext &ctx) const;
-
-    /// Check whether it is safe to adjust the actual file given the collected information.
-    bool isSafeToApply(const ProfileEntry &entry, const EntryContext &ctx) const;
-
-    /// Actually apply changes to `ctx` according to `entry`.
-    bool applyChanges(const ProfileEntry &entry, const EntryContext &ctx) const;
-
-    /// Gets the currently set capabilities from `ctx.fd_path` and stores them in `ctx.caps`.
-    /**
-     * `entry` is potentially modified if capabilities can't be applied. The
-     * return value indicates if an operational error occurred but it doesn't
-     * indicate whether a capability value could be assigned. Check
-     * `ctx.caps.valid()` for this.
-     **/
-    bool getCapabilities(const ProfileEntry &entry, EntryContext &ctx);
-
-    /// Safely open the target file taking symlinks and insecure constellations into account.
-    /**
-     * On success the file descriptor will be stored in ctx.fd.
-     *
-     * \return
-     *      An indication whether the file could be successfully opened
-     **/
-    bool safeOpen(EntryContext &ctx);
-
-    /// Resolves the file system path for the given file descriptor via /proc/self/fd.
-    std::string getPathFromProc(const FileDesc &fd) const;
 
     /// Attempt to open the given profile path and add it to m_profile_streams.
     bool tryOpenProfile(const std::string &path);
@@ -143,11 +106,6 @@ protected: // data
     VariableExpansions m_variable_expansions;
 
     ProfileParser m_profile_parser;
-
-    /// The effective user ID we're running as.
-    const uid_t m_euid;
-    /// The effective group ID we're running as.
-    const gid_t m_egid;
 
     ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
 };
