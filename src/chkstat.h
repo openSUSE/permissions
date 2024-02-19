@@ -67,7 +67,11 @@ protected: // functions
     bool resolveEntryOwnership(const ProfileEntry &entry, EntryContext &ctx);
 
     /// Tests whether /proc is available in a caching manner.
-    bool checkHaveProc() const;
+    ProcMountState procState() const;
+
+    bool haveProc() const {
+        return m_proc_mount_avail == ProcMountState::AVAIL;
+    }
 
     /// Prints an introductory text describing the active configuration.
     void printHeader();
@@ -145,7 +149,7 @@ protected: // data
     /// The effective group ID we're running as.
     const gid_t m_egid;
 
-    mutable ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
+    ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
 };
 
 // vim: et ts=4 sts=4 sw=4 :

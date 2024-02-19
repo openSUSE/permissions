@@ -298,19 +298,21 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
     }
 }
 
-bool Chkstat::checkHaveProc() const {
-    if (m_proc_mount_avail == ProcMountState::UNKNOWN) {
-        m_proc_mount_avail = ProcMountState::UNAVAIL;
-        char *pretend_no_proc = secure_getenv("CHKSTAT_PRETEND_NO_PROC");
+ProcMountState Chkstat::procState() const {
+    auto ret = ProcMountState::UNAVAIL;
 
-        struct statfs proc;
-        int r = statfs("/proc", &proc);
-        if (!pretend_no_proc && r == 0 && proc.f_type == PROC_SUPER_MAGIC) {
-            m_proc_mount_avail = ProcMountState::AVAIL;
-        }
+    if (secure_getenv("CHKSTAT_PRETEND_NO_PROC") != nullptr) {
+        return ret;
     }
 
-    return m_proc_mount_avail == ProcMountState::AVAIL;
+    struct statfs proc;
+    int r = statfs("/proc", &proc);
+
+    if (r == 0 && proc.f_type == PROC_SUPER_MAGIC) {
+        ret = ProcMountState::AVAIL;
+    }
+
+    return ret;
 }
 
 void Chkstat::printHeader() {
@@ -682,7 +684,9 @@ std::string Chkstat::getPathFromProc(const FileDesc &fd) const {
 int Chkstat::processEntries() {
     size_t errors = 0;
 
-    if (m_apply_changes && !checkHaveProc()) {
+    m_proc_mount_avail = procState();
+
+    if (m_apply_changes && !haveProc()) {
         std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
         errors++;
         m_apply_changes = false;
@@ -713,7 +717,7 @@ int Chkstat::processEntries() {
         //
         // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
         // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-        if (checkHaveProc()) {
+        if (haveProc()) {
             ctx.fd_path = std::string("/proc/self/fd/") + std::to_string(ctx.fd.get());
         } else {
             // fall back to plain path-access for read-only operation. (this
