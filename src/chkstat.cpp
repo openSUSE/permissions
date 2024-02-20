@@ -287,7 +287,7 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
     }
 }
 
-ProcMountState Chkstat::procState() const {
+Chkstat::ProcMountState Chkstat::procState() const {
     auto ret = ProcMountState::UNAVAIL;
 
     if (secure_getenv("CHKSTAT_PRETEND_NO_PROC") != nullptr) {

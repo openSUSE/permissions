@@ -36,12 +36,4 @@ struct ProfileEntry {
     }
 };
 
-/// enum to differentiate different /proc availability situations.
-enum class ProcMountState {
-    /// status was not investigated yet
-    UNKNOWN,
-    AVAIL,
-    UNAVAIL,
-};
-
 // vim: et ts=4 sts=4 sw=4 :

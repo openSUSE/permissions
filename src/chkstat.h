@@ -22,6 +22,16 @@ public: // functions
 
     int run();
 
+protected: // types
+
+    /// enum to differentiate different /proc availability situations.
+    enum class ProcMountState {
+        /// status was not investigated yet
+        UNKNOWN,
+        AVAIL,
+        UNAVAIL,
+    };
+
 protected: // functions
 
     /// Process the already validated command line arguments.
