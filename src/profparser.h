@@ -15,6 +15,7 @@ struct ProfileEntry {
     std::string file;
     std::string owner;
     std::string group;
+    // NOTE: this is mutable to allow for a const dropXID() due to the somewhat unfortunate logic in EntryProcessor::getCapabilities().
     mutable mode_t mode = 0;
     FileCapabilities caps;
 
@@ -30,7 +31,6 @@ struct ProfileEntry {
         return (this->mode & (S_ISUID | S_ISGID)) != 0;
     }
 
-    // NOTE: this is currently mutable due to the somewhat unfortunate logic in EntryProcessor::getCapabilities().
     void dropXID() const {
         const mode_t to_drop = (S_ISUID | S_ISGID);
         mode &= ~(to_drop);
@@ -46,6 +46,10 @@ public: // functions
             m_expansions{expansions} {}
 
     /// Parses the given profile file and stores the according entries.
+    /**
+     * \param[in] path The path of the profile for displaying purposes.
+     * \param[in-out] fs The open input stream for parsing the profile.
+     **/
     void parse(const std::string &path, std::ifstream &fs);
 
     /// Whether to process capability settings or to discard them.
@@ -67,15 +71,12 @@ protected: // functions
     /**
      * \param[in] line
      *      The input line from a profile file that starts with "+"
-     * \param[input] active_paths
-     *      The paths that the capability line applies to. It is expected that
-     *      these paths already have entries in m_profile_entries.
      * \return
-     *      Whether the line could successfully be parsed
+     *      Whether the line could be successfully parsed
      **/
     bool parseCapabilityLine(const std::string &line);
 
-    /// Adds ProfileEntry to m_entries from the current m_parse_context.
+    /// Adds a ProfileEntry to m_entries from the current m_parse_context.
     void addCurrentEntries();
 
     bool parseOwnership(const std::string &ownership);

@@ -94,8 +94,8 @@ protected: // data
 
     /// Whether to actually apply changes.
     /**
-     * This basically defined by command line parameters but can be overridden
-     * by runtime context.
+     * This is basically defined by command line parameters but can be
+     * overridden by runtime context e.g. a missing /proc or sysconfig.
      **/
     bool m_apply_changes = false;
 

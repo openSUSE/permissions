@@ -7,9 +7,9 @@
 #include "cmdline.h"
 #include "profparser.h"
 
-/// Process a single permissions profile entry performing operations on the file system.
+/// Process a single ProfileEntry entry potentially performing operations on the file system.
 /**
- * This class actually compares configuration data with file state found on
+ * This class compares the configuration data with actual file state found on
  * disk. It can act in a read-only mode where it only prints what changes
  * would be performed. Or it can actually apply necessary changes.
  **/
@@ -23,6 +23,11 @@ public: // functions
         return m_path;
     }
 
+    /// Perform the necessary processing logic.
+    /**
+     * \param[in] have_proc Whether a /proc mount is available. If not then
+     * no changes will be applied in the file system for security reasons.
+     **/
     bool process(const bool have_proc);
 
 protected: // functions
@@ -41,10 +46,10 @@ protected: // functions
 
     /// Gets the currently set capabilities from `m_safe_path` and stores them in `m_caps`.
     /**
-     * `m_entry` is potentially modified if capabilities can't be applied. The
-     * return value indicates if an operational error occurred but it doesn't
-     * indicate whether a capability value could be assigned. Check
-     * `m_caps.valid()` for this.
+     * The setXid bits in `m_entry` are potentially modified if capabilities
+     * can't be applied. The return value indicates if an operational error
+     * occurred but it doesn't indicate whether capabilities are actually set
+     * on the file. Check `m_caps.hasCaps()` for this.
      **/
     bool getCapabilities();
 
@@ -55,13 +60,13 @@ protected: // functions
      **/
     void printDifferences() const;
 
-    /// Check whether it is safe to adjust the actual file given the collected information.
+    /// Checks whether it is safe to adjust the actual file given the collected information.
     bool isSafeToApply() const;
 
     /// Actually apply changes to the opened file according to `m_entry`.
     bool applyChanges() const;
 
-    /// Based on the given `entry` sets `need_fix_*` members as required and returns if any fixing is necessary.
+    /// Based on `m_entry` sets `m_need_fix_*` members as required and returns if any fixing is necessary.
     bool checkNeedsFixing() {
         m_need_fix_perms = m_file_status.getModeBits() != m_entry.mode;
         m_need_fix_ownership = !m_file_status.matchesOwnership(m_file_uid, m_file_gid);

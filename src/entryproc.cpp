@@ -100,7 +100,7 @@ bool EntryProcessor::resolveOwnership() {
     } else {
         good = false;
         if (m_args.verbose.isSet()) {
-            std::cerr << m_path << ": unknown user " << m_entry.owner << ". ignoring entry." << std::endl;
+            std::cerr << m_path << ": unknown user " << m_entry.owner << ". Ignoring entry." << std::endl;
         }
     }
 
@@ -111,7 +111,7 @@ bool EntryProcessor::resolveOwnership() {
     } else {
         good = false;
         if (m_args.verbose.isSet()) {
-            std::cerr << m_path << ": unknown group " << m_entry.group << ". ignoring entry." << std::endl;
+            std::cerr << m_path << ": unknown group " << m_entry.group << ". Ignoring entry." << std::endl;
         }
     }
 
@@ -208,7 +208,7 @@ bool EntryProcessor::safeOpen() {
         // user (from the profile entry) or our effective user
         if (!m_file_status.hasSafeOwner({m_file_uid, m_euid})) {
             if (is_final_path_element) {
-                std::cerr << m_path << ": has unexpected owner (" << m_file_status.st_uid << "). refusing to correct due to unknown integrity." << std::endl;
+                std::cerr << m_path << ": has unexpected owner (" << m_file_status.st_uid << "). Refusing to correct due to unknown integrity." << std::endl;
                 return false;
             } else {
                 std::cerr << m_path << ": on an insecure path - " << pathfd.path() << " has different non-root owner who could tamper with the file." << std::endl;
@@ -219,7 +219,7 @@ bool EntryProcessor::safeOpen() {
         // same goes for the group, if it is writable
         if(!m_file_status.hasSafeGroup({m_file_gid, m_egid})) {
             if (is_final_path_element) {
-                std::cerr << m_path << ": is group-writable and has unexpected group (" << m_file_status.st_gid << "). refusing to correct due to unknown integrity." << std::endl;
+                std::cerr << m_path << ": is group-writable and has unexpected group (" << m_file_status.st_gid << "). Refusing to correct due to unknown integrity." << std::endl;
                 return false;
             }
             else {

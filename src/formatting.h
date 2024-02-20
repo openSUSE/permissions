@@ -45,7 +45,7 @@ protected:
     NumberBase m_base = NumberBase::DEC;
 };
 
-//! helper type to output a file mode in octal nicely formatted onto an ostream
+/// Helper type to output a file mode in octal nicely formatted onto an ostream.
 class FileModeInt :
         public FormattedInt {
 public:
@@ -58,7 +58,7 @@ public:
 
 std::ostream& operator<<(std::ostream &o, const FormattedInt &fi);
 
-//! helper type for outputting file ownership on a stream
+/// Helper type for outputting file ownership on a stream.
 class FileOwnership {
 public:
     FileOwnership(uid_t uid, gid_t gid) :

@@ -263,7 +263,7 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
 
         if (m_package_profiles_seen.find(file) != m_package_profiles_seen.end())
             // per-package profiles for this package have already been
-            // processed in a location of higher priority. ignore these
+            // processed in a location of higher priority. Ignore these
             // duplicate files.
             continue;
 

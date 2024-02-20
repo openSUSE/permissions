@@ -291,7 +291,7 @@ public:
 
     bool hasCaps() const { return m_caps != nullptr; }
 
-    //! explicitly free and invalidate() the currently stored capabilities
+    /// Explicitly free and invalidate() the currently stored capabilities.
     void destroy();
 
     cap_t raw() { return m_caps; }
