@@ -39,7 +39,7 @@ protected: // functions
      **/
     bool safeOpen();
 
-    /// Gets the currently set capabilities from `m_fd_path` and stores them in `m_caps`.
+    /// Gets the currently set capabilities from `m_safe_path` and stores them in `m_caps`.
     /**
      * `m_entry` is potentially modified if capabilities can't be applied. The
      * return value indicates if an operational error occurred but it doesn't
@@ -63,8 +63,8 @@ protected: // functions
 
     /// Based on the given `entry` sets `need_fix_*` members as required and returns if any fixing is necessary.
     bool checkNeedsFixing() {
-        m_need_fix_perms = m_status.getModeBits() != m_entry.mode;
-        m_need_fix_ownership = !m_status.matchesOwnership(m_file_uid, m_file_gid);
+        m_need_fix_perms = m_file_status.getModeBits() != m_entry.mode;
+        m_need_fix_ownership = !m_file_status.matchesOwnership(m_file_uid, m_file_gid);
         m_need_fix_caps = m_entry.caps != m_caps;
         return m_need_fix_perms || m_need_fix_caps || m_need_fix_ownership;
     }
@@ -74,9 +74,9 @@ protected: // data
     uid_t m_file_uid = (uid_t)-1; ///< The resolved user-id corresponding to the active ProfileEntry.
     gid_t m_file_gid = (gid_t)-1; ///< The resolved group-id corresponding to the active ProfileEntry.
     std::string m_path; ///< The path of the current file to check below a potential m_args.root_path.
-    std::string m_fd_path; ///< A path for safely opening the target file (typically in /proc/self/fd/...).
+    std::string m_safe_path; ///< A path for safely opening the target file (typically in /proc/self/fd/...).
     FileCapabilities m_caps; ///< The actual capabilities found on on the file.
-    FileStatus m_status; ///< The actual file status info found on the file.
+    FileStatus m_file_status; ///< The actual file status info found on the file.
     bool m_need_fix_perms = false; ///< Indicates whether actual file permissions need to be fixed.
     bool m_need_fix_caps = false; ///< Indicates whether actual file capabilities need to be fixed.
     bool m_need_fix_ownership = false; ///< Indicates whether actual file user:group ownership needs to be fixed.

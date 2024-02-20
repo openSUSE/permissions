@@ -36,7 +36,7 @@ bool EntryProcessor::process(const bool have_proc) {
 
         if (!m_fd.valid()) {
             return false;
-        } else if (m_status.isLink()) {
+        } else if (m_file_status.isLink()) {
             return true;
         }
 
@@ -48,11 +48,11 @@ bool EntryProcessor::process(const bool have_proc) {
             //
             // So we use path-based operations (yes!) with /proc/self/fd/xxx. (Since safe_open already resolved
             // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
-            m_fd_path = std::string("/proc/self/fd/") + std::to_string(m_fd.get());
+            m_safe_path = std::string("/proc/self/fd/") + std::to_string(m_fd.get());
         } else {
             // fall back to plain path-access for read-only operation. (this much is fine)
             // we only report errors below, m_apply_changes is set to false in this case.
-            m_fd_path = m_entry.file;
+            m_safe_path = m_entry.file;
             assert(!m_apply_changes);
         }
 
@@ -146,7 +146,7 @@ bool EntryProcessor::safeOpen() {
                 return false;
             }
             // status and pathfd must be in sync for the root-escape check below
-            m_status = root_status;
+            m_file_status = root_status;
         }
 
         // make out the leading path component
@@ -164,7 +164,7 @@ bool EntryProcessor::safeOpen() {
             continue;
 
         // never move up from the configured root directory (using the stat result from the previous loop iteration)
-        if (component == ".." && !altroot.empty() && m_status.sameObject(root_status))
+        if (component == ".." && !altroot.empty() && m_file_status.sameObject(root_status))
             continue;
 
         {
@@ -181,7 +181,7 @@ bool EntryProcessor::safeOpen() {
             pathfd.set(tmpfd);
         }
 
-        if (!m_status.fstat(pathfd)) {
+        if (!m_file_status.fstat(pathfd)) {
             std::cerr << "warning: skipping  " << m_path << ": " << pathfd.path() << ": fstat(): "
                 << std::strerror(errno) << std::endl;
             return false;
@@ -191,24 +191,24 @@ bool EntryProcessor::safeOpen() {
         // as we have no way to verify file contents
         if (is_parent_element) {
             // the owner needs to be root or our effective UID
-            if (!m_status.hasSafeOwner({m_euid})) {
+            if (!m_file_status.hasSafeOwner({m_euid})) {
                 m_traversed_insecure = true;
             // if the dir is group-writable then require the root group or our
             // effective GID.
-            } else if (!m_status.hasSafeGroup({m_egid})) {
+            } else if (!m_file_status.hasSafeGroup({m_egid})) {
                 m_traversed_insecure = true;
             }
             // path is in a world-writable directory
-            else if (!m_status.isLink() && m_status.isWorldWritable()) {
+            else if (!m_file_status.isLink() && m_file_status.isWorldWritable()) {
                 m_traversed_insecure = true;
             }
         }
 
         // if the object is owned by non-root, the owner must match the target
         // user (from the profile entry) or our effective user
-        if (!m_status.hasSafeOwner({m_file_uid, m_euid})) {
+        if (!m_file_status.hasSafeOwner({m_file_uid, m_euid})) {
             if (is_final_path_element) {
-                std::cerr << m_path << ": has unexpected owner (" << m_status.st_uid << "). refusing to correct due to unknown integrity." << std::endl;
+                std::cerr << m_path << ": has unexpected owner (" << m_file_status.st_uid << "). refusing to correct due to unknown integrity." << std::endl;
                 return false;
             } else {
                 std::cerr << m_path << ": on an insecure path - " << pathfd.path() << " has different non-root owner who could tamper with the file." << std::endl;
@@ -217,9 +217,9 @@ bool EntryProcessor::safeOpen() {
         }
 
         // same goes for the group, if it is writable
-        if(!m_status.hasSafeGroup({m_file_gid, m_egid})) {
+        if(!m_file_status.hasSafeGroup({m_file_gid, m_egid})) {
             if (is_final_path_element) {
-                std::cerr << m_path << ": is group-writable and has unexpected group (" << m_status.st_gid << "). refusing to correct due to unknown integrity." << std::endl;
+                std::cerr << m_path << ": is group-writable and has unexpected group (" << m_file_status.st_gid << "). refusing to correct due to unknown integrity." << std::endl;
                 return false;
             }
             else {
@@ -228,7 +228,7 @@ bool EntryProcessor::safeOpen() {
             }
         }
 
-        if (m_status.isLink()) {
+        if (m_file_status.isLink()) {
             // If the path configured in the permissions configuration is a symlink, we don't follow it.
             // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
             if (is_final_path_element)
@@ -241,7 +241,7 @@ bool EntryProcessor::safeOpen() {
             // Don't follow symlinks owned by regular users.
             // In theory, we could also trust symlinks where the owner of the target matches the owner
             // of the link, but we're going the simple route for now.
-            if (!m_status.hasSafeOwner({m_euid}) || !m_status.hasSafeGroup({m_egid})) {
+            if (!m_file_status.hasSafeOwner({m_euid}) || !m_file_status.hasSafeGroup({m_egid})) {
                 std::cerr << m_path << ": on an insecure path - " << pathfd.path() << " has different non-root owner who could tamper with the file." << std::endl;
                 return false;
             }
@@ -277,7 +277,7 @@ bool EntryProcessor::safeOpen() {
             }
 
             path_rest = link + path_rest;
-        } else if (m_status.isDirectory()) {
+        } else if (m_file_status.isDirectory()) {
             // parentfd is only needed to find the parent of a symlink.
             // We can't encounter links when resolving '.' or '..' so those don't need any special handling.
             parentfd.set(dup(pathfd.get()));
@@ -285,7 +285,7 @@ bool EntryProcessor::safeOpen() {
     }
 
     // world-writable file: error out due to unknown file integrity
-    if (m_status.isRegular() && m_status.isWorldWritable()) {
+    if (m_file_status.isRegular() && m_file_status.isWorldWritable()) {
         std::cerr << m_path << ": file has insecure permissions (world-writable)" << std::endl;
         return false;
     }
@@ -297,7 +297,7 @@ bool EntryProcessor::safeOpen() {
 
 bool EntryProcessor::getCapabilities() {
 
-    if (!m_caps.setFromFile(m_fd_path)) {
+    if (!m_caps.setFromFile(m_safe_path)) {
         std::cerr << m_path << ": " << m_caps.lastErrorText() << std::endl;
         return false;
     }
@@ -327,7 +327,7 @@ void EntryProcessor::printDifferences() const {
     std::cout << " (";
 
     if (m_need_fix_ownership) {
-        std::cout << "wrong owner/group " << FileOwnership(m_status);
+        std::cout << "wrong owner/group " << FileOwnership(m_file_status);
         need_comma = true;
     }
 
@@ -335,7 +335,7 @@ void EntryProcessor::printDifferences() const {
         if (need_comma) {
             std::cout << ", ";
         }
-        std::cout << "wrong permissions " << FileModeInt(m_status.getModeBits());
+        std::cout << "wrong permissions " << FileModeInt(m_file_status.getModeBits());
         need_comma = true;
     }
 
@@ -356,14 +356,14 @@ void EntryProcessor::printDifferences() const {
 
 bool EntryProcessor::isSafeToApply() const {
     // don't allow high privileges for unusual file types
-    if ((m_entry.hasCaps() || m_entry.hasSetXID()) && !m_status.isRegular() && !m_status.isDirectory()) {
+    if ((m_entry.hasCaps() || m_entry.hasSetXID()) && !m_file_status.isRegular() && !m_file_status.isDirectory()) {
         std::cerr << m_path << ": will only assign capabilities or setXid bits to regular files or directories" << std::endl;
         return false;
     }
 
     // don't give high privileges to files controlled by non-root users
     if (m_traversed_insecure) {
-        if (m_entry.hasCaps() || (m_entry.mode & S_ISUID) || ((m_entry.mode & S_ISGID) && m_status.isRegular())) {
+        if (m_entry.hasCaps() || (m_entry.mode & S_ISUID) || ((m_entry.mode & S_ISGID) && m_file_status.isRegular())) {
             std::cerr << m_path << ": will not give away capabilities or setXid bits on an insecure path" << std::endl;
             return false;
         }
@@ -376,7 +376,7 @@ bool EntryProcessor::applyChanges() const {
     bool ret = true;
 
     if (m_need_fix_ownership) {
-        if (::chown(m_fd_path.c_str(), m_file_uid, m_file_gid) != 0) {
+        if (::chown(m_safe_path.c_str(), m_file_uid, m_file_gid) != 0) {
             std::cerr << m_path << ": chown(): " << std::strerror(errno) << std::endl;
             ret = false;
         }
@@ -385,7 +385,7 @@ bool EntryProcessor::applyChanges() const {
     // also re-apply the mode if we had to change ownership and a setXid
     // bit was set before, since this resets the setXid bit.
     if (m_need_fix_perms || (m_need_fix_ownership && m_entry.hasSetXID())) {
-        if (::chmod(m_fd_path.c_str(), m_entry.mode) != 0) {
+        if (::chmod(m_safe_path.c_str(), m_entry.mode) != 0) {
             std::cerr << m_path << ": chmod: " << std::strerror(errno) << std::endl;
             ret = false;
         }
@@ -394,10 +394,10 @@ bool EntryProcessor::applyChanges() const {
     // chown and - depending on the file system - chmod clear existing capabilities
     // so apply the intended caps even if they were correct previously
     if (m_entry.hasCaps() || m_need_fix_caps) {
-        if (m_status.isRegular()) {
+        if (m_file_status.isRegular()) {
             // cap_set_file() tries to be helpful and does an lstat() to check that it isn't called on
             // a symlink. So we have to open() it (without O_PATH) and use cap_set_fd().
-            FileDesc cap_fd{::open(m_fd_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY)};
+            FileDesc cap_fd{::open(m_safe_path.c_str(), O_NOATIME | O_CLOEXEC | O_RDONLY)};
             if (!cap_fd.valid()) {
                 std::cerr << m_path << ": open() for changing capabilities: " << std::strerror(errno) << std::endl;
                 ret = false;
