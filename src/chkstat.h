@@ -3,7 +3,6 @@
 // local headers
 #include "cmdline.h"
 #include "profparser.h"
-#include "types.h"
 #include "utility.h"
 #include "varexp.h"
 

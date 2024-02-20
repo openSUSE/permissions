@@ -5,7 +5,7 @@
 
 // local headers
 #include "cmdline.h"
-#include "types.h"
+#include "profparser.h"
 
 /// Process a single permissions profile entry performing operations on the file system.
 /**
