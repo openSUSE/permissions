@@ -21,16 +21,6 @@ public: // functions
 
     int run();
 
-protected: // types
-
-    /// enum to differentiate different /proc availability situations.
-    enum class ProcMountState {
-        /// status was not investigated yet
-        UNKNOWN,
-        AVAIL,
-        UNAVAIL,
-    };
-
 protected: // functions
 
     /// Process the already validated command line arguments.
@@ -72,12 +62,8 @@ protected: // functions
     /// The main profile entry traversal algorithm that carries out required file system operations.
     int processEntries();
 
-    /// Tests whether /proc is available in a caching manner.
-    ProcMountState procState() const;
-
-    bool haveProc() const {
-        return m_proc_mount_avail == ProcMountState::AVAIL;
-    }
+    /// Checks whether /proc is mounted and returns the result.
+    bool isProcMounted() const;
 
     /// Prints an introductory text describing the active configuration.
     void printHeader();
@@ -88,6 +74,9 @@ protected: // functions
 protected: // data
 
     const CmdlineArgs &m_args;
+
+    /// Whether a /proc mount has been detected.
+    const bool m_have_proc;
 
     /// Optional explicit set of files to check.
     std::set<std::string> m_files_to_check;
@@ -115,8 +104,6 @@ protected: // data
     VariableExpansions m_variable_expansions;
 
     ProfileParser m_profile_parser;
-
-    ProcMountState m_proc_mount_avail = ProcMountState::UNKNOWN;
 };
 
 // vim: et ts=4 sts=4 sw=4 :

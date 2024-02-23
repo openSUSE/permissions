@@ -40,6 +40,7 @@
 
 Chkstat::Chkstat(const CmdlineArgs &args) :
             m_args{args},
+            m_have_proc{isProcMounted()},
             m_apply_changes{args.apply_changes.getValue()},
             m_profile_parser{m_args, m_variable_expansions} {
 }
@@ -287,21 +288,19 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
     }
 }
 
-Chkstat::ProcMountState Chkstat::procState() const {
-    auto ret = ProcMountState::UNAVAIL;
-
+bool Chkstat::isProcMounted() const {
     if (secure_getenv("CHKSTAT_PRETEND_NO_PROC") != nullptr) {
-        return ret;
+        return false;
     }
 
     struct statfs proc;
     int r = statfs("/proc", &proc);
 
     if (r == 0 && proc.f_type == PROC_SUPER_MAGIC) {
-        ret = ProcMountState::AVAIL;
+        return true;
     }
 
-    return ret;
+    return false;
 }
 
 void Chkstat::printHeader() {
@@ -322,9 +321,7 @@ void Chkstat::printHeader() {
 int Chkstat::processEntries() {
     size_t errors = 0;
 
-    m_proc_mount_avail = procState();
-
-    if (m_apply_changes && !haveProc()) {
+    if (m_apply_changes && !m_have_proc) {
         std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
         errors++;
         m_apply_changes = false;
@@ -336,7 +333,7 @@ int Chkstat::processEntries() {
         if (!needToCheck(processor.path()))
             continue;
 
-        if (!processor.process(haveProc()))
+        if (!processor.process(m_have_proc))
             errors++;
     }
 
