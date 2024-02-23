@@ -1,6 +1,7 @@
 // Linux
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -40,6 +41,20 @@ void FileDesc::close() {
     }
 
     invalidate();
+}
+
+std::string FileDesc::path() const {
+    std::string linkpath(PATH_MAX, '\0');
+    auto procpath = std::string("/proc/self/fd/") + std::to_string(this->get());
+
+    ssize_t l = ::readlink(procpath.c_str(), &linkpath[0], linkpath.size());
+    if (l > 0) {
+        linkpath.resize(std::min(static_cast<size_t>(l), linkpath.size()));
+    } else {
+        linkpath = "ancestor";
+    }
+
+    return linkpath;
 }
 
 FileCapabilities::~FileCapabilities() {

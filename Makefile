@@ -1,4 +1,4 @@
-REQUIRED_CXXFLAGS=-std=c++17 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
+REQUIRED_CXXFLAGS=-std=c++17 -D_GNU_SOURCE -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -Werror -Wall -Wextra -pedantic -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wdouble-promotion  -Wshadow  -Wformat=2 -Wsign-conversion
 ifdef CXXFLAGS
 override CXXFLAGS:=$(REQUIRED_CXXFLAGS) $(CXXFLAGS)
 else
@@ -39,7 +39,7 @@ man5dir=$(mandir)/man5
 zypp_plugins=$(prefix)/lib/zypp/plugins
 zypp_commit_plugins=$(zypp_plugins)/commit
 
-OBJS = src/chkstat.o src/utility.o src/formatting.o
+OBJS = src/chkstat.o src/utility.o src/formatting.o src/cmdline.o src/varexp.o src/profparser.o src/entryproc.o
 
 all: src/chkstat
 	@if grep -n -o -P '\t' src/*.cpp src/*.h; then echo "error: source has mixed tabs and spaces!" ; touch src/chkstat.cpp ; exit 1 ; fi ; :

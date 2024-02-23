@@ -1,5 +1,4 @@
-#ifndef CHKSTAT_UTILITY_H
-#define CHKSTAT_UTILITY_H
+#pragma once
 
 // POSIX
 #include <sys/capability.h>
@@ -15,62 +14,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-/// SwitchArg that can be programmatically set.
-/**
- * TCLAP::SwitchArg doesn't offer a public API to programmatically change the
- * switch's value. Therefore this specialization provides an additional method
- * to make this possible.
- **/
-class SwitchArgRW :
-        public TCLAP::SwitchArg {
-public:
-    SwitchArgRW(
-            const std::string &flag,
-            const std::string &name,
-            const std::string &desc,
-            TCLAP::CmdLineInterface &parser) :
-            TCLAP::SwitchArg{flag, name, desc, parser} {
-    }
-
-    void setValue(bool val) {
-        _value = val;
-        // this is used for isSet(), _value only for getValue(), so
-        // sync both.
-        _alreadySet = val;
-    }
-};
-
-/// ValueArg with sane const semantics.
-/**
- * The TCLAP::ValueArg is missing accessors that allow access the contained
- * value in const contexts. Sadly there was no release of TCLAP in a long
- * time, the upstream master branch contains suitable fixes already, however.
- * This is just a small wrapper to fix this situation.
- **/
-template <typename T>
-class SaneValueArg :
-        public TCLAP::ValueArg<T> {
-public:
-    SaneValueArg(
-            const std::string &flag,
-            const std::string &name,
-            const std::string &desc,
-            bool req,
-            T value,
-            const std::string &typeDesc,
-            TCLAP::CmdLineInterface &parser) :
-            TCLAP::ValueArg<T>{flag, name, desc, req, value, typeDesc, parser} {
-    }
-
-    const T& getValue() const {
-        return this->_value;
-    }
-
-    T& getValue() {
-        return this->_value;
-    }
-};
 
 /// `isspace()` has overloads which gives trouble with template argument deduction, therefore provide a wrapper.
 inline bool chkspace(char c) { return std::isspace(c); }
@@ -104,6 +47,16 @@ template <typename UNARY = bool(char)>
 void strip(std::string &s, UNARY f = chkspace) {
     lstrip(s, f);
     rstrip(s, f);
+}
+
+template <typename UNARY = bool(char)>
+std::string stripped(std::string s, UNARY f = chkspace) {
+    strip(s, f);
+    return s;
+}
+
+inline void stripTrailingSlashes(std::string &s) {
+    rstrip(s, [](char c) { return c == '/'; });
 }
 
 /// Checks whether the given string has the given prefix.
@@ -194,6 +147,9 @@ public:
 
     /// Explicitly close and invalidate() the currently stored file descriptor.
     void close();
+
+    /// Resolves the file system path of the file descriptor via /proc/self/fd - for display purposes.
+    std::string path() const;
 
 protected:
 
@@ -335,7 +291,7 @@ public:
 
     bool hasCaps() const { return m_caps != nullptr; }
 
-    //! explicitly free and invalidate() the currently stored capabilities
+    /// Explicitly free and invalidate() the currently stored capabilities.
     void destroy();
 
     cap_t raw() { return m_caps; }
@@ -375,7 +331,5 @@ protected: // data
      cap_t m_caps = nullptr;
      int m_last_errno = 0;
 };
-
-#endif // inc. guard
 
 // vim: et ts=4 sts=4 sw=4 :
