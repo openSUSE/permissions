@@ -32,11 +32,13 @@ bool EntryProcessor::process(const bool have_proc) {
 
         if (!safeOpen()) {
             return false;
+        } else if (!m_fd.valid()) {
+            // this means the entry it to be skipped e.g. because the file
+            // does not exist
+            return true;
         }
 
-        if (!m_fd.valid()) {
-            return false;
-        } else if (m_file_status.isLink()) {
+        if (m_file_status.isLink()) {
             return true;
         }
 
@@ -175,8 +177,9 @@ bool EntryProcessor::safeOpen() {
                 if (errno != ENOENT) {
                     std::cerr << "warning: skipping " << m_path << ": " << pathfd.path() << ": openat(): "
                         << std::strerror(errno) << std::endl;
+                    return false;
                 }
-                return false;
+                return true;
             }
             pathfd.set(tmpfd);
         }
