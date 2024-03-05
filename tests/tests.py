@@ -6,6 +6,40 @@ import shutil
 
 from base import TestBase, ConfigLocation
 
+class TestNoErrorIfNotExisting(TestBase):
+
+    def __init__(self):
+        super().__init__("checks whether a entry for a non-existing file triggers errors")
+
+    def run(self):
+        testdir = self.createAndGetTestDir(0o770)
+        testfile = os.path.sep.join((testdir, "testfile"))
+        testpaths = (testdir, testfile)
+
+        modes = {
+            "easy": (0o750, 0o740),
+            "secure": (0o710, 0o700),
+            "paranoid": (0o700, 0o600)
+        }
+
+        entries = {}
+
+        for profile, perms in modes.items():
+            lines = entries.setdefault(profile, [])
+            for path, mode in ((testdir, perms[0]), (testfile, perms[1])):
+                lines.append(self.buildProfileLine(path, mode))
+
+        self.addProfileEntries(entries)
+
+        for profile, entries in entries.items():
+
+            # configure the given profile as default
+            self.switchSystemProfile(profile)
+            res, output = self.applySystemProfile()
+            if res != 0:
+                self.printError("applying system profile", profile, "for non-existent file failed")
+
+
 
 class TestCorrectMode(TestBase):
 
@@ -1322,6 +1356,7 @@ class TestVariableApplication(TestVariablesBase):
 
 
 tests = (
+    TestNoErrorIfNotExisting,
     TestCorrectMode,
     TestCorrectOwner,
     TestBasePermissions,
