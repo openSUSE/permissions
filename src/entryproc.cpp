@@ -30,17 +30,11 @@ bool EntryProcessor::process(const bool have_proc) {
             return true;
         }
 
-        if (!safeOpen()) {
-            return false;
-        } else if (!m_fd.valid()) {
-            // this means the entry it to be skipped e.g. because the file
-            // does not exist
-            return true;
+        if (const auto res = safeOpen(); res != OpenRes::CONTINUE) {
+            return res == OpenRes::SKIP ? true : false;
         }
 
-        if (m_file_status.isLink()) {
-            return true;
-        }
+        assert (m_fd.valid());
 
         if (have_proc) {
             // fd is opened with O_PATH, file operations like cap_get_fd() and fchown() don't work with it.
@@ -120,7 +114,7 @@ bool EntryProcessor::resolveOwnership() {
     return good;
 }
 
-bool EntryProcessor::safeOpen() {
+EntryProcessor::OpenRes EntryProcessor::safeOpen() {
     size_t link_count = 0;
     FileDesc pathfd;
     FileDesc parentfd;
@@ -140,12 +134,12 @@ bool EntryProcessor::safeOpen() {
 
             if (pathfd.invalid()) {
                 std::cerr << root << ": failed to open root directory: " << std::strerror(errno) << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
 
             if (!root_status.fstat(pathfd)) {
                 std::cerr << root << ": failed to fstat root directory: " << root << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
             // status and pathfd must be in sync for the root-escape check below
             m_file_status = root_status;
@@ -174,12 +168,13 @@ bool EntryProcessor::safeOpen() {
             auto child = component.empty() ? "." : component.c_str();
             int tmpfd = openat(pathfd.get(), child, O_PATH | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
             if (tmpfd == -1) {
-                if (errno != ENOENT) {
+                if (errno == ENOENT) {
+                    return OpenRes::SKIP;
+                } else {
                     std::cerr << "warning: skipping " << m_path << ": " << pathfd.path() << ": openat(): "
                         << std::strerror(errno) << std::endl;
-                    return false;
+                    return OpenRes::ERROR;
                 }
-                return true;
             }
             pathfd.set(tmpfd);
         }
@@ -187,7 +182,7 @@ bool EntryProcessor::safeOpen() {
         if (!m_file_status.fstat(pathfd)) {
             std::cerr << "warning: skipping  " << m_path << ": " << pathfd.path() << ": fstat(): "
                 << std::strerror(errno) << std::endl;
-            return false;
+            return OpenRes::ERROR;
         }
 
         // owner of directories must be trusted for setuid/setgid/capabilities
@@ -212,10 +207,10 @@ bool EntryProcessor::safeOpen() {
         if (!m_file_status.hasSafeOwner({m_file_uid, m_euid})) {
             if (is_final_path_element) {
                 std::cerr << m_path << ": has unexpected owner (" << m_file_status.st_uid << "). Refusing to correct due to unknown integrity." << std::endl;
-                return false;
+                return OpenRes::ERROR;
             } else {
                 std::cerr << m_path << ": on an insecure path - " << pathfd.path() << " has different non-root owner who could tamper with the file." << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
         }
 
@@ -223,11 +218,11 @@ bool EntryProcessor::safeOpen() {
         if(!m_file_status.hasSafeGroup({m_file_gid, m_egid})) {
             if (is_final_path_element) {
                 std::cerr << m_path << ": is group-writable and has unexpected group (" << m_file_status.st_gid << "). Refusing to correct due to unknown integrity." << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
             else {
                 std::cerr << m_path << ": on an insecure path - " << pathfd.path() << " has different non-root group that could tamper with the file." << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
         }
 
@@ -235,10 +230,10 @@ bool EntryProcessor::safeOpen() {
             // If the path configured in the permissions configuration is a symlink, we don't follow it.
             // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
             if (is_final_path_element)
-               return false;
+               return OpenRes::SKIP;
             else if (++link_count >= 256) {
                 std::cerr << m_path << ": excess link count stopping at " << pathfd.path() << "." << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
 
             // Don't follow symlinks owned by regular users.
@@ -246,7 +241,7 @@ bool EntryProcessor::safeOpen() {
             // of the link, but we're going the simple route for now.
             if (!m_file_status.hasSafeOwner({m_euid}) || !m_file_status.hasSafeGroup({m_egid})) {
                 std::cerr << m_path << ": on an insecure path - " << pathfd.path() << " has different non-root owner who could tamper with the file." << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
 
             std::string link(PATH_MAX, '\0');
@@ -254,7 +249,7 @@ bool EntryProcessor::safeOpen() {
 
             if (len <= 0 || static_cast<size_t>(len) >= link.size()) {
                 std::cerr << m_path << ": " << pathfd.path() << ": readlink(): " << std::strerror(errno) << std::endl;
-                return false;
+                return OpenRes::ERROR;
             }
 
             link.resize(static_cast<size_t>(len));
@@ -290,12 +285,12 @@ bool EntryProcessor::safeOpen() {
     // world-writable file: error out due to unknown file integrity
     if (m_file_status.isRegular() && m_file_status.isWorldWritable()) {
         std::cerr << m_path << ": file has insecure permissions (world-writable)" << std::endl;
-        return false;
+        return OpenRes::ERROR;
     }
 
     m_fd.steal(pathfd);
 
-    return true;
+    return OpenRes::CONTINUE;
 }
 
 bool EntryProcessor::getCapabilities() {

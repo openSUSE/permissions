@@ -30,6 +30,14 @@ public: // functions
      **/
     bool process(const bool have_proc);
 
+protected: // types
+
+    enum class OpenRes {
+        ERROR,
+        SKIP,
+        CONTINUE
+    };
+
 protected: // functions
 
     /// Resolves the textual user:group in `m_entry` and stores the result in `m_file_uid` and `m_file_gid`.
@@ -42,7 +50,7 @@ protected: // functions
      * \return
      *      An indication whether the file could be successfully opened
      **/
-    bool safeOpen();
+    OpenRes safeOpen();
 
     /// Gets the currently set capabilities from `m_safe_path` and stores them in `m_caps`.
     /**
