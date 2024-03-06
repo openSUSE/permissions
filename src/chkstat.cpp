@@ -27,10 +27,12 @@
 // local headers
 #include "chkstat.h"
 #include "entryproc.h"
+#include "environment.h"
 #include "formatting.h"
 #include "utility.h"
 
 // C++
+#include <cassert>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -42,6 +44,7 @@ Chkstat::Chkstat(const CmdlineArgs &args) :
             m_args{args},
             m_have_proc{isProcMounted()},
             m_apply_changes{args.apply_changes.getValue()},
+            m_allow_no_proc{secure_getenv(ENVVAR_ALLOW_NO_PROC.c_str()) != nullptr},
             m_profile_parser{m_args, m_variable_expansions} {
 }
 
@@ -289,7 +292,7 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
 }
 
 bool Chkstat::isProcMounted() const {
-    if (secure_getenv("CHKSTAT_PRETEND_NO_PROC") != nullptr) {
+    if (secure_getenv(ENVVAR_PRETEND_NO_PROC.c_str()) != nullptr) {
         return false;
     }
 
@@ -322,12 +325,20 @@ int Chkstat::processEntries() {
     size_t errors = 0;
 
     if (m_apply_changes && !m_have_proc) {
-        std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
-        errors++;
-        m_apply_changes = false;
+        if (m_allow_no_proc) {
+            std::cerr << "WARNING: /proc is not available, continuing in insecure mode because " << ENVVAR_ALLOW_NO_PROC << " is set." << std::endl;
+        } else {
+            std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
+            errors++;
+            m_apply_changes = false;
+        }
     }
 
+    if (!m_have_proc && !m_allow_no_proc) {
+        assert(!m_apply_changes);
+    }
     for (const auto& [path, entry]: m_profile_parser.entries()) {
+
         EntryProcessor processor{entry, m_args, m_apply_changes};
 
         if (!needToCheck(processor.path()))

@@ -65,6 +65,9 @@ protected: // functions
     /// Checks whether /proc is mounted and returns the result.
     bool isProcMounted() const;
 
+    /// Checks if changes are allowed to be applied without /proc filesystem
+    bool allowNoProc() const;
+
     /// Prints an introductory text describing the active configuration.
     void printHeader();
 
@@ -87,6 +90,17 @@ protected: // data
      * overridden by runtime context e.g. a missing /proc or sysconfig.
      **/
     bool m_apply_changes = false;
+
+    /// Allow operation without mounted /proc file system.
+    /**
+     * In normal operation we fall back to a read only mode if /proc is not
+     * available because securely operating on arbitrary filesystems is not
+     * possible then. In some configurations /proc is not available (e.g.
+     * container setups) but changes should be applied anyway.
+     * The caller needs to ensure that no unpriviled user can influence the
+     * operation in nefarious ways
+     **/
+    const bool m_allow_no_proc = false;
 
     /// The predefined profile names shipped with permissions.
     static constexpr const char * const PREDEFINED_PROFILES[] = {"easy", "secure", "paranoid"};
