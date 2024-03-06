@@ -46,10 +46,10 @@ bool EntryProcessor::process(const bool have_proc) {
             // all symlinks, 'fd' can't refer to a symlink which we'd have to worry might get followed.)
             m_safe_path = std::string("/proc/self/fd/") + std::to_string(m_fd.get());
         } else {
-            // fall back to plain path-access for read-only operation. (this much is fine)
-            // we only report errors below, m_apply_changes is set to false in this case.
+            // No proc filesystem is available.
+            // Unless the environment variable is set we only report errors below, m_apply_changes is set to false in this case.
+            // otherwise we operate insecurely and trust that this is done only in safe environments, see bsc#1219736
             m_safe_path = m_entry.file;
-            assert(!m_apply_changes);
         }
 
         if (!getCapabilities()) {
