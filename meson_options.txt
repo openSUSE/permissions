@@ -1,0 +1,1 @@
+option('testbuild', type: 'boolean', value: false, description: 'apply extra build settings for the regression test')
