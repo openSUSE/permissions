@@ -124,7 +124,11 @@ class ChkstatRegtest:
 
         perm_root = os.path.realpath(__file__).split(os.path.sep)[:-2]
         self.m_permissions_repo = os.path.sep.join(perm_root)
-        self.m_chkstat_orig = os.path.sep.join([self.m_permissions_repo, "src/chkstat"])
+
+        if not self.m_args.buildtree.startswith(os.path.sep):
+            self.m_args.buildtree = os.path.sep.join([self.m_permissions_repo, self.m_args.buildtree])
+
+        self.m_chkstat_orig = os.path.sep.join([self.m_args.buildtree, "chkstat"])
 
     def printDebug(self, *args, **kwargs):
 
@@ -176,8 +180,11 @@ class ChkstatRegtest:
             help="Build a more debug friendly version of chkstat to make tracking down bugs in `gdb` easier"
         )
 
+        self.m_parser.add_argument('buildtree', default='build',
+           help="The meson build tree to use.", nargs='?')
+
         self.m_parser.add_argument(
-            "--skip-make", action='store_true',
+            "--skip-build", action='store_true',
             help="By default the regtest tries to (re)build the chkstat binary. If this switch is set then whichever binary is currently found will be used."
         )
 
@@ -604,7 +611,7 @@ class ChkstatRegtest:
 
     def buildChkstat(self):
 
-        if self.m_args.skip_make:
+        if self.m_args.skip_build:
             if not os.path.exists(self.m_chkstat_orig):
                 print("Couldn't find compiled chkstat binary in",
                       self.m_chkstat_orig, file=sys.stderr)
@@ -615,26 +622,29 @@ class ChkstatRegtest:
         self.printHeading("Rebuilding test version of chkstat")
         print()
 
-        subprocess.check_call(
-            ["make", "clean"],
-            cwd=self.m_permissions_repo
-        )
-
+        buildtype = "debug" if self.m_args.build_debug else "debugoptimized"
+        settings = []
         # this causes a debug version with additional libasan routines
         # to be built for testing
         # asan requires /proc so don't use it if we don't mount it
-        make_env = os.environ.copy()
         if not self.m_args.skip_proc:
-            make_env["CHKSTAT_TEST"] = "1"
-        if self.m_args.build_debug:
-            make_env["CHKSTAT_DEBUG"] = "1"
+            settings.append("-Dtestbuild=true")
 
         try:
-            subprocess.check_call(
-                ["make"],
-                cwd=self.m_permissions_repo,
-                env=make_env
-            )
+            meson_config_args = ["--buildtype", buildtype] + settings
+            if not os.path.exists(self.m_args.buildtree):
+                os.makedirs(self.m_args.buildtree)
+                subprocess.check_call(
+                    ["meson", "setup"] + meson_config_args + [self.m_args.buildtree],
+                    cwd=self.m_permissions_repo
+                )
+            else:
+                subprocess.check_call(
+                    ["meson", "configure"] + meson_config_args,
+                    cwd=self.m_args.buildtree,
+                )
+            print()
+            subprocess.check_call(["meson", "compile"], cwd=self.m_args.buildtree)
             print()
         except subprocess.CalledProcessError:
             color_printer.setRed()

@@ -1,4 +1,3 @@
-chkstat
-*.o
 __pycache__
 .tags
+build*

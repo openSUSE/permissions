@@ -11,6 +11,21 @@ The different profiles allow to select a base security level and also allow to
 customize settings. See the accompanying man pages for more detailed
 information.
 
+# Building
+
+This project uses Meson for building. A straightforward build is done like
+this:
+
+    # create a build tree in the build sub-directory
+    meson setup build
+
+    cd build
+    # building of the chkstat program
+    meson compile
+
+    # optional installation
+    meson install
+
 # Known limitations
 
 chkstat doesn't remove permissions that were removed from the profiles. So if
