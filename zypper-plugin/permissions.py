@@ -31,7 +31,7 @@
 #
 # The COMMITBEGIN and COMMITEND hooks allow to inspect which packages are
 # installed or removed. We can't look at individual files, though. Therefore
-# we have to blindly call chkstat at the end of each transaction that adds one
+# we have to blindly call permctl at the end of each transaction that adds one
 # or more packages.
 
 import sys
@@ -58,14 +58,14 @@ def callCheckstat():
     # is not disabled in /etc/sysconfig/security. If it is then the admin
     # hopefuly knows what they are doing on their own.
     res = subprocess.call(
-        ['/usr/bin/chkstat', '--system'],
+        ['/usr/bin/permctl', '--system'],
         shell=False,
         close_fds=True,
         stdout=sys.stderr
     )
 
     if res != 0:
-        log("chkstat failed with exit code", res)
+        log("permctl failed with exit code", res)
 
 
 class PermissionsPlugin(zypp_plugin.Plugin):
@@ -79,9 +79,9 @@ class PermissionsPlugin(zypp_plugin.Plugin):
         # part of this transaction
         #self.m_matches = set()
         # This is actually not needed currently. In the first place I wanted
-        # to only call chkstat when a file was added or replaced that is
+        # to only call permctl when a file was added or replaced that is
         # listed in permissions.local. Since this information is not easily
-        # available from zypper we always call chkstat instead.
+        # available from zypper we always call permctl instead.
         #self._parsePermissions("/etc/permissions.local", "local")
 
     def _parsePermissions(self, path, label):

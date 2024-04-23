@@ -78,7 +78,7 @@ bool EntryProcessor::process(const bool have_proc) {
 
         if (m_euid != 0) {
             // only attempt to change the owner if we're actually privileged
-            // to do so (chkstat also supports to run as a regular user within
+            // to do so (permctl also supports to run as a regular user within
             // certain limits)
             m_need_fix_ownership = false;
         }
@@ -228,7 +228,7 @@ EntryProcessor::OpenRes EntryProcessor::safeOpen() {
 
         if (m_file_status.isLink()) {
             // If the path configured in the permissions configuration is a symlink, we don't follow it.
-            // This is to emulate legacy behaviour: old insecure versions of chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
+            // This is to emulate legacy behaviour: old insecure versions of permctl/chkstat did a simple lstat(path) as 'protection' against malicious symlinks.
             if (is_final_path_element)
                return OpenRes::SKIP;
             else if (++link_count >= 256) {

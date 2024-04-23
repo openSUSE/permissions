@@ -6,7 +6,7 @@
 .SH "NAME"
 permission - default permission settings
 .SH "SYNOPSIS"
-The chkstat program sets permissions and ownerships according to the
+The permctl program sets permissions and ownerships according to the
 permission files\.
 .SH "DESCRIPTION"
 .PP
@@ -28,7 +28,7 @@ The file name in the first column can contain contain variables as defined in
 the \fIvariables.conf\fR file.
 .br
 A variable expands to one or more alternative path segments that relate to the
-same program or file.  chkstat will look in each possible path 
+same program or file. permctl will look in each possible path
 resulting from the variable expansion and apply the permissions accordingly.
 .PP
 The variables.conf file will ignore empty lines, whitespace only lines or
@@ -76,7 +76,7 @@ sub_dirs = prog_v1 prog_v2
 .br
 %{lib_dirs}/%{sub_dirs}/libsomething.so root:root 04755
 .PP
-Will cause chkstat to try and apply the given permission to all of the
+Will cause permctl to try and apply the given permission to all of the
 following paths:
 .PP
 \- /lib/prog_v1/libsomething.so
@@ -105,7 +105,7 @@ following paths:
 /etc/permissions\.local
 .br
 .SH "SEE ALSO"
-chkstat(8)
+permctl(8)
 .sp
 .SH "AUTHOR"
 Written by Ludwig Nussel

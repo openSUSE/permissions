@@ -21,21 +21,21 @@ from enum import Enum
 # the host system and is generally complex to achieve when user privileges
 # need to be switched for testing, for example.
 #
-# chkstat on its own supports some switches like `--root` to operate on a
+# permctl on its own supports some switches like `--root` to operate on a
 # specific file system subtree. However, this also triggers other, potentially
-# uncommon logic in chkstat, while we're more interested in the major use
+# uncommon logic in permctl, while we're more interested in the major use
 # cases.
 #
 # a good compromise is to use user and mount namespaces:
 #
 # - real root privileges are not required
 # - damaging the system is less likely, only user data can suffer
-# - typical code paths of chkstat can largely be kept as-is
+# - typical code paths of permctl can largely be kept as-is
 # - even some privileged operations like setting setuid-root bits or
 # capabilities can be emulated
 #
 # the downside is that we need to construct a fake root file system from what
-# we have on the host. This is what the ChkstatRegtest class is caring for.
+# we have on the host. This is what the PermctlRegtest class is caring for.
 # Another downside is that we cannot chown() or chgrp() to any other group
 # than root (our fake root in the user namespace). Actually: It is possible
 # when sub-uids and sub-gids are correctly configured in the host system.
@@ -107,16 +107,16 @@ PER_PACKAGE_CONFIG_DIRS = {
 }
 
 
-class ChkstatRegtest:
+class PermctlRegtest:
     """The main test execution class. It sets up the fake root using
     namespaces and runs each individual test case."""
 
     # a couple of environment variable used to communicate namespace setup
     # details to child instances of ourselves
-    REEXEC_ENV_MARKER = "CHKSTAT_REGTEST_REEXEC"
-    WAIT_FOR_SUBID_MAP_ENV_MARKER = "CHKSTAT_WAIT_FOR_SUBID_MAP"
-    SUB_UID_RANGE_ENV_VAR = "CHKSTAT_SUB_UID_RANGE"
-    SUB_GID_RANGE_ENV_VAR = "CHKSTAT_SUB_GID_RANGE"
+    REEXEC_ENV_MARKER = "PERMCTL_REGTEST_REEXEC"
+    WAIT_FOR_SUBID_MAP_ENV_MARKER = "PERMCTL_WAIT_FOR_SUBID_MAP"
+    SUB_UID_RANGE_ENV_VAR = "PERMCTL_SUB_UID_RANGE"
+    SUB_GID_RANGE_ENV_VAR = "PERMCTL_SUB_GID_RANGE"
 
     def __init__(self):
 
@@ -128,7 +128,7 @@ class ChkstatRegtest:
         if not self.m_args.buildtree.startswith(os.path.sep):
             self.m_args.buildtree = os.path.sep.join([self.m_permissions_repo, self.m_args.buildtree])
 
-        self.m_chkstat_orig = os.path.sep.join([self.m_args.buildtree, "chkstat"])
+        self.m_permctl_orig = os.path.sep.join([self.m_args.buildtree, "permctl"])
 
     def printDebug(self, *args, **kwargs):
 
@@ -142,7 +142,7 @@ class ChkstatRegtest:
     def setupArgParser(self):
 
         self.m_parser = argparse.ArgumentParser(
-            description="Regression test suite for the chkstat program"
+            description="Regression test suite for the permctl program"
         )
 
         self.m_parser.add_argument(
@@ -177,7 +177,7 @@ class ChkstatRegtest:
 
         self.m_parser.add_argument(
             "--build-debug", action='store_true',
-            help="Build a more debug friendly version of chkstat to make tracking down bugs in `gdb` easier"
+            help="Build a more debug friendly version of permctl to make tracking down bugs in `gdb` easier"
         )
 
         self.m_parser.add_argument('buildtree', default='build',
@@ -185,12 +185,12 @@ class ChkstatRegtest:
 
         self.m_parser.add_argument(
             "--skip-build", action='store_true',
-            help="By default the regtest tries to (re)build the chkstat binary. If this switch is set then whichever binary is currently found will be used."
+            help="By default the regtest tries to (re)build the permctl binary. If this switch is set then whichever binary is currently found will be used."
         )
 
         self.m_parser.add_argument(
             "--skip-proc", action='store_true',
-            help="Run chkstat without a mounted /proc to test these special chkstat code paths that deal with that condition. This is only really useful in old code streams that attempt to mount their own /proc for backwards compatibility."
+            help="Run permctl without a mounted /proc to test these special permctl code paths that deal with that condition. This is only really useful in old code streams that attempt to mount their own /proc for backwards compatibility."
         )
 
         self.m_args = self.m_parser.parse_args()
@@ -198,7 +198,7 @@ class ChkstatRegtest:
     def ensureForkedNamespace(self):
         """This function reexecutes the current script in a forked user and
         mount namespace for faking a root file system and root context for
-        testing chkstat."""
+        testing permctl."""
 
         unshare = shutil.which("unshare")
 
@@ -511,10 +511,10 @@ class ChkstatRegtest:
             except subprocess.CalledProcessError:
                 pass
 
-    def getChkstatPath(self):
-        return "/usr/local/bin/chkstat"
+    def getPermctlPath(self):
+        return "/usr/local/bin/permctl"
 
-    def getChkstatConfigRoot(self):
+    def getPermctlConfigRoot(self):
         return "/usr/local"
 
     def setupFakeRoot(self, skip_proc):
@@ -525,7 +525,7 @@ class ChkstatRegtest:
         self.m_fake_root = "/tmp"
         self.mountTmpFS(self.m_fake_root)
 
-        # for chkstat to find a production-like environment, we need
+        # for permctl to find a production-like environment, we need
         # to own the root filesystem '/', thus let's chroot into /tmp,
         # where we only bind mount the most important stuff from the
         # root mount namespace
@@ -546,7 +546,7 @@ class ChkstatRegtest:
                 raise Exception("bad mount src " + src)
 
         # mount a new proc corresponding to our forked pid namespace
-        # unless this is disabled, to test chkstat behaviour without /proc
+        # unless this is disabled, to test permctl behaviour without /proc
         if not skip_proc:
             new_proc = self.m_fake_root + "/proc"
             os.mkdir(new_proc)
@@ -562,11 +562,11 @@ class ChkstatRegtest:
         )
 
         self.mountTmpFS(self.m_fake_root + "/usr/local")
-        local_bin = self.m_fake_root + self.getChkstatPath()
+        local_bin = self.m_fake_root + self.getPermctlPath()
         os.makedirs(os.path.dirname(local_bin), exist_ok=True)
-        # copy the current chkstat into a suitable location of
+        # copy the current permctl into a suitable location of
         # the fake root FS
-        shutil.copy(self.m_chkstat_orig, local_bin)
+        shutil.copy(self.m_permctl_orig, local_bin)
 
         # make a writeable home available for the user namespace root
         # user
@@ -609,17 +609,17 @@ class ChkstatRegtest:
         fn, ln, _, _ = frame
         print("Exception in {}:{}:".format(fn, ln), str(e), file=sys.stderr)
 
-    def buildChkstat(self):
+    def buildPermctl(self):
 
         if self.m_args.skip_build:
-            if not os.path.exists(self.m_chkstat_orig):
-                print("Couldn't find compiled chkstat binary in",
-                      self.m_chkstat_orig, file=sys.stderr)
+            if not os.path.exists(self.m_permctl_orig):
+                print("Couldn't find compiled permctl binary in",
+                      self.m_permctl_orig, file=sys.stderr)
                 sys.exit(2)
 
             return
 
-        self.printHeading("Rebuilding test version of chkstat")
+        self.printHeading("Rebuilding test version of permctl")
         print()
 
         buildtype = "debug" if self.m_args.build_debug else "debugoptimized"
@@ -648,7 +648,7 @@ class ChkstatRegtest:
             print()
         except subprocess.CalledProcessError:
             color_printer.setRed()
-            print("Failed to compile test version of chkstat")
+            print("Failed to compile test version of permctl")
             sys.exit(1)
 
     def run(self, tests):
@@ -669,7 +669,7 @@ class ChkstatRegtest:
             self.ensureForkedNamespace()
             return
 
-        self.buildChkstat()
+        self.buildPermctl()
 
         self.setupFakeRoot(self.m_args.skip_proc)
         self.checkCapsSupport()
@@ -826,8 +826,8 @@ class TestBase:
     def prepare(self):
         if not TestBase.global_init_performed:
 
-            TestBase.config_root = self.m_main_test_instance.getChkstatConfigRoot()
-            TestBase.chkstat = self.m_main_test_instance.getChkstatPath()
+            TestBase.config_root = self.m_main_test_instance.getPermctlConfigRoot()
+            TestBase.permctl = self.m_main_test_instance.getPermctlPath()
 
             config_root = TestBase.config_root
 
@@ -871,7 +871,7 @@ class TestBase:
             except FileNotFoundError:
                 pass
 
-        # chkstat expects the base files to exist, otherwise warnings
+        # permctl expects the base files to exist, otherwise warnings
         # are emitted
         self.createTestFile(central_perms, 0o644)
         self.createTestFile(sysconfig, 0o644)
@@ -954,9 +954,9 @@ class TestBase:
         self.createSecuritySysconfig(profile)
 
     def applySystemProfile(self, extra_args=[]):
-        print("Applying current system profile using chkstat")
+        print("Applying current system profile using permctl")
         args = ["--set", "--system"] + extra_args
-        return self.callChkstat(args)
+        return self.callPermctl(args)
 
     def extractPerms(self, s):
         return s.st_mode & ~(stat.S_IFMT(s.st_mode))
@@ -1103,9 +1103,9 @@ class TestBase:
                 expected_caps, actual_caps
             ))
 
-    def callChkstat(self, args):
-        """Calls chkstat passing the given command line arguments. The
-        function will capture chkstat's stdout and stderr via a pipe
+    def callPermctl(self, args):
+        """Calls permctl passing the given command line arguments. The
+        function will capture permctl's stdout and stderr via a pipe
         and then print the output on the terminal in a marked up
         fashion.
 
@@ -1116,7 +1116,7 @@ class TestBase:
         if isinstance(args, str):
             args = [args]
 
-        cmdline = [self.chkstat, "--config-root", TestBase.config_root] + args
+        cmdline = [self.permctl, "--config-root", TestBase.config_root] + args
 
         print('#', ' '.join(cmdline))
 
@@ -1144,8 +1144,8 @@ class TestBase:
 
         return proc.wait(), ret
 
-    def extractMessagesFromChkstat(self, output, paths):
-        """output is a list of lines as returned from callChkstat(),
+    def extractMessagesFromPermctl(self, output, paths):
+        """output is a list of lines as returned from callPermctl(),
         paths is a list of paths for which diagnostic/error messages
         should be extracted from the output.
 

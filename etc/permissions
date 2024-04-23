@@ -5,7 +5,7 @@
 #
 # Author: Roman Drahtmueller <draht@suse.de>, 2001
 #
-# This file is used by chkstat (and indirectly by various RPM scripts)
+# This file is used by permctl (and indirectly by various RPM scripts)
 # to check or set the modes and ownerships of files and directories in the installation.
 #
 # There is a set of files with similar meaning in a SUSE installation:
@@ -21,10 +21,10 @@
 # <file> <owner>:<group> <permission>
 #
 # How it works:
-# To change an entry copy the line to permissions.local, modify it
-# to suit your needs and call "chkstat --system"
+# To change an entry, copy the line to permissions.local, modify it
+# to suit your needs and call "permctl --system"
 #
-# chkstat uses the variable PERMISSION_SECURITY from
+# permctl uses the variable PERMISSION_SECURITY from
 # /etc/sysconfig/security to determine which security level to
 # apply.
 # In addition to the central files listed above the directory
