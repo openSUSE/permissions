@@ -2,9 +2,9 @@
 
 import sys
 
-from base import ChkstatRegtest
+from base import PermctlRegtest
 from tests import tests
 
-test = ChkstatRegtest()
+test = PermctlRegtest()
 res = test.run(tests)
 sys.exit(res)

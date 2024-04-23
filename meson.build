@@ -25,8 +25,8 @@ if get_option('testbuild')
   endforeach
 endif
 
-executable('chkstat', [
-    'src/chkstat.cpp',
+executable('permctl', [
+    'src/permctl.cpp',
     'src/cmdline.cpp',
     'src/entryproc.cpp',
     'src/formatting.cpp',
@@ -43,7 +43,9 @@ executable('chkstat', [
   install: true
 )
 
-install_man('man/chkstat.8')
+# backward compatibility symlink
+install_symlink('chkstat', pointing_to: 'permctl', install_dir: 'bin')
+install_man('man/permctl.8')
 install_man('man/permissions.5')
 install_data(sources: 'etc/sysconfig.security', install_dir: 'share/fillup-templates')
 install_data(sources: 'zypper-plugin/permissions.py', install_dir: 'lib/zypp/plugins/commit')

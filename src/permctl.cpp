@@ -25,7 +25,7 @@
 #include <unistd.h>
 
 // local headers
-#include "chkstat.h"
+#include "permctl.h"
 #include "entryproc.h"
 #include "environment.h"
 #include "formatting.h"
@@ -40,15 +40,27 @@
 #include <string>
 #include <string_view>
 
-Chkstat::Chkstat(const CmdlineArgs &args) :
+namespace {
+    bool allowNoProc() {
+        for (const auto envvar: ENVVARS_ALLOW_NO_PROC) {
+            if (::secure_getenv(envvar) != nullptr) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+PermCtl::PermCtl(const CmdlineArgs &args) :
             m_args{args},
             m_have_proc{isProcMounted()},
             m_apply_changes{args.apply_changes.getValue()},
-            m_allow_no_proc{secure_getenv(ENVVAR_ALLOW_NO_PROC.c_str()) != nullptr},
+            m_allow_no_proc{allowNoProc()},
             m_profile_parser{m_args, m_variable_expansions} {
 }
 
-bool Chkstat::processArguments() {
+bool PermCtl::processArguments() {
     for (auto path: m_args.examine_paths.getValue()) {
         stripTrailingSlashes(path);
         m_files_to_check.insert(path);
@@ -75,7 +87,7 @@ bool Chkstat::processArguments() {
     return true;
 }
 
-bool Chkstat::parseSysconfig() {
+bool PermCtl::parseSysconfig() {
     auto stripQuotes = [](std::string s) -> std::string {
         strip(s, [](char c) { return c == '"' || c == '\''; });
         return s;
@@ -140,7 +152,7 @@ bool Chkstat::parseSysconfig() {
     return true;
 }
 
-void Chkstat::addProfile(const std::string &name) {
+void PermCtl::addProfile(const std::string &name) {
     for (const auto &profile: m_profiles) {
         if (profile == name)
             // already exists
@@ -150,7 +162,7 @@ void Chkstat::addProfile(const std::string &name) {
     m_profiles.push_back(name);
 }
 
-bool Chkstat::tryOpenProfile(const std::string &path) {
+bool PermCtl::tryOpenProfile(const std::string &path) {
     std::ifstream stream{path};
 
     if (!stream.is_open())
@@ -160,7 +172,7 @@ bool Chkstat::tryOpenProfile(const std::string &path) {
     return true;
 }
 
-void Chkstat::collectProfilePaths() {
+void PermCtl::collectProfilePaths() {
     /*
      * Since configuration files are in the process of being separated between
      * stock configuration files in /usr and editable configuration files in
@@ -231,7 +243,7 @@ void Chkstat::collectProfilePaths() {
     }
 }
 
-void Chkstat::collectPackageProfilePaths(const std::string &dir) {
+void PermCtl::collectPackageProfilePaths(const std::string &dir) {
     // First collect a sorted set of base files, skipping unwanted files like
     // backup files or specific profile files. Therefore filter out duplicates
     // using the sorted set.
@@ -291,8 +303,8 @@ void Chkstat::collectPackageProfilePaths(const std::string &dir) {
     }
 }
 
-bool Chkstat::isProcMounted() const {
-    if (secure_getenv(ENVVAR_PRETEND_NO_PROC.c_str()) != nullptr) {
+bool PermCtl::isProcMounted() const {
+    if (secure_getenv(ENVVAR_PRETEND_NO_PROC) != nullptr) {
         return false;
     }
 
@@ -306,7 +318,7 @@ bool Chkstat::isProcMounted() const {
     return false;
 }
 
-void Chkstat::printHeader() {
+void PermCtl::printHeader() {
     if (m_args.no_header.isSet())
         return;
 
@@ -321,12 +333,12 @@ void Chkstat::printHeader() {
     }
 }
 
-int Chkstat::processEntries() {
+int PermCtl::processEntries() {
     size_t errors = 0;
 
     if (m_apply_changes && !m_have_proc) {
         if (m_allow_no_proc) {
-            std::cerr << "WARNING: /proc is not available, continuing in insecure mode because " << ENVVAR_ALLOW_NO_PROC << " is set." << std::endl;
+            std::cerr << "WARNING: /proc is not available, continuing in insecure mode because " << ENVVARS_ALLOW_NO_PROC[0] << " is set." << std::endl;
         } else {
             std::cerr << "ERROR: /proc is not available - unable to fix policy violations. Will continue in warn-only mode." << std::endl;
             errors++;
@@ -356,7 +368,7 @@ int Chkstat::processEntries() {
     return 0;
 }
 
-int Chkstat::run() {
+int PermCtl::run() {
     if (!processArguments())
         return 1;
 
@@ -435,12 +447,18 @@ int main(int argc, const char **argv) {
     try {
         CmdlineArgs args;
 
+        if (std::string_view{argv[0]}.find("chkstat") != std::string_view::npos) {
+            if (::isatty(STDOUT_FILENO) == 1) {
+                std::cerr << "WARNING: `chkstat` has been renamed to `permctl`." << "\n";
+            }
+        }
+
         if (auto ret = args.parse(argc, argv); ret != 0) {
             return ret;
         }
 
-        Chkstat chkstat{args};
-        return chkstat.run();
+        PermCtl permctl{args};
+        return permctl.run();
     } catch (const std::exception &ex) {
         std::cerr << "exception occurred: " << ex.what() << std::endl;
         return 1;

@@ -13,11 +13,11 @@
 #include <utility>
 #include <vector>
 
-/// Main application class for Chkstat.
-class Chkstat {
+/// Main application class for permctl.
+class PermCtl {
 public: // functions
 
-    Chkstat(const CmdlineArgs &args);
+    PermCtl(const CmdlineArgs &args);
 
     int run();
 
@@ -64,9 +64,6 @@ protected: // functions
 
     /// Checks whether /proc is mounted and returns the result.
     bool isProcMounted() const;
-
-    /// Checks if changes are allowed to be applied without /proc filesystem
-    bool allowNoProc() const;
 
     /// Prints an introductory text describing the active configuration.
     void printHeader();

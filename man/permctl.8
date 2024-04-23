@@ -1,31 +1,32 @@
 .\"
-.\" SUSE man page for chkstat
+.\" SUSE man page for permctl
 .\"
 .\" Author: Ruediger Oertel
 .\"
-.TH CHKSTAT 8 "2010-11-09" "SUSE Linux" "Tool to check and set file permissions"
+.TH PERMCTL 8 "2024-04-23" "SUSE Linux" "Tool to check and set file permissions"
 .\"
 .UC 8
 .SH NAME
 .\"
-chkstat \- Tool to check and set file permissions
+permctl \- Tool to check and set file permissions
 .SH SYNOPSIS
 .\"
-.B chkstat
+.B permctl
 .RB [OPTIONS]
 .B <permission-files...>
 
-.B chkstat
+.B permctl
 .RB \-\-system
 .RB [OPTIONS]
 .B <files...>
 .\"
 .SH DESCRIPTION
 The program
-.I /usr/bin/chkstat
-is a tool to check and set file permissions.
+.I /usr/bin/permctl
+is a tool to check and set file permissions. It was previously called chkstat,
+but has been renamed to better describe its purpose.
 .PP
-chkstat can either operate in system mode or on individually
+permctl can either operate in system mode or on individually
 specified permission files. In system mode, \fI/etc/sysconfig/security\fR
 determines which level to use and whether to actually apply
 permission changes.
@@ -68,20 +69,20 @@ and instead of all files listed in the permissions files.
 Check files relative to the specified directory.
 .PP
 .SH "ENVIRONMENT VARIABLES"
-.B CHKSTAT_ALLOW_INSECURE_MODE_IF_NO_PROC
+.B PERMCTL_ALLOW_INSECURE_MODE_IF_NO_PROC
 Allow to operate without mounted /proc filesystem. This is an unsafe mode that must only
 be used in controlled environments where unprivileged users can't influence filesystem
 operation.
 .PP
 .SH EXAMPLES
 .PP
-.B chkstat --set /usr/share/permissions/permissions /usr/share/permissions/permissions.secure
+.B permctl --set /usr/share/permissions/permissions /usr/share/permissions/permissions.secure
 .PP
 parses the files /usr/share/permissions/permissions and
 /usr/share/permissions/permissions and sets the
 access mode and the user- and group memberships for each file listed.
 .PP
-.B chkstat --system /bin/ping
+.B permctl --system /bin/ping
 .PP
 Run in system mode and only correct permissions of /bin/ping
 .
@@ -101,4 +102,3 @@ Reinhold Sojer, Ruediger Oertel, Michael Schroeder, Ludwig Nussel
 Useful changes and additions by Tobias Burnus
 .PP
 Major refactoring by Matthias Gerstner, Malte Kraus
-

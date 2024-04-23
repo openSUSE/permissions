@@ -98,7 +98,7 @@ class TestCorrectOwner(TestBase):
         # don't use friendly user and group names but plain numerical
         # IDs instead. This way we don't have to adjust /etc/passwd
         # and /etc/group. Numerical IDs are only supported in newer
-        # chkstat versions.
+        # permctl versions.
 
         # we need a defined order of execution here, therefore
         # iterate over the sorted dictionary keys.
@@ -108,7 +108,7 @@ class TestCorrectOwner(TestBase):
         #
         # we start out from 0:0 and downgrade first to 0:1 then to 1:1
         # to avoid triggering the "refusing to correct" logic in
-        # chkstat.
+        # permctl.
         owners = {
             "easy": (0, 0),
             "paranoid": (0, 1),
@@ -170,7 +170,7 @@ class TestBasePermissions(TestBase):
             for path, mode in modes.items():
                 self.assertMode(path, mode)
                 # change the mode to something else so we can
-                # check that chkstat is always restoring the
+                # check that permctl is always restoring the
                 # correct mode, independent of the active
                 # profile
                 os.chmod(path, mode & 0o111)
@@ -218,7 +218,7 @@ class TestPackagePermissions(TestBase):
 
         self.addPackageProfileEntries(package, entries)
 
-        # add a duplicate per-package profile located in /etc. chkstat
+        # add a duplicate per-package profile located in /etc. permctl
         # should only apply the /usr one.
         bad_entries = {
             # the basename must always exist, even if empty.
@@ -237,7 +237,7 @@ class TestPackagePermissions(TestBase):
                 self.printMode(p)
 
             # for the "empty" profile we need to choose some
-            # non-existing one, otherwise chkstat falls back to
+            # non-existing one, otherwise permctl falls back to
             # "secure"
             self.switchSystemProfile(profile if profile else "fake")
             self.applySystemProfile()
@@ -328,7 +328,7 @@ class TestDefaultProfile(TestBase):
     def __init__(self):
         super().__init__("checks whether the default profile is correctly selected")
         # if no profile is explicitly configured then this one should
-        # be implicitly selected by chkstat
+        # be implicitly selected by permctl
         self.m_default_profile = "secure"
 
     def run(self):
@@ -688,11 +688,11 @@ class TestUnexpectedPathOwner(TestBase):
         found_file_reject = False
 
         # we can't evaluate the exit code in this case, even if the
-        # modes aren't corrected chkstat returns 0.
+        # modes aren't corrected permctl returns 0.
         #
-        # instead parse chkstat's output to determine it correctly
+        # instead parse permctl's output to determine it correctly
         # refused to do anything
-        messages = self.extractMessagesFromChkstat(lines, [baddir, badfile])
+        messages = self.extractMessagesFromPermctl(lines, [baddir, badfile])
         needle = "unexpected owner"
 
         for message in messages[baddir]:
@@ -760,11 +760,11 @@ class TestUnexpectedPathGroup(TestBase):
         found_file_reject = False
 
         # we can't evaluate the exit code in this case, even if the
-        # modes aren't corrected chkstat returns 0.
+        # modes aren't corrected permctl returns 0.
         #
-        # instead parse chkstat's output to determine it correctly
+        # instead parse permctl's output to determine it correctly
         # refused to do anything
-        messages = self.extractMessagesFromChkstat(lines, [baddir, badfile])
+        messages = self.extractMessagesFromPermctl(lines, [baddir, badfile])
         needle = "unexpected group"
 
         for message in messages[baddir]:
@@ -814,7 +814,7 @@ class TestRejectWorldWritable(TestBase):
 
         # like in the other cases, don't check the exit code, rely on
         # output parsing
-        messages = self.extractMessagesFromChkstat(lines, badfile)
+        messages = self.extractMessagesFromPermctl(lines, badfile)
         needle = "world-writable"
         found_rejection = False
 
@@ -876,7 +876,7 @@ class TestRejectInsecurePath(TestBase):
         self.assertMode(somefile1, 0o644)
         self.assertMode(somefile2, 0o644)
 
-        messages = self.extractMessagesFromChkstat(lines, [somefile1, somefile2])
+        messages = self.extractMessagesFromPermctl(lines, [somefile1, somefile2])
         needle = "on an insecure path"
 
         for insecure in (somefile1, somefile2):
@@ -922,7 +922,7 @@ class TestUnknownOwnership(TestBase):
         self.switchSystemProfile(testprofile)
         code, lines = self.applySystemProfile(["--verbose"])
 
-        messages = self.extractMessagesFromChkstat(lines, (baduser_file, badgroup_file))
+        messages = self.extractMessagesFromPermctl(lines, (baduser_file, badgroup_file))
 
         found_baduser_report = False
         baduser_needle = "unknown user {}".format(username)
@@ -987,7 +987,7 @@ class TestRejectUserSymlink(TestBase):
         self.switchSystemProfile(testprofile)
         code, lines = self.applySystemProfile()
 
-        messages = self.extractMessagesFromChkstat(lines, testlink)
+        messages = self.extractMessagesFromPermctl(lines, testlink)
         needle = "on an insecure path"
 
         found_badlink_report = False
@@ -1036,7 +1036,7 @@ class TestPrivsForSpecialFiles(TestBase):
         self.switchSystemProfile(testprofile)
         code, lines = self.applySystemProfile()
 
-        messages = self.extractMessagesFromChkstat(lines, [s[0] for s in specials])
+        messages = self.extractMessagesFromPermctl(lines, [s[0] for s in specials])
         needle = "will only assign capabilities"
         found_rejects = 0
 
@@ -1099,7 +1099,7 @@ class TestPrivsOnInsecurePath(TestBase):
 
         self.assertNoCaps(targetfiles[2])
 
-        messages = self.extractMessagesFromChkstat(lines, targetfiles)
+        messages = self.extractMessagesFromPermctl(lines, targetfiles)
         needle = "will not give away capabilities"
         found_rejects = 0
 
@@ -1132,7 +1132,7 @@ class TestSymlinkBehaviour(TestBase):
         #
         # behaviour should be the same for both.
         #
-        # in older chkstat versions symlinks have not been followed,
+        # in older permctl versions symlinks have not been followed,
         # in newer ones they were followed in a safe manner, but
         # in-between an inconsistency was present between absolute and
         # relative symlinks.
@@ -1203,7 +1203,7 @@ class TestSymlinkDirBehaviour(TestBase):
         # behaviour should be the same for both.
         #
         # symlink handling is difficult:
-        #  - for relative links chkstat needs to keep proper track of the parent directory
+        #  - for relative links permctl needs to keep proper track of the parent directory
         #  - for absolute links, the configured root may not be escaped
 
         testroot = self.createAndGetTestDir(0o755)
@@ -1278,11 +1278,11 @@ class TestVariableParsing(TestVariablesBase):
 
         self.createVariablesConf(variables)
 
-        res, lines = self.callChkstat(["--print-variables"])
+        res, lines = self.callPermctl(["--print-variables"])
         print()
 
         if res != 0:
-            self.printError("failed to run chkstat to print parsed variables")
+            self.printError("failed to run permctl to print parsed variables")
             return
 
         parsed = {}

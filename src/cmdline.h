@@ -18,7 +18,7 @@ public: // data
     TCLAP::SwitchArg verbose;
     TCLAP::SwitchArg print_variables;
 
-    // NOTE: previously chkstat allowed multiple specifications of value
+    // NOTE: old chkstat allowed multiple specifications of value
     // switches like --level and --root but actually only used the last
     // occurrence on the command line. In theory this is a backward
     // compatibility break, but it's also kind of a bug.

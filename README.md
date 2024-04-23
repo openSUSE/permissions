@@ -20,7 +20,7 @@ this:
     meson setup build
 
     cd build
-    # building of the chkstat program
+    # building of the permctl program
     meson compile
 
     # optional installation
@@ -28,7 +28,7 @@ this:
 
 # Known limitations
 
-chkstat doesn't remove permissions that were removed from the profiles. So if
+permctl doesn't remove permissions that were removed from the profiles. So if
 an entry is removed like with https://github.com/openSUSE/permissions/pull/100
 there needs to be an update of the package that caries the binary to take
 effect. ATM we don't see this as major problem and also don't have a good way
