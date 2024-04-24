@@ -7,6 +7,7 @@
 
 // C++
 #include <fstream>
+#include <functional>
 #include <map>
 #include <string>
 
@@ -18,13 +19,16 @@ struct ProfileEntry {
     // NOTE: this is mutable to allow for a const dropXID() due to the somewhat unfortunate logic in EntryProcessor::getCapabilities().
     mutable mode_t mode = 0;
     FileCapabilities caps;
+    FileAcl acl;
 
     ProfileEntry() = default;
 
-    ProfileEntry(const std::string &p_file, const std::string &p_owner, const std::string &p_group, mode_t p_mode) :
-            file(p_file), owner(p_owner), group(p_group), mode(p_mode) {}
+    ProfileEntry(const std::string &p_file, const std::string &p_owner, const std::string &p_group, mode_t p_mode);
 
     bool hasCaps() const { return caps.hasCaps(); }
+
+    /// Returns whether an extended ACL is configured for this entry.
+    bool hasACL() const { return acl.valid() && acl.isExtendedACL(); }
 
     /// Returns whether this profile entry contains a setuid or setgid bit.
     bool hasSetXID() const {
@@ -67,14 +71,26 @@ public: // functions
 
 protected: // functions
 
+    /// Parses an extra "+<keyword>" line encountered in a permission profile.
+    void parseExtraLine(const std::string &line, std::function<void(const std::string_view)> printBadLine);
+
     /// Parses extra "+capabilities" lines in permission profiles.
     /**
      * \param[in] line
-     *      The input line from a profile file that starts with "+"
+     *      The input line from a profile file that starts with "+capabilities "
      * \return
      *      Whether the line could be successfully parsed
      **/
     bool parseCapabilityLine(const std::string &line);
+
+    /// Parses extra "+acl" lines in permission profiles.
+    /**
+     * \param[in] line
+     *      The input line from a profile file that starts with "+acl ".
+     * \return
+     *      Whether the line could be successfully parsed
+     **/
+    bool parseAclLine(const std::string &line);
 
     /// Adds a ProfileEntry to m_entries from the current m_parse_context.
     void addCurrentEntries();

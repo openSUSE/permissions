@@ -56,6 +56,12 @@ bool EntryProcessor::process(const bool have_proc) {
             return false;
         }
 
+        if (!m_acl.setFromFile(m_safe_path)) {
+            // don't make this an abort condition, we don't know how likely it
+            // is that e.g. a file system doesn't support this.
+            std::cerr << m_path << ": failed to obtain ACL: " << std::strerror(errno) << std::endl;
+        }
+
         if (!checkNeedsFixing()) {
             // nothing to do
             return true;
@@ -313,14 +319,28 @@ bool EntryProcessor::getCapabilities() {
 void EntryProcessor::printDifferences() const {
     std::cout << m_path << ": "
         << (m_apply_changes ? "setting to " : "should be ")
-        << m_entry.owner << ":" << m_entry.group << " "
-        << FileModeInt(m_entry.mode);
+        << m_entry.owner << ":" << m_entry.group << " ";
+
+    if (m_entry.hasACL()) {
+        std::cout << m_entry.acl.toText();
+    } else {
+        std::cout << FileModeInt(m_entry.mode);
+    }
 
     if (m_need_fix_caps && m_entry.hasCaps()) {
         std::cout << " \"" << m_entry.caps.toText() << "\".";
     }
 
     bool need_comma = false;
+
+    auto maybeComma = [&need_comma]() -> std::string_view {
+        if (!need_comma) {
+            need_comma = true;
+            return "";
+        } else {
+            return ", ";
+        }
+    };
 
     std::cout << " (";
 
@@ -330,22 +350,26 @@ void EntryProcessor::printDifferences() const {
     }
 
     if (m_need_fix_perms) {
-        if (need_comma) {
-            std::cout << ", ";
-        }
-        std::cout << "wrong permissions " << FileModeInt(m_file_status.getModeBits());
-        need_comma = true;
+        std::cout << maybeComma() << "wrong permissions " << FileModeInt(m_file_status.getModeBits());
     }
 
     if (m_need_fix_caps) {
-        if (need_comma) {
-            std::cout << ", ";
-        }
+        std::cout << maybeComma();
 
         if (m_caps.hasCaps()) {
             std::cout << "wrong capabilities \"" << m_caps.toText() << "\"";
         } else {
             std::cout << "missing capabilities";
+        }
+    }
+
+    if (m_need_fix_acl) {
+        std::cout << maybeComma();
+
+        if (m_acl.isExtendedACL()) {
+            std::cout << "wrong ACL \"" << m_acl.toText() << "\"";
+        } else {
+            std::cout << "missing ACL";
         }
     }
 
@@ -408,6 +432,13 @@ bool EntryProcessor::applyChanges() const {
             }
         } else {
             std::cerr << m_path << ": cannot set capabilities: not a regular file" << std::endl;
+            ret = false;
+        }
+    }
+
+    if (m_need_fix_acl) {
+        if (!m_entry.acl.applyToFile(m_safe_path)) {
+            std::cerr << m_path << ": failed to set ACL: " << std::strerror(errno) << std::endl;
             ret = false;
         }
     }
