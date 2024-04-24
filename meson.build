@@ -43,6 +43,24 @@ executable('permctl', [
   install: true
 )
 
+a2x = find_program('a2x', required: false)
+
+if a2x.found()
+  man5 = custom_target('man_permissions',
+    output: 'permissions.5',
+    input: 'man/permissions.adoc',
+    command: [a2x, '-f', 'manpage', '@INPUT@'])
+
+  man8 = custom_target('man_permctl',
+    output: 'permctl.8',
+    input: 'man/permctl.adoc',
+    command: [a2x, '-f', 'manpage', '@INPUT@'])
+
+  alias_target('generate-man', man5, man8)
+else
+  message('No "a2x" program found. Install asciidoc for being able to generate man pages')
+endif
+
 # backward compatibility symlink
 install_symlink('chkstat', pointing_to: 'permctl', install_dir: 'bin')
 install_man('man/permctl.8')

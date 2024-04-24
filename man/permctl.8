@@ -1,104 +1,144 @@
+'\" t
+.\"     Title: permctl
+.\"    Author: [see the "AUTHORS" section]
+.\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
+.\"      Date: 04/24/2024
+.\"    Manual: \ \&
+.\"    Source: \ \&
+.\"  Language: English
 .\"
-.\" SUSE man page for permctl
-.\"
-.\" Author: Ruediger Oertel
-.\"
-.TH PERMCTL 8 "2024-04-23" "SUSE Linux" "Tool to check and set file permissions"
-.\"
-.UC 8
-.SH NAME
-.\"
-permctl \- Tool to check and set file permissions
-.SH SYNOPSIS
-.\"
-.B permctl
-.RB [OPTIONS]
-.B <permission-files...>
-
-.B permctl
-.RB \-\-system
-.RB [OPTIONS]
-.B <files...>
-.\"
-.SH DESCRIPTION
-The program
-.I /usr/bin/permctl
-is a tool to check and set file permissions. It was previously called chkstat,
-but has been renamed to better describe its purpose.
+.TH "PERMCTL" "8" "04/24/2024" "\ \&" "\ \&"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+permctl \- tool to check and set file permissions
+.SH "SYNOPSIS"
+.sp
+\fBpermctl\fR [OPTIONS] <permission\-files\&...>
+.sp
+\fBpermctl\fR \-\-system [OPTIONS] <files\&...>
+.SH "DESCRIPTION"
+.sp
+The program \fI/usr/bin/permctl\fR is a tool to check and set file permissions\&. It was previously called chkstat, but has been renamed to better describe its purpose\&.
+.sp
+permctl can either operate in system mode or on individually specified permission files\&. In system mode, \fI/etc/sysconfig/security\fR determines which level to use and whether to actually apply permission changes\&.
+.SH "OPTIONS"
 .PP
-permctl can either operate in system mode or on individually
-specified permission files. In system mode, \fI/etc/sysconfig/security\fR
-determines which level to use and whether to actually apply
-permission changes.
+\fB\-\-system\fR
+.RS 4
+Run in system mode\&. Parses
+\fI/etc/sysconfig/security\fR
+to determine which security level to use (\fIPERMISSION_SECURITY\fR) and whether to set or merely warn about permission changes (\fICHECK_PERMISSIONS\fR)\&. In system mode non\-option arguments refer to files\&. I\&.e\&. just as if the \-\-examine option was specified for them\&.
+.RE
 .PP
-.\"
-.SS OPTIONS
-.TP
-.IR \-\-system
-Run in system mode. Parses \fI/etc/sysconfig/security\fR to
-determine which security level to use (\fIPERMISSION_SECURITY\fR)
-and whether to set or merely warn about permission changes
-(\fICHECK_PERMISSIONS\fR). In system mode non-option arguments refer
-to files. Ie just as if the \-\-examine option was specified for them.
-.TP
-.IR \-\-set
-Actually apply the file permissions. The default is to check and
-warn only unless in system mode where \fICHECK_PERMISSIONS\fR
-specifies the default behavior.
-.TP
-.IR \-\-warn
-Opposite of --set, ie warn only but don't make actual changes
-.TP
-.IR \-\-noheader
-Omit printing the output header lines.
-.TP
-.IR \-\-fscaps,\ \-\-no\-fscaps
-Enable or disable use of fscaps. In system mode the setting of
-\fIPERMISSIONS_FSCAPS\fR determines whether fscaps are on or off when this
-option is not set.
-.TP
-.IR \-\-examine\ file
-Check permissions for this file instead of all files listed in the permissions files.
-.TP
-.IR \-\-files\ filelist
+\fB\-\-set\fR
+.RS 4
+Actually apply the file permissions\&. The default is to check and warn only, unless in system mode where
+\fICHECK_PERMISSIONS\fR
+specifies the default behavior\&.
+.RE
+.PP
+\fB\-\-warn\fR
+.RS 4
+Opposite of \-\-set, i\&.e\&. warn only but don\(cqt make actual changes
+.RE
+.PP
+\fB\-\-noheader\fR
+.RS 4
+Omit printing the output header lines\&.
+.RE
+.PP
+\fB\-\-fscaps, \-\-no\-fscaps\fR
+.RS 4
+Enable or disable use of fscaps\&. In system mode the setting of
+\fIPERMISSIONS_FSCAPS\fR
+determines whether fscaps are on or off when this option is not set\&.
+.RE
+.PP
+\fB\-\-examine <file>\fR
+.RS 4
+Check permissions for this file instead of all files listed in the permissions files\&.
+.RE
+.PP
+\fB\-\-files <filelist\&...>\fR
+.RS 4
 Check permissions for the files listed in
-.IR filelist
-and instead of all files listed in the permissions files.
-.TP
-.IR \-\-root\ directory
-Check files relative to the specified directory.
+\fIfilelist\fR
+instead of all files listed in the permissions files\&.
+.RE
 .PP
+\fB\-\-root <directory>\fR
+.RS 4
+Check files relative to the specified directory\&.
+.RE
 .SH "ENVIRONMENT VARIABLES"
-.B PERMCTL_ALLOW_INSECURE_MODE_IF_NO_PROC
-Allow to operate without mounted /proc filesystem. This is an unsafe mode that must only
-be used in controlled environments where unprivileged users can't influence filesystem
-operation.
 .PP
-.SH EXAMPLES
-.PP
-.B permctl --set /usr/share/permissions/permissions /usr/share/permissions/permissions.secure
-.PP
-parses the files /usr/share/permissions/permissions and
-/usr/share/permissions/permissions and sets the
-access mode and the user- and group memberships for each file listed.
-.PP
-.B permctl --system /bin/ping
-.PP
-Run in system mode and only correct permissions of /bin/ping
-.
+\fBPERMCTL_ALLOW_INSECURE_MODE_IF_NO_PROC\fR
+.RS 4
+Allow to operate without mounted /proc filesystem\&. This is an unsafe mode that must only be used in controlled environments where unprivileged users can\(cqt influence filesystem operation\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+permctl \-\-set /usr/share/permissions/permissions /usr/share/permissions/permissions\&.secure
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Parses the files /usr/share/permissions/permissions and /usr/share/permissions/permissions and sets the access mode and the user\- and group memberships for each file listed\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+permctl \-\-system /bin/ping
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Run in system mode and only correct permissions of /bin/ping\&.
 .SH "SEE ALSO"
 .sp
 permissions(5)
-.
-.SH COPYRIGHT
-1996-2003 SuSE Linux AG, Nuernberg, Germany.
-
-2008-2019 SUSE LINUX Products GmbH
-
-2019-2024 SUSE Software Solutions Germany GmbH
-.SH AUTHORS
+.SH "COPYRIGHT"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+1996\-2003 SuSE Linux AG, Nuernberg, Germany\&.
+2008\-2019 SUSE LINUX Products GmbH
+2019\-2024 SUSE Software Solutions Germany GmbH
+.fi
+.if n \{\
+.RE
+.\}
+.SH "AUTHORS"
+.sp
 Reinhold Sojer, Ruediger Oertel, Michael Schroeder, Ludwig Nussel
-.PP
+.sp
 Useful changes and additions by Tobias Burnus
-.PP
+.sp
 Major refactoring by Matthias Gerstner, Malte Kraus
