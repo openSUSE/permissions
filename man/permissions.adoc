@@ -1,0 +1,108 @@
+PERMISSIONS(5)
+==============
+
+NAME
+----
+permissions - default permission settings
+
+SYNOPSIS
+--------
+The permctl program sets permissions and ownerships of files according to the
+permission configuration files.
+
+DESCRIPTION
+-----------
+
+- The files /usr/share/permissions/permissions.* are line based and space delimited.
+- Lines starting with `'#'` are comments.
+- The first column specifies the file name. Directory names have to end with a slash.
+- The second column specifies the owner and group.
+- The third column specifies the file mode.
+- The special value *+capabilities* in the first column extends the
+  information of the previous line with file capabilites.
+
+The file name in the first column can contain contain variables as defined in
+the __variables.conf__ file. A variable expands to one or more alternative path
+segments that relate to the same program or file. permctl will look in each
+possible path resulting from the variable expansion and apply the permissions
+accordingly.
+
+The variables.conf file will ignore empty lines, whitespace only lines or
+comment lines starting with '#'. All other lines must contain variable
+definitions that follow the syntax **myvar = /path/1 /path/2**.  This
+example will declare a variable identified as `myvar` that will expand to
+both specified path segments.
+
+Path segments appearing in variable assignments need to be separated by
+whitespace characters. The path values cannot contain whitespace themselves.
+The variable identifier is limited to alphanumeric characters and the
+underscore character.
+
+To reference a variable in a permissions file it needs to be dereferenced
+using the `%{myvar}` syntax. The variable needs to appear as a single path
+component and cannot be mixed with other literal characters. Multiple
+variables per path are allowed. The following are valid variable uses:
+
+----
+- %{myvar}/sub/path
+- /parent/path/%{myvar}
+- /parent/path/%{myvar}/sub/path
+- %{var1}/path/%{var2}
+----
+
+While the following are invalid:
+
+----
+- /prefix/pre%{myvar}suf/suffix
+- /%{var}text/path
+- /path/text%{var}
+----
+
+EXAMPLES
+--------
+
+A specification like this:
+
+----
+# in variables.conf
+lib_dirs = /lib /lib64
+sub_dirs = prog_v1 prog_v2
+
+# in a permissions profile
+%{lib_dirs}/%{sub_dirs}/libsomething.so root:root 04755
+----
+
+Will cause permctl to try and apply the given permission to all of the
+following paths:
+
+ /lib/prog_v1/libsomething.so
+ /lib64/prog_v1/libsomething.so
+ /lib/prog_v2/libsomething.so
+ /lib64/prog_v2/libsomething.so
+
+FILES
+-----
+
+ /usr/share/permissions/permissions
+ /usr/share/permissions/permissions.easy
+ /usr/share/permissions/permissions.secure
+ /usr/share/permissions/permissions.paranoid
+ /usr/share/permissions/packages.d/*
+ /usr/share/permissions/permissions.d/* (deprecated)
+ /usr/share/permissions/variables.conf
+ /etc/permissions.local
+
+SEE ALSO
+--------
+
+permctl(8)
+
+AUTHORS
+-------
+
+Written by Ludwig Nussel.
+
+REPORTING BUGS
+--------------
+
+Report bugs to https://bugzilla.suse.com/ or to https://github.com/openSUSE/permissions/.
