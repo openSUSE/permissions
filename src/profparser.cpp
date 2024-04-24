@@ -2,6 +2,19 @@
 #include "profparser.h"
 #include "utility.h"
 
+ProfileEntry::ProfileEntry(const std::string &p_file, const std::string &p_owner,
+            const std::string &p_group, mode_t p_mode) :
+            file(p_file), owner(p_owner), group(p_group), mode(p_mode) {
+    // By default make the ACL equal to the basic mode, this way the ACL
+    // object can be used for assigning ACLs, even if no ACL is configured in
+    // the profile.
+    // This is necessary for being able to remove existing ACL entries in case
+    // none are configured in the profile. A chmod() won't remove existing
+    // ACL entries, we need to explicitly apply a basic ACL to get rid of
+    // them.
+    acl = FileAcl{mode};
+}
+
 void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
     size_t linenr = 0;
     std::string line;
@@ -16,6 +29,7 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
     // # comment
     // <path> <user>:<group> <mode>
     // [+capabilities cap_net_raw=ep]
+    // [+acl user:nobody:rw-,mask::rw-]
 
     while (std::getline(fs, line)) {
         linenr++;
@@ -25,12 +39,8 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
         if (line.empty() || line[0] == '#' || line[0] == '$')
             continue;
 
-        // an extra capability line that belongs to the context of the last profile entry seen.
         if (line[0] == '+') {
-            if (!parseCapabilityLine(line)) {
-                printBadLine("bad capability spec or bad +<keyword>");
-            }
-
+            parseExtraLine(line, printBadLine);
             continue;
         }
 
@@ -61,16 +71,29 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
     }
 }
 
+void ProfileParser::parseExtraLine(const std::string &line, std::function<void(const std::string_view)> printBadLine) {
+        if (m_parse_context.paths.empty()) {
+            std::cerr << "lone +<keyword> line or follow-up parsing error\n";
+            return;
+        }
+
+        // an extra capability line that belongs to the context of the last profile entry seen.
+        if (hasPrefix(line, "+capabilities ")) {
+            if (!parseCapabilityLine(line)) {
+                printBadLine("bad capability spec");
+            }
+        } else if (hasPrefix(line, "+acl ")) {
+            if (!parseAclLine(line)) {
+                printBadLine("bad ACL spec");
+            }
+        } else {
+            printBadLine("bad +<keyword> line");
+        }
+}
+
 bool ProfileParser::parseCapabilityLine(const std::string &line) {
 
-    if (m_parse_context.paths.empty()) {
-        std::cerr << "lone capability line or follow-up parsing error\n";
-        return false;
-    }
-
-    if (!hasPrefix(line, "+capabilities "))
-        return false;
-    else if (!m_use_fscaps)
+    if (!m_use_fscaps)
         // ignore the content
         return true;
 
@@ -93,6 +116,64 @@ bool ProfileParser::parseCapabilityLine(const std::string &line) {
 
         if (!entry.caps.setFromText(cap_text)) {
             ret = false;
+        }
+    }
+
+    return ret;
+}
+
+bool ProfileParser::parseAclLine(const std::string &line) {
+    auto acl_text = line.substr(line.find_first_of(' '));
+    if (acl_text.empty())
+        // ignore empty ACL specification
+        return true;
+
+    bool ret = true;
+
+    for (const auto &path: m_parse_context.paths) {
+        auto it = m_entries.find(fullPath(path));
+        if (it == m_entries.end()) {
+            std::cerr << "No profile entry for path " << path << "???\n";
+            ret = false;
+            continue;
+        }
+
+        auto &entry = it->second;
+
+        if (!entry.acl.setFromText(acl_text)) {
+            std::cerr << "Bad ACL specification or invalid user/group name\n";
+            ret = false;
+            // if this fails once, then it will fail for all other entries as well.
+            break;
+        }
+
+        if (!entry.acl.isExtendedACL()) {
+            // we set a basic ACL entry by default, see ProfileEntry() constructor.
+            std::cerr << "This ACL entry does not contain extended privileges. Permctl does not support this, use the regular octal mode instead\n";
+            ret = false;
+            // see above
+            break;
+        }
+
+        if (!entry.acl.setBasicEntries(m_parse_context.mode)) {
+            std::cerr << "Failed to add basic mode entries to ACL\n";
+            ret = false;
+            // see above
+            break;
+        }
+
+        if (!entry.acl.tryCalcMask()) {
+            std::cerr << "Failed to calculate mask entry for ACL\n";
+            ret = false;
+            // see above
+            break;
+        }
+
+        if (!entry.acl.verify()) {
+            std::cerr << "Resulting ACL failed verification, it has logical errors\n";
+            ret = false;
+            // see above
+            break;
         }
     }
 

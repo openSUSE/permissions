@@ -34,7 +34,7 @@ executable('permctl', [
     'src/utility.cpp',
     'src/varexp.cpp'
   ],
-  dependencies: [dependency('libcap'), dependency('tclap')],
+  dependencies: [dependency('libcap'), dependency('tclap'), dependency('libacl')],
   # link statically against libstdc++. since some people are afraid of ABI
   # changes in this area and since permissions is a base package in SUSE this
   # protects us from such potential breakage at the expense of some increased

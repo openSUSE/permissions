@@ -76,10 +76,24 @@ protected: // functions
 
     /// Based on `m_entry` sets `m_need_fix_*` members as required and returns if any fixing is necessary.
     bool checkNeedsFixing() {
-        m_need_fix_perms = m_file_status.getModeBits() != m_entry.mode;
+        if (m_entry.hasACL()) {
+            // if we are using an ACL then we must not compare the traditional
+            // mode bits. The group bits will be mapped to the ACL mask and
+            // thus no longer correspond to the basic mode configured in the
+            // permissions profile.
+            // also doing a regular chmod() is unnecessary, since the basic
+            // permissions are also contained in the ACL.
+            m_need_fix_perms = false;
+        } else {
+            m_need_fix_perms = m_file_status.getModeBits() != m_entry.mode;
+        }
         m_need_fix_ownership = !m_file_status.matchesOwnership(m_file_uid, m_file_gid);
         m_need_fix_caps = m_entry.caps != m_caps;
-        return m_need_fix_perms || m_need_fix_caps || m_need_fix_ownership;
+        // the right hand check catches the case that no ACL is configured and
+        // the entry contains only a representation of the UNIX base mode.
+        // Nothing needs to be done in this case.
+        m_need_fix_acl = m_acl != m_entry.acl && !(m_acl.isBasicACL() && m_entry.acl.isBasicACL());
+        return m_need_fix_perms || m_need_fix_caps || m_need_fix_ownership || m_need_fix_acl;
     }
 
 protected: // data
@@ -89,10 +103,12 @@ protected: // data
     std::string m_path; ///< The path of the current file to check below a potential m_args.root_path.
     std::string m_safe_path; ///< A path for safely opening the target file (typically in /proc/self/fd/...).
     FileCapabilities m_caps; ///< The actual capabilities found on on the file.
+    FileAcl m_acl; ///< The actual ACL found on the file.
     FileStatus m_file_status; ///< The actual file status info found on the file.
     bool m_need_fix_perms = false; ///< Indicates whether actual file permissions need to be fixed.
     bool m_need_fix_caps = false; ///< Indicates whether actual file capabilities need to be fixed.
     bool m_need_fix_ownership = false; ///< Indicates whether actual file user:group ownership needs to be fixed.
+    bool m_need_fix_acl = false; ///< Indicates whether the actual access ACL needs to be fixed.
     bool m_traversed_insecure = false; ///< An insecure ownership constellation was detected in the file's path.
     FileDesc m_fd; ///< An `O_PATH` file descriptor for the target file which is set in safeOpen().
 
