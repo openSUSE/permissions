@@ -2,10 +2,15 @@ project('permissions', 'cpp',
   license: 'gpl2',
   default_options: ['buildtype=debugoptimized', 'cpp_std=c++17', 'warning_level=3', 'werror=true'])
 
+is_gcc = meson.get_compiler('cpp').get_id() == 'gcc'
 
-foreach warning: [ 'duplicated-cond', 'duplicated-branches',
-    'logical-op', 'null-dereference', 'double-promotion', 'shadow',  'format=2',
-    'sign-conversion']
+warnings = ['null-dereference', 'double-promotion', 'shadow',  'format=2', 'sign-conversion']
+
+if is_gcc
+  warnings += ['duplicated-cond', 'duplicated-branches', 'logical-op']
+endif
+
+foreach warning: warnings
   add_global_arguments('-W' + warning, language: 'cpp')
 endforeach
 
