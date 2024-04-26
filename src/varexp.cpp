@@ -20,8 +20,8 @@ void VariableExpansions::load(const std::string &root) {
     size_t linenr = 0;
     std::string line;
 
-    auto printBadLine = [conf_path, line](const std::string_view context) {
-        std::cerr << conf_path << ":" << line <<
+    auto printBadLine = [conf_path, linenr](const std::string_view context) {
+        std::cerr << conf_path << ":" << linenr <<
             ": syntax error in variable configuration (" << context << ")" << std::endl;
     };
 
