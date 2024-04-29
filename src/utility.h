@@ -380,7 +380,7 @@ protected: // data
 class FileAcl {
 public:
     /// Creates an invalid ACL.
-    FileAcl() = default;
+    FileAcl();
 
     /// Creates an ACL corresponding to the given mode.
     FileAcl(mode_t mode);
@@ -388,11 +388,9 @@ public:
     FileAcl(const FileAcl &other) = delete;
     FileAcl& operator=(const FileAcl &other) = delete;
 
-    FileAcl(FileAcl &&other) {
+    FileAcl(FileAcl &&other) : FileAcl{} {
         *this = std::move(other);
     }
-
-    ~FileAcl();
 
     /// This parses the ACL from a short or long format ACL string.
     /**
@@ -465,7 +463,7 @@ public:
     bool verify() const;
 
     /// Returns whether an ACL data structure is allocated in the object.
-    bool valid() const { return m_acl != nullptr; }
+    bool valid() const { return static_cast<bool>(m_acl); }
 
     /// This checks whether the current ACL data only contains user/group/world base modes.
     /**
@@ -483,8 +481,7 @@ public:
         // steal the rvalue's list so we take over ownership, while
         // the other doesn't free them during destruction. This allows to keep
         // this non-copyable type in containers.
-        m_acl = other.m_acl;
-        other.m_acl = nullptr;
+        m_acl = std::move(other.m_acl);
         return *this;
     }
 
@@ -502,14 +499,18 @@ public:
 
 protected: // functions
 
-    /// Frees any memory, if necessary, rendering the object `!valid()`.
-    void free();
+    acl_t raw() { return m_acl.get(); }
 
-    acl_t raw() { return m_acl; }
+    void checkForRealloc(acl_t ptr);
+
+protected: // types
+
+    // acl_t is a typedef'd pointer type, unique_ptr expects the value type; this is it.
+    using AclT = std::remove_pointer<acl_t>::type;
 
 protected: // data
 
-    acl_t m_acl = nullptr;
+    std::unique_ptr<AclT, int (*)(void*)> m_acl;
 };
 
 // vim: et ts=4 sts=4 sw=4 :
