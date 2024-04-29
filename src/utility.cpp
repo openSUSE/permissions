@@ -127,37 +127,28 @@ bool FileCapabilities::applyToFD(int fd) const {
     return true;
 }
 
-FileAcl::FileAcl(mode_t mode) {
-    m_acl = acl_from_mode(mode);
+FileAcl::FileAcl() :
+        m_acl{nullptr, ::acl_free} {
 }
 
-FileAcl::~FileAcl() {
-    free();
-}
-
-void FileAcl::free() {
-    if (m_acl) {
-        acl_free(m_acl);
-        m_acl = nullptr;
-    }
+FileAcl::FileAcl(mode_t mode) :
+        m_acl{::acl_from_mode(mode), ::acl_free} {
 }
 
 bool FileAcl::setFromText(const std::string &text) {
-    free();
-    m_acl = acl_from_text(text.c_str());
+    m_acl.reset(::acl_from_text(text.c_str()));
 
     return valid();
 }
 
 bool FileAcl::setFromFile(const std::string &path) {
-    free();
-    m_acl = acl_get_file(path.c_str(), ACL_TYPE_ACCESS);
+    m_acl.reset(::acl_get_file(path.c_str(), ACL_TYPE_ACCESS));
 
     return valid();
 }
 
 bool FileAcl::applyToFile(const std::string &path) const {
-    return acl_set_file(path.c_str(), ACL_TYPE_ACCESS, m_acl) == 0;
+    return ::acl_set_file(path.c_str(), ACL_TYPE_ACCESS, m_acl.get()) == 0;
 }
 
 bool FileAcl::setBasicEntries(mode_t mode) {
@@ -172,35 +163,53 @@ bool FileAcl::setBasicEntries(mode_t mode) {
         return false;
 
     acl_entry_t entry;
-    if (acl_get_entry(basic.raw(), ACL_FIRST_ENTRY, &entry) != 1)
+    if (::acl_get_entry(basic.raw(), ACL_FIRST_ENTRY, &entry) != 1)
         return false;
 
     do {
         acl_entry_t new_entry;
-        if (acl_create_entry(&m_acl, &new_entry) != 0)
+        auto ptr = raw();
+        if (::acl_create_entry(&ptr, &new_entry) != 0)
             return false;
-        if (acl_copy_entry(new_entry, entry) != 0)
+        checkForRealloc(ptr);
+        if (::acl_copy_entry(new_entry, entry) != 0)
             return false;
-    } while (acl_get_entry(basic.raw(), ACL_NEXT_ENTRY, &entry) == 1);
+    } while (::acl_get_entry(basic.raw(), ACL_NEXT_ENTRY, &entry) == 1);
 
     return true;
 }
 
 bool FileAcl::tryCalcMask() {
-    return acl_calc_mask(&m_acl) == 0;
+    auto ptr = raw();
+    const auto ret = ::acl_calc_mask(&ptr) == 0;
+
+    checkForRealloc(ptr);
+
+    return ret;
+}
+
+void FileAcl::checkForRealloc(acl_t ptr) {
+    // some libacl functions take a pointer to pointer (acl_t*), because they
+    // may realloc the pointed-to memory as a side effect.
+    // in this case we must reflect the change in our managed m_acl
+    // unique_ptr.
+    if (ptr != m_acl.get()) {
+        m_acl.release();
+        m_acl.reset(ptr);
+    }
 }
 
 bool FileAcl::verify() const {
-    return acl_valid(m_acl) == 0;
+    return ::acl_valid(m_acl.get()) == 0;
 }
 
 std::string FileAcl::toText() const {
     if (!valid())
         return "";
 
-    auto text = acl_to_any_text(m_acl, nullptr, ' ', 0);
+    auto text = ::acl_to_any_text(m_acl.get(), nullptr, ' ', 0);
     std::string ret{text};
-    acl_free(text);
+    ::acl_free(text);
     return ret;
 }
 
@@ -209,7 +218,7 @@ bool FileAcl::isBasicACL() const {
         // what to do here? would require an exception, actually
         return true;
 
-    return acl_equiv_mode(m_acl, nullptr) == 0;
+    return ::acl_equiv_mode(m_acl.get(), nullptr) == 0;
 }
 
 bool FileAcl::operator==(const FileAcl &other) const {
@@ -218,7 +227,7 @@ bool FileAcl::operator==(const FileAcl &other) const {
     else if (!valid() && !other.valid())
         return true;
 
-    return acl_cmp(m_acl, other.m_acl) == 0;
+    return ::acl_cmp(m_acl.get(), other.m_acl.get()) == 0;
 }
 
 // vim: et ts=4 sts=4 sw=4 :
