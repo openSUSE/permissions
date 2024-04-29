@@ -103,7 +103,7 @@ protected: // functions
     /// Returns the full path for `path` considering any configured root path
     std::string fullPath(const std::string &path) const;
 
-    void printBadLine(const std::string_view text) const;
+    void printDiagnostic(const std::string_view text) const;
 
 protected: // data
 
