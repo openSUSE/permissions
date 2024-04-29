@@ -72,7 +72,7 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
 }
 
 void ProfileParser::parseExtraLine(const std::string &line, std::function<void(const std::string_view)> printBadLine) {
-        if (m_parse_context.paths.empty()) {
+        if (m_parse_context.paths.empty() || m_active_entries.empty()) {
             std::cerr << "lone +<keyword> line or follow-up parsing error\n";
             return;
         }
@@ -102,24 +102,19 @@ bool ProfileParser::parseCapabilityLine(const std::string &line) {
         // ignore empty capability specification
         return true;
 
-    bool ret = true;
+    FileCapabilities caps;
 
-    for (const auto &path: m_parse_context.paths) {
-        auto it = m_entries.find(fullPath(path));
-        if (it == m_entries.end()) {
-            std::cerr << "No profile entry for path " << path << "???";
-            ret = false;
-            continue;
-        }
-
-        auto &entry = it->second;
-
-        if (!entry.caps.setFromText(cap_text)) {
-            ret = false;
-        }
+    if (!caps.setFromText(cap_text)) {
+        std::cerr << "Failed to parse capability string: " << caps.lastErrorText() << std::endl;
+        return false;
     }
 
-    return ret;
+    for (auto it: m_active_entries) {
+        auto &entry = it->second;
+        entry.caps = caps.copy();
+    }
+
+    return true;
 }
 
 bool ProfileParser::parseAclLine(const std::string &line) {
@@ -128,68 +123,56 @@ bool ProfileParser::parseAclLine(const std::string &line) {
         // ignore empty ACL specification
         return true;
 
-    bool ret = true;
+    FileAcl acl;
 
-    for (const auto &path: m_parse_context.paths) {
-        auto it = m_entries.find(fullPath(path));
-        if (it == m_entries.end()) {
-            std::cerr << "No profile entry for path " << path << "???\n";
-            ret = false;
-            continue;
-        }
-
-        auto &entry = it->second;
-
-        if (!entry.acl.setFromText(acl_text)) {
-            std::cerr << "Bad ACL specification or invalid user/group name\n";
-            ret = false;
-            // if this fails once, then it will fail for all other entries as well.
-            break;
-        }
-
-        if (!entry.acl.isExtendedACL()) {
-            // we set a basic ACL entry by default, see ProfileEntry() constructor.
-            std::cerr << "This ACL entry does not contain extended privileges. Permctl does not support this, use the regular octal mode instead\n";
-            ret = false;
-            // see above
-            break;
-        }
-
-        if (!entry.acl.setBasicEntries(m_parse_context.mode)) {
-            std::cerr << "Failed to add basic mode entries to ACL\n";
-            ret = false;
-            // see above
-            break;
-        }
-
-        if (!entry.acl.tryCalcMask()) {
-            std::cerr << "Failed to calculate mask entry for ACL\n";
-            ret = false;
-            // see above
-            break;
-        }
-
-        if (!entry.acl.verify()) {
-            std::cerr << "Resulting ACL failed verification, it has logical errors\n";
-            ret = false;
-            // see above
-            break;
-        }
+    if (!acl.setFromText(acl_text)) {
+        std::cerr << "Bad ACL specification or invalid user/group name\n";
+        return false;
     }
 
-    return ret;
+    if (!acl.isExtendedACL()) {
+        // we set a basic ACL entry by default, see ProfileEntry() constructor.
+        std::cerr << "This ACL entry does not contain extended privileges. Permctl does not support this, this ACL will be ignored\n";
+        return false;
+    }
+
+    if (!acl.setBasicEntries(m_parse_context.mode)) {
+        std::cerr << "Failed to add basic mode entries to ACL\n";
+        return false;
+    }
+
+    if (!acl.tryCalcMask()) {
+        std::cerr << "Failed to calculate mask entry for ACL\n";
+        return false;
+    }
+
+    if (!acl.verify()) {
+        std::cerr << "Resulting ACL failed verification, it has logical errors\n";
+        return false;
+    }
+
+    for (auto it: m_active_entries) {
+        auto &entry = it->second;
+        entry.acl = acl.copy();
+    }
+
+    return true;
 }
 
 void ProfileParser::addCurrentEntries() {
+    m_active_entries.clear();
+
     for (auto path: m_parse_context.paths) {
         path = fullPath(path);
 
         // this overwrites a possibly already existing entry
         // this is intended behaviour, hence the order in which profiles are
         // applied is important
-        m_entries[path] = ProfileEntry{
+        auto res = m_entries.insert_or_assign(path, ProfileEntry{
                 path, m_parse_context.user,
-                m_parse_context.group, m_parse_context.mode};
+                m_parse_context.group, m_parse_context.mode});
+
+        m_active_entries.push_back(res.first);
     }
 }
 

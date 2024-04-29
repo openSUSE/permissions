@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <vector>
 
 /// Represents a single permissions profile entry.
 struct ProfileEntry {
@@ -129,8 +130,11 @@ protected: // data
         }
     } m_parse_context;
 
+    using ProfileEntryMap = std::map<std::string, ProfileEntry>;
     /// A mapping of file paths to ProfileEntry, denotes the entry to apply for each path.
-    std::map<std::string, ProfileEntry> m_entries;
+    ProfileEntryMap m_entries;
+    /// The currently active profile entries to consider for extra lines appearing in a profile.
+    std::vector<ProfileEntryMap::iterator> m_active_entries;
 };
 
 // vim: et ts=4 sts=4 sw=4 :
