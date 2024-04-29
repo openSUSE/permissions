@@ -16,13 +16,10 @@ ProfileEntry::ProfileEntry(const std::string &p_file, const std::string &p_owner
 }
 
 void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
-    size_t linenr = 0;
     std::string line;
     std::vector<std::string> parts;
 
-    auto printBadLine = [path, linenr](const std::string_view context) {
-        std::cerr << path << ":" << linenr << ": syntax error in permissions profile (" << context << ")" << std::endl;
-    };
+    m_parse_context.init(path);
 
     // we're parsing lines of the following format here:
     //
@@ -32,7 +29,7 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
     // [+acl user:nobody:rw-,mask::rw-]
 
     while (std::getline(fs, line)) {
-        linenr++;
+        m_parse_context.linenr++;
         strip(line);
 
         // don't know exactly why the dollar is also ignored, probably some dark legacy.
@@ -40,7 +37,7 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
             continue;
 
         if (line[0] == '+') {
-            parseExtraLine(line, printBadLine);
+            parseExtraLine(line);
             continue;
         }
 
@@ -71,7 +68,7 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
     }
 }
 
-void ProfileParser::parseExtraLine(const std::string &line, std::function<void(const std::string_view)> printBadLine) {
+void ProfileParser::parseExtraLine(const std::string &line) {
         if (m_parse_context.paths.empty() || m_active_entries.empty()) {
             std::cerr << "lone +<keyword> line or follow-up parsing error\n";
             return;
@@ -212,6 +209,11 @@ std::string ProfileParser::fullPath(const std::string &path) const {
         return path;
 
     return root + '/' + path;
+}
+
+void ProfileParser::printBadLine(const std::string_view text) const {
+    std::cerr << m_parse_context.profile << ":" << m_parse_context.linenr << ": "
+        << "error in permissions profile: " << text << "\n";
 }
 
 // vim: et ts=4 sts=4 sw=4 :

@@ -73,7 +73,7 @@ public: // functions
 protected: // functions
 
     /// Parses an extra "+<keyword>" line encountered in a permission profile.
-    void parseExtraLine(const std::string &line, std::function<void(const std::string_view)> printBadLine);
+    void parseExtraLine(const std::string &line);
 
     /// Parses extra "+capabilities" lines in permission profiles.
     /**
@@ -103,6 +103,8 @@ protected: // functions
     /// Returns the full path for `path` considering any configured root path
     std::string fullPath(const std::string &path) const;
 
+    void printBadLine(const std::string_view text) const;
+
 protected: // data
 
     /// Whether to touch file based capabilities.
@@ -121,12 +123,19 @@ protected: // data
         std::string group;
         mode_t mode;
         std::vector<std::string> paths;
+        std::string profile;
+        size_t linenr;
 
         void clear() {
             user.clear();
             group.clear();
             paths.clear();
             mode = 0;
+        }
+
+        void init(const std::string &p_profile) {
+            profile = p_profile;
+            linenr = 0;
         }
     } m_parse_context;
 
