@@ -1164,6 +1164,8 @@ class TestBase:
 
         for line in output:
 
+            self._checkForASANErrors(line)
+
             for path in paths:
 
                 if not line.startswith(path):
@@ -1181,3 +1183,8 @@ class TestBase:
                 break
 
         return ret
+
+    def _checkForASANErrors(self, line):
+        if line.find("LeakSanitizer: detected memory leaks") != -1:
+            self.printError("ASAN found memory leaks!")
+            self.m_errors += 1
