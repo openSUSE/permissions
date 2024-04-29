@@ -15,8 +15,10 @@
 #include <cctype>
 #include <cstring>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 /// `isspace()` has overloads which gives trouble with template argument deduction, therefore provide a wrapper.
@@ -268,11 +270,10 @@ public:
 class FileCapabilities {
 public:
 
-    explicit FileCapabilities() {}
+    FileCapabilities();
 
-    ~FileCapabilities();
-
-    FileCapabilities(FileCapabilities &&other) {
+    FileCapabilities(FileCapabilities &&other) :
+            FileCapabilities{} {
         *this = std::move(other);
     }
 
@@ -283,8 +284,7 @@ public:
         // steal the rvalue's caps so we take over ownership, while
         // the other doesn't free them during destruction. This allows to keep
         // this non-copyable type in containers.
-        m_caps = other.m_caps;
-        other.invalidate();
+        m_caps = std::move(other.m_caps);
         return *this;
     }
 
@@ -293,12 +293,9 @@ public:
         return !(*this == other);
     }
 
-    bool hasCaps() const { return m_caps != nullptr; }
+    bool hasCaps() const { return static_cast<bool>(m_caps); }
 
-    /// Explicitly free and invalidate() the currently stored capabilities.
-    void destroy();
-
-    cap_t raw() { return m_caps; }
+    cap_t raw() { return m_caps.get(); }
 
     /// Set new capability data from a textual representation.
     /**
@@ -326,14 +323,15 @@ public:
     /// Returns a human readable error text for the last error during setFromFile().
     std::string lastErrorText() const;
 
-protected: // functions
+protected: // types
 
-    void invalidate() { m_caps = nullptr; }
+    // cap_t is a typedef'd pointer type, unique_ptr expects the value type; this is it.
+    using CapT = std::remove_pointer<cap_t>::type;
 
 protected: // data
 
-     cap_t m_caps = nullptr;
-     int m_last_errno = 0;
+    std::unique_ptr<CapT, int (*)(void*)> m_caps;
+    int m_last_errno = 0;
 };
 
 /// A wrapper around the `acl_t` type from the libacl library which deals with the POSIX access control list extension.

@@ -57,8 +57,9 @@ std::string FileDesc::path() const {
     return linkpath;
 }
 
-FileCapabilities::~FileCapabilities() {
-    destroy();
+FileCapabilities::FileCapabilities() :
+        m_caps{nullptr, ::cap_free} {
+
 }
 
 bool FileCapabilities::operator==(const FileCapabilities &other) const {
@@ -71,24 +72,11 @@ bool FileCapabilities::operator==(const FileCapabilities &other) const {
         return false;
 
     // otherwise ask the lib
-    return cap_compare(m_caps, other.m_caps) == 0;
-}
-
-void FileCapabilities::destroy() {
-    if (!hasCaps())
-        return;
-
-    if (cap_free(m_caps) != 0) {
-        std::cerr << "Freeing file capabilities: " << strerror(errno) << std::endl;
-    }
-
-    invalidate();
+    return ::cap_compare(m_caps.get(), other.m_caps.get()) == 0;
 }
 
 bool FileCapabilities::setFromText(const std::string &text) {
-    destroy();
-
-    m_caps = cap_from_text(text.c_str());
+    m_caps.reset(::cap_from_text(text.c_str()));
 
     return hasCaps();
 }
@@ -97,22 +85,20 @@ std::string FileCapabilities::toText() const {
     if (!hasCaps())
         return "";
 
-    auto text = cap_to_text(m_caps, nullptr);
+    auto text = ::cap_to_text(m_caps.get(), nullptr);
 
     if (!text)
         return "";
 
     auto ret = std::string(text);
 
-    cap_free(text);
+    ::cap_free(text);
 
     return ret;
 }
 
 bool FileCapabilities::setFromFile(const std::string &path) {
-    destroy();
-
-    m_caps = cap_get_file(path.c_str());
+    m_caps.reset(::cap_get_file(path.c_str()));
 
     m_last_errno = m_caps ? 0 : errno;
 
@@ -134,7 +120,7 @@ std::string FileCapabilities::lastErrorText() const {
 }
 
 bool FileCapabilities::applyToFD(int fd) const {
-    if (cap_set_fd(fd, m_caps) != 0) {
+    if (::cap_set_fd(fd, m_caps.get()) != 0) {
         return false;
     }
 
