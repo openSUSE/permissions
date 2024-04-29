@@ -94,6 +94,10 @@ bool ProfileParser::parseCapabilityLine(const std::string &line) {
         // ignore the content
         return true;
 
+    if ((m_active_entries[0]->second).caps.hasCaps()) {
+        printBadLine("Warning: multiple +capabilities lines encountered. Overriding previous settings");
+    }
+
     auto cap_text = line.substr(line.find_first_of(' '));
     if (cap_text.empty())
         // ignore empty capability specification
@@ -119,6 +123,10 @@ bool ProfileParser::parseAclLine(const std::string &line) {
     if (acl_text.empty())
         // ignore empty ACL specification
         return true;
+
+    if ((m_active_entries[0]->second).acl.isExtendedACL()) {
+        printBadLine("Warning: multiple +acl lines encountered. Overriding previous settings");
+    }
 
     FileAcl acl;
 
