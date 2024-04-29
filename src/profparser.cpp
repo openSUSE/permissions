@@ -49,18 +49,18 @@ void ProfileParser::parse(const std::string &path, std::ifstream &fs) {
         splitWords(line, parts);
 
         if (parts.size() != 3) {
-            printBadLine("invalid number of whitespace separated words");
+            printDiagnostic("invalid number of whitespace separated words");
             continue;
         }
 
         if (!parseOwnership(parts[1])) {
-            printBadLine("bad user:group specification");
+            printDiagnostic("bad user:group specification");
             continue;
         } else if (!parseMode(parts[2])) {
-            printBadLine("bad mode specification");
+            printDiagnostic("bad mode specification");
             continue;
         } else if (!m_expansions.expandPath(parts[0], m_parse_context.paths)) {
-            printBadLine("bad variable expansions");
+            printDiagnostic("bad variable expansions");
             continue;
         }
 
@@ -77,14 +77,14 @@ void ProfileParser::parseExtraLine(const std::string &line) {
         // an extra capability line that belongs to the context of the last profile entry seen.
         if (hasPrefix(line, "+capabilities ")) {
             if (!parseCapabilityLine(line)) {
-                printBadLine("bad capability spec");
+                printDiagnostic("bad capability spec");
             }
         } else if (hasPrefix(line, "+acl ")) {
             if (!parseAclLine(line)) {
-                printBadLine("bad ACL spec");
+                printDiagnostic("bad ACL spec");
             }
         } else {
-            printBadLine("bad +<keyword> line");
+            printDiagnostic("bad +<keyword> line");
         }
 }
 
@@ -95,7 +95,7 @@ bool ProfileParser::parseCapabilityLine(const std::string &line) {
         return true;
 
     if ((m_active_entries[0]->second).caps.hasCaps()) {
-        printBadLine("Warning: multiple +capabilities lines encountered. Overriding previous settings");
+        printDiagnostic("Warning: multiple +capabilities lines encountered. Overriding previous settings");
     }
 
     auto cap_text = line.substr(line.find_first_of(' '));
@@ -125,7 +125,7 @@ bool ProfileParser::parseAclLine(const std::string &line) {
         return true;
 
     if ((m_active_entries[0]->second).acl.isExtendedACL()) {
-        printBadLine("Warning: multiple +acl lines encountered. Overriding previous settings");
+        printDiagnostic("Warning: multiple +acl lines encountered. Overriding previous settings");
     }
 
     FileAcl acl;
@@ -219,9 +219,8 @@ std::string ProfileParser::fullPath(const std::string &path) const {
     return root + '/' + path;
 }
 
-void ProfileParser::printBadLine(const std::string_view text) const {
-    std::cerr << m_parse_context.profile << ":" << m_parse_context.linenr << ": "
-        << "error in permissions profile: " << text << "\n";
+void ProfileParser::printDiagnostic(const std::string_view text) const {
+    std::cerr << m_parse_context.profile << ":" << m_parse_context.linenr << ": " << text << "\n";
 }
 
 // vim: et ts=4 sts=4 sw=4 :
