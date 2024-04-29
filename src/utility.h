@@ -270,7 +270,9 @@ public:
 class FileCapabilities {
 public:
 
-    FileCapabilities();
+    FileCapabilities() :
+            FileCapabilities{nullptr} {
+    }
 
     FileCapabilities(FileCapabilities &&other) :
             FileCapabilities{} {
@@ -292,6 +294,8 @@ public:
     bool operator!=(const FileCapabilities &other) const {
         return !(*this == other);
     }
+
+    FileCapabilities copy() const;
 
     bool hasCaps() const { return static_cast<bool>(m_caps); }
 
@@ -322,6 +326,10 @@ public:
 
     /// Returns a human readable error text for the last error during setFromFile().
     std::string lastErrorText() const;
+
+protected: // functions
+
+    explicit FileCapabilities(cap_t raw);
 
 protected: // types
 
@@ -380,7 +388,9 @@ protected: // data
 class FileAcl {
 public:
     /// Creates an invalid ACL.
-    FileAcl();
+    FileAcl() :
+            FileAcl{nullptr} {
+    }
 
     /// Creates an ACL corresponding to the given mode.
     FileAcl(mode_t mode);
@@ -391,6 +401,15 @@ public:
     FileAcl(FileAcl &&other) : FileAcl{} {
         *this = std::move(other);
     }
+
+    /// Return an explicit deep copy of the current ACL.
+    /**
+     * FileAcl is a move only type, but some situations may require an
+     * explicit deep copy. This function performs this operation. Check
+     * whether the returned object is valid(), since the copy operation can
+     * also fail.
+     **/
+    FileAcl copy() const;
 
     /// This parses the ACL from a short or long format ACL string.
     /**
@@ -498,6 +517,8 @@ public:
     }
 
 protected: // functions
+
+    explicit FileAcl(acl_t raw);
 
     acl_t raw() { return m_acl.get(); }
 

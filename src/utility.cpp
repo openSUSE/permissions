@@ -57,9 +57,8 @@ std::string FileDesc::path() const {
     return linkpath;
 }
 
-FileCapabilities::FileCapabilities() :
-        m_caps{nullptr, ::cap_free} {
-
+FileCapabilities::FileCapabilities(cap_t raw) :
+        m_caps{raw, ::cap_free} {
 }
 
 bool FileCapabilities::operator==(const FileCapabilities &other) const {
@@ -75,10 +74,19 @@ bool FileCapabilities::operator==(const FileCapabilities &other) const {
     return ::cap_compare(m_caps.get(), other.m_caps.get()) == 0;
 }
 
+FileCapabilities FileCapabilities::copy() const {
+    return FileCapabilities{::cap_dup(m_caps.get())};
+}
+
 bool FileCapabilities::setFromText(const std::string &text) {
     m_caps.reset(::cap_from_text(text.c_str()));
 
-    return hasCaps();
+    if (!hasCaps()) {
+        m_last_errno = errno;
+        return false;
+    }
+
+    return true;
 }
 
 std::string FileCapabilities::toText() const {
@@ -127,12 +135,16 @@ bool FileCapabilities::applyToFD(int fd) const {
     return true;
 }
 
-FileAcl::FileAcl() :
-        m_acl{nullptr, ::acl_free} {
-}
-
 FileAcl::FileAcl(mode_t mode) :
         m_acl{::acl_from_mode(mode), ::acl_free} {
+}
+
+FileAcl::FileAcl(acl_t raw) :
+        m_acl{raw, ::acl_free} {
+}
+
+FileAcl FileAcl::copy() const {
+    return FileAcl{::acl_dup(const_cast<acl_t>(m_acl.get()))};
 }
 
 bool FileAcl::setFromText(const std::string &text) {
