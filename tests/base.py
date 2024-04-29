@@ -180,7 +180,7 @@ class PermctlRegtest:
             help="Build a more debug friendly version of permctl to make tracking down bugs in `gdb` easier"
         )
 
-        self.m_parser.add_argument('buildtree', default='build',
+        self.m_parser.add_argument('buildtree', default='build-regtest',
            help="The meson build tree to use.", nargs='?')
 
         self.m_parser.add_argument(
