@@ -912,7 +912,7 @@ class TestBase:
                 for line in lines:
                     profile_file.write(line + "\n")
 
-    def buildProfileLine(self, path, mode, owner="root", group="root", caps=[]):
+    def buildProfileLine(self, path, mode, owner="root", group="root", caps=[], acl=[]):
         ret = "{} {}:{} {}".format(
             path, owner, group,
             format(mode, '04o')
@@ -920,6 +920,9 @@ class TestBase:
 
         if caps:
             ret += "\n +capabilities {}".format(','.join(caps))
+
+        if acl:
+            ret += "\n +acl {}".format(','.join(acl if isinstance(acl, list) else [acl]))
 
         return ret
 
@@ -1104,6 +1107,53 @@ class TestBase:
             self.printError(path, "doesn't have expected capabilities '{}' but '{}' instead".format(
                 expected_caps, actual_caps
             ))
+
+    def getACLEntries(self, path):
+        """Returns a list of all extended ACL entries."""
+
+        getfacl = shutil.which("getfacl")
+
+        if not getfacl:
+            self.printWarning(
+                "Couldn't find `getfacl` utility, can't fully check ACL entries. Run `zypper in acl` to install it."
+            )
+            return []
+
+        getfacl_out = subprocess.check_output(
+            [getfacl, "-s", "-c", path],
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            shell=False,
+        )
+
+        entries = []
+
+        for line in getfacl_out.decode('utf8').splitlines():
+            line = line.strip()
+
+            if line.find('::') != -1:
+                # skip any basic and mask entries like user::rwx
+                continue
+
+            if len(line.split(':')) != 3:
+                # skip anything unexpected, we are looking for <type>:<name>:<perm> tuples
+                continue
+
+            entries.append(line)
+
+        return entries
+
+    def addACLEntries(self, path, perms):
+
+        setfacl = shutil.which("setfacl")
+
+        if not setfacl:
+            self.printWarning(
+                "Couldn't find `setfacl` utility, can't fully check ACL entries. Run `zypper in acl` to install it."
+            )
+            return
+
+        subprocess.check_output( [setfacl, '-m', perms, path])
 
     def callPermctl(self, args):
         """Calls permctl passing the given command line arguments. The
