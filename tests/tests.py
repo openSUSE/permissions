@@ -642,6 +642,93 @@ class TestCapabilities(TestBase):
         self.assertNoCaps(testfile)
 
 
+class TestACLs(TestBase):
+
+    def __init__(self):
+
+        super().__init__("checks whether managment of ACLs works as expected")
+
+    def run(self):
+
+        file_missing_acl = "/missing_acl"
+        file_mismatch_acl = "/mismatch_acl"
+        # gets assigned an ACL but is not configured for an ACL -> ACL should
+        # be dropped by permctl
+        file_extra_acl = "/extra_acl"
+        # a basic ACL is configured for this file, which should be rejected
+        file_basic_acl = "/basic_acl"
+        # configuration of multiple ACL entries and capabilities, all should apply correctly
+        file_acl_and_cap = "/acl_plus_cap"
+
+        self.createTestFile(file_missing_acl, 0o755)
+        self.createTestFile(file_mismatch_acl, 0o755)
+        self.addACLEntries(file_mismatch_acl, "user:bin:r-x")
+        self.createTestFile(file_extra_acl, 0o755)
+        self.addACLEntries(file_extra_acl, "user:nobody:rwx")
+        self.createTestFile(file_basic_acl, 0o444)
+        self.createTestFile(file_acl_and_cap, 0o111)
+
+        # just test a single profile, we just want to see whether ACLs work at all
+        profile = "easy"
+
+        entries = {
+                profile: [
+                    self.buildProfileLine(file_missing_acl, 0o444, acl="user:nobody:rwx"),
+                    self.buildProfileLine(file_mismatch_acl, 0o444, acl="user:nobody:rwx"),
+                    self.buildProfileLine(file_extra_acl, 0o444),
+                    self.buildProfileLine(file_basic_acl, 0o755, acl="user::rw-,group::rw-,other::rw-"),
+                    self.buildProfileLine(file_acl_and_cap, 0o444,
+                                          acl=["user:nobody:rw-", "user:bin:--x"],
+                                          caps=["cap_net_admin=ep"])
+                ]
+        }
+
+        self.addProfileEntries(entries)
+
+        self.switchSystemProfile(profile)
+        _, permctl_lines = self.applySystemProfile()
+
+        # we are expecting the group mode to reflect the ACL mask now, which is
+        # 'rwx' due to the user:nobody ACL entry.
+        self.checkACL(file_missing_acl, "missing_acl", "user:nobody:rwx", 0o474)
+        self.checkACL(file_mismatch_acl, "mismatch_acl", "user:nobody:rwx", 0o474)
+        self.checkACL(file_extra_acl, "extra_acl", [], 0o444)
+
+        self.checkACL(file_basic_acl, "basic_acl", [], 0o755)
+        for line in permctl_lines:
+            if line.find("does not contain extended privileges") != -1:
+                print("basic ACL config was properly rejected by permctl")
+                break
+        else:
+            self.printError("basic_acl config was not rejected / diagnosed?")
+
+        self.checkACL(file_acl_and_cap, "acl_plus_cap", ["user:nobody:rw-", "user:bin:--x"], 0o474)
+        self.assertHasCaps(file_acl_and_cap, ["cap_net_admin=ep"])
+
+    def checkACL(self, path, label, entries, mode):
+        if not isinstance(entries, list):
+            entries = [entries]
+        actual_entries = self.getACLEntries(path)
+
+        entries.sort()
+        actual_entries.sort()
+
+        if entries == actual_entries:
+            print(label, ": ACL entries (if any) are as expected", sep='')
+        else:
+            self.printError(label, ": ACL entries are not as expected", sep='')
+            self.printACL(actual_entries)
+
+        if self.getMode(path) != mode:
+            self.printError(label, ": basic mode of file is unexpected", sep='')
+
+
+    def printACL(self, entries):
+        print("found", len(entries), "entries:")
+        for entry in entries:
+            print("-", entry)
+
+
 class TestUnexpectedPathOwner(TestBase):
 
     def __init__(self):
@@ -1380,5 +1467,6 @@ tests = (
     TestSymlinkBehaviour,
     TestSymlinkDirBehaviour,
     TestVariableParsing,
-    TestVariableApplication
+    TestVariableApplication,
+    TestACLs
 )
