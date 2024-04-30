@@ -3,33 +3,43 @@ PERMISSIONS(5)
 
 NAME
 ----
-permissions - default permission settings
+permissions - manage system wide file permission settings
 
 SYNOPSIS
 --------
-The permctl program sets permissions and ownerships of files according to the
-permission configuration files.
+The `permctl(8)` program sets permissions and ownerships of files according to
+the permission configuration files described in this manual page.
 
 DESCRIPTION
 -----------
 
-- The files /usr/share/permissions/permissions.* are line based and space delimited.
-- Lines starting with `'#'` are comments.
-- The first column specifies the file name. Directory names have to end with a slash.
-- The second column specifies the owner and group.
-- The third column specifies the file mode.
-- The special value *+capabilities* in the first column extends the
-  information of the previous line with file capabilites.
+=== File Format
 
-The file name in the first column can contain contain variables as defined in
-the __variables.conf__ file. A variable expands to one or more alternative path
-segments that relate to the same program or file. permctl will look in each
-possible path resulting from the variable expansion and apply the permissions
-accordingly.
+The files /usr/share/permissions/permissions.* are line based and space
+delimited. Lines starting with `'#'` are comments. A file entry consists of a
+line of the format
+
+----
+/path/to/file user:group 0755
+ +capabilities cap_net_admin=ep
+----
+
+- The first column specifies the file name. Directory names must end with a slash.
+- The second column specifies the file owner and group delimited by a `':'` character.
+- The third column specifies the file mode in octal.
+- Basic file entries can be extended by immediately following lines starting
+  with `+capabilities` to grant Linux capabilities to the file. The string
+  specified here must conform to the rules found in __cap_from_text(3)__.
+
+The file name in the first column of the base entry can contain contain
+variables as defined in the __variables.conf__ file. A variable expands to one
+or more alternative path segments that relate to the same program or file.
+permctl will look in each possible path resulting from the variable expansion
+and apply the permissions accordingly.
 
 The variables.conf file will ignore empty lines, whitespace only lines or
-comment lines starting with '#'. All other lines must contain variable
-definitions that follow the syntax **myvar = /path/1 /path/2**.  This
+comment lines starting with `'#'`. All other lines must contain variable
+definitions that follow the syntax **myvar = /path/1 /path/2**. This
 example will declare a variable identified as `myvar` that will expand to
 both specified path segments.
 
@@ -38,10 +48,10 @@ whitespace characters. The path values cannot contain whitespace themselves.
 The variable identifier is limited to alphanumeric characters and the
 underscore character.
 
-To reference a variable in a permissions file it needs to be dereferenced
+To reference a variable in a permissions file, it needs to be dereferenced
 using the `%{myvar}` syntax. The variable needs to appear as a single path
 component and cannot be mixed with other literal characters. Multiple
-variables per path are allowed. The following are valid variable uses:
+variables per path are allowed. The following are valid uses of variables:
 
 ----
 - %{myvar}/sub/path
@@ -58,10 +68,39 @@ While the following are invalid:
 - /path/text%{var}
 ----
 
+=== Configuration File Locations
+
+The `permctl` program, when run in `--system` mode, will assemble a set of
+configuration entries depending on the profiles configured in
+__/etc/sysconfig/security__. The order of files parsed (with increasing
+priority) is as follows:
+
+*/usr/share/permissions/permissions*:: contains fixed entries independent of the active profile.
+*/usr/share/permissions/permissions.<profile>*:: contains the per-profile configuration of files.
+*/usr/share/permissions/packages.d/**:: contains per-package drop-in configuration files, which can also exist in fixed or in different profile variants.
+*/etc/permissions.local*:: contains local per-system extra entries or overrides managed by the system administrator.
+
+=== Available Predefined Profiles
+
+The permissions package ships the following predefines profiles:
+
+*easy*:: security settings targeted towards single user workstations, where
+  the only user is also the administrator. This profile is tailored towards more
+  simplicity (less configuration and authorization requirements) at the possible
+  expense of security in some areas.
+*secure*:: this is a balanced profile for servers or multi-user workstations
+  that contains more secure settings at the expense of additional
+  configuration or authorization requirements in some areas.
+*paranoid*:: this is a profile that disables all `setuid` and `setgid` bits and
+  most capabilities. It is intended for power users that want to add back
+  individual `setuid` bits via the __/etc/permissions.local__ file. This
+  profile is not intended to be used as-is, as it will likely break the system
+  without careful tuning.
+
 EXAMPLES
 --------
 
-A specification like this:
+This is a demonstration of the use of variable expansion:
 
 ----
 # in variables.conf
@@ -72,8 +111,8 @@ sub_dirs = prog_v1 prog_v2
 %{lib_dirs}/%{sub_dirs}/libsomething.so root:root 04755
 ----
 
-Will cause permctl to try and apply the given permission to all of the
-following paths:
+This will cause `permctl `to try and apply the given permission to all of the
+following paths, if existing:
 
  /lib/prog_v1/libsomething.so
  /lib64/prog_v1/libsomething.so
