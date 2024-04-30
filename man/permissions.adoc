@@ -22,14 +22,25 @@ line of the format
 ----
 /path/to/file user:group 0755
  +capabilities cap_net_admin=ep
+ +acl user:somebody:rwx
 ----
 
 - The first column specifies the file name. Directory names must end with a slash.
 - The second column specifies the file owner and group delimited by a `':'` character.
 - The third column specifies the file mode in octal.
-- Basic file entries can be extended by immediately following lines starting
-  with `+capabilities` to grant Linux capabilities to the file. The string
-  specified here must conform to the rules found in __cap_from_text(3)__.
+
+Basic file entries can be extended by immediately following lines starting
+with `+<keyword>`. The following keywords are supported:
+
+*+capabilities*:: grant Linux capabilities to the file. The
+  string specified here must conform to the rules found in __cap_from_text(3)__.
+*+acl*:: grant additional access control list (ACL) entries to the file. The
+  string specified here must conform to the rules found in __acl(5)__ (section
+  ACL TEXT FORMS). The ACL entries will be merged with the basic octal file
+  mode, therefore they must not contain any permissions for the file owner,
+  group or other. If a file has extended ACL entries assigned, but none are
+  configured in the permissions configuration, the extended ACL entries will
+  be removed by `permctl(8)`.
 
 The file name in the first column of the base entry can contain contain
 variables as defined in the __variables.conf__ file. A variable expands to one
