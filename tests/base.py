@@ -736,10 +736,12 @@ class PermctlRegtest:
         print(str(tests_run).rjust(2), "tests run")
         color_printer.setGreen()
         print(str(tests_run - tests_failed).rjust(2), "tests succeeded")
-        color_printer.setRed()
-        print(str(tests_failed).rjust(2), "tests failed")
-        color_printer.setYellow()
-        print(str(tests_warned).rjust(2), "tests had warnings")
+        if tests_failed != 0:
+            color_printer.setRed()
+            print(str(tests_failed).rjust(2), "tests failed")
+        if tests_warned != 0:
+            color_printer.setYellow()
+            print(str(tests_warned).rjust(2), "tests had warnings")
         color_printer.reset()
 
         if tests_failed != 0:
