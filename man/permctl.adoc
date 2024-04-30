@@ -4,7 +4,7 @@ PERMCTL(8)
 NAME
 ----
 
-permctl - tool to check and set file permissions
+permctl - tool to check and set system wide file permissions
 
 SYNOPSIS
 --------
@@ -17,40 +17,44 @@ DESCRIPTION
 -----------
 
 The program __/usr/bin/permctl__ is a tool to check and set file permissions. It
-was previously called chkstat, but has been renamed to better describe its
+was previously called `chkstat`, but has been renamed to better describe its
 purpose.
 
 permctl can either operate in system mode or on individually specified
-permission files. In system mode, __/etc/sysconfig/security__ determines
-which level to use and whether to actually apply permission changes.
+permission files. In system mode, the file __/etc/sysconfig/security__
+determines which profile to use and whether to actually apply permission
+changes.
 
 OPTIONS
 -------
 
 *--system*::
   Run in system mode. Parses __/etc/sysconfig/security__ to
-  determine which security level to use (_PERMISSION_SECURITY_)
+  determine which profile / security level to use (_PERMISSION_SECURITY_)
   and whether to set or merely warn about permission changes
-  (_CHECK_PERMISSIONS_). In system mode non-option arguments refer
-  to files. I.e. just as if the --examine option was specified for them.
+  (_CHECK_PERMISSIONS_). In system mode, any non-option arguments limit the
+  set of files to operate on; i.e. just as if the --examine option was
+  specified for them.
 *--set*::
   Actually apply the file permissions. The default is to check and
-  warn only, unless in system mode where _CHECK_PERMISSIONS_
+  warn only, unless in system mode, where _CHECK_PERMISSIONS_
   specifies the default behavior.
 *--warn*::
-  Opposite of --set, i.e. warn only but don't make actual changes
+  Opposite of --set, i.e. warn only, but don't make actual changes.
 *--noheader*::
-  Omit printing the output header lines.
+  Omit printing the output header lines which describe the configuration files
+  used by permctl.
 *--fscaps, --no-fscaps*::
-  Enable or disable use of fscaps. In system mode the setting of
-  _PERMISSIONS_FSCAPS_ determines whether fscaps are on or off when this
+  Enable or disable use of file based capabilities. In system mode the setting of
+  _PERMISSIONS_FSCAPS_ determines whether capabilities are applied, when this
   option is not set.
-*--examine <file>*::
+*--examine <file...>*::
   Check permissions for this file instead of all files listed in the
-  permissions files.
+  permissions files. Can appear multiple times.
 *--files <filelist...>*::
   Check permissions for the files listed in _filelist_ instead of all files
-  listed in the permissions files.
+  listed in the permissions files. Can appear multiple times. The files must
+  contain the file paths to check, one per line.
 *--root <directory>*::
   Check files relative to the specified directory.
 
@@ -58,9 +62,9 @@ ENVIRONMENT VARIABLES
 ---------------------
 
 *PERMCTL_ALLOW_INSECURE_MODE_IF_NO_PROC*::
-  Allow to operate without mounted /proc filesystem. This is an unsafe mode
+  Allow to operate without mounted /proc file system. This is an unsafe mode
   that must only be used in controlled environments where unprivileged users
-  can't influence filesystem operation.
+  can't influence file system operation.
 
 EXAMPLES
 --------
@@ -70,8 +74,8 @@ permctl --set /usr/share/permissions/permissions /usr/share/permissions/permissi
 ----
 
 Parses the files /usr/share/permissions/permissions and
-/usr/share/permissions/permissions and sets the
-access mode and the user- and group memberships for each file listed.
+/usr/share/permissions/permissions and sets the file permissions for all files
+listed there.
 
 ----
 permctl --system /bin/ping

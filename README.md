@@ -1,15 +1,26 @@
-# SUSE permissions package
+# SUSE permissions Package
 
 This repository contains the source for the SUSE Base:System/permissions
-package. This package provides different permission profiles that can be
-changed during runtime of a SUSE Linux installation. Permissions covered are
-file mode, owner and group as well as capabilities and `setuid` and `setgid`
-bits. Therefore the permission profiles govern an important aspect of system
-security.
+package. This package provides the `permctl` (formerly `chkstat`) utility and
+a set of different file permission profiles. These profiles can be changed by
+administrators of SUSE Linux distributions. The profiles consist of a list of
+privileged file paths whose permissions are managed by the `permctl` program.
+The file permissions that can be configured include:
 
-The different profiles allow to select a base security level and also allow to
-customize settings. See the accompanying man pages for more detailed
-information.
+- the octal file mode, including special mode bits like `setuid`, `setgid` and
+  sticky bits
+- file owner and group
+- Linux capabilities
+- ACL (access control list) entries
+
+Therefore the permission profiles govern an important aspect of system
+security on SUSE distributions. The different profiles allow an administrator
+to select a base security level and also allow to customize settings. See the
+accompanying man pages for more detailed information.
+
+The permissions package is a base package on SUSE Linux distributions and
+`permctl` is also invoked regularly as part of RPM package installations to
+apply special privileges to files.
 
 # Building
 
@@ -26,10 +37,18 @@ this:
     # optional installation
     meson install
 
-# Known limitations
+# Known Limitations
 
-permctl doesn't remove permissions that were removed from the profiles. So if
-an entry is removed like with https://github.com/openSUSE/permissions/pull/100
-there needs to be an update of the package that caries the binary to take
-effect. ATM we don't see this as major problem and also don't have a good way
-to solve this generally. If you you have an idea submits are very welcome.
+`permctl` doesn't recognize when formerly managed files are removed from the
+profiles. So if an entry is removed like in
+<https://github.com/openSUSE/permissions/pull/100>, there needs to be an
+update of the package that carries the binary, to take effect. At the moment
+we don't see this as major problem and also don't have a good way to solve
+this generally. If you have an idea, pull requests are very welcome.
+
+Generally `permctl` is not considered a "monitoring" tool in the sense that it
+detects malicious or haphazard changes to file permissions. Using it to
+restore permissions to known good values is not recommended, since bad
+permissions might already have put the system at risk. Also the root cause for
+bad file permission settings can obscured this way, maybe hiding a deeper
+rooting problem that should be fixed.

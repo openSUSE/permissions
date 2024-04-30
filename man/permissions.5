@@ -2,12 +2,12 @@
 .\"     Title: permissions
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 04/24/2024
+.\"      Date: 04/30/2024
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "PERMISSIONS" "5" "04/24/2024" "\ \&" "\ \&"
+.TH "PERMISSIONS" "5" "04/30/2024" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -28,11 +28,26 @@
 .\" * MAIN CONTENT STARTS HERE *
 .\" -----------------------------------------------------------------
 .SH "NAME"
-permissions \- default permission settings
+permissions \- manage system wide file permission settings
 .SH "SYNOPSIS"
 .sp
-The permctl program sets permissions and ownerships of files according to the permission configuration files\&.
+The permctl(8) program sets permissions and ownerships of files according to the permission configuration files described in this manual page\&.
 .SH "DESCRIPTION"
+.SS "File Format"
+.sp
+The files /usr/share/permissions/permissions\&.* are line based and space delimited\&. Lines starting with \*(Aq#\*(Aq are comments\&. A file entry consists of a line of the format
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+/path/to/file user:group 0755
+ +capabilities cap_net_admin=ep
+ +acl user:somebody:rwx
+.fi
+.if n \{\
+.RE
+.\}
 .sp
 .RS 4
 .ie n \{\
@@ -42,7 +57,7 @@ The permctl program sets permissions and ownerships of files according to the pe
 .sp -1
 .IP \(bu 2.3
 .\}
-The files /usr/share/permissions/permissions\&.* are line based and space delimited\&.
+The first column specifies the file name\&. Directory names must end with a slash\&.
 .RE
 .sp
 .RS 4
@@ -53,9 +68,9 @@ The files /usr/share/permissions/permissions\&.* are line based and space delimi
 .sp -1
 .IP \(bu 2.3
 .\}
-Lines starting with
-\*(Aq#\*(Aq
-are comments\&.
+The second column specifies the file owner and group delimited by a
+\*(Aq:\*(Aq
+character\&.
 .RE
 .sp
 .RS 4
@@ -66,51 +81,32 @@ are comments\&.
 .sp -1
 .IP \(bu 2.3
 .\}
-The first column specifies the file name\&. Directory names have to end with a slash\&.
+The third column specifies the file mode in octal\&.
 .RE
 .sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
-The second column specifies the owner and group\&.
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
-The third column specifies the file mode\&.
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04'\(bu\h'+03'\c
-.\}
-.el \{\
-.sp -1
-.IP \(bu 2.3
-.\}
-The special value
+Basic file entries can be extended by immediately following lines starting with +<keyword>\&. The following keywords are supported:
+.PP
 \fB+capabilities\fR
-in the first column extends the information of the previous line with file capabilites\&.
+.RS 4
+grant Linux capabilities to the file\&. The string specified here must conform to the rules found in
+\fIcap_from_text(3)\fR\&.
+.RE
+.PP
+\fB+acl\fR
+.RS 4
+grant additional access control list (ACL) entries to the file\&. The string specified here must conform to the rules found in
+\fIacl(5)\fR
+(section ACL TEXT FORMS)\&. The ACL entries will be merged with the basic octal file mode, therefore they must not contain any permissions for the file owner, group or other\&. If a file has extended ACL entries assigned, but none are configured in the permissions configuration, the extended ACL entries will be removed by
+permctl(8)\&.
 .RE
 .sp
-The file name in the first column can contain contain variables as defined in the \fIvariables\&.conf\fR file\&. A variable expands to one or more alternative path segments that relate to the same program or file\&. permctl will look in each possible path resulting from the variable expansion and apply the permissions accordingly\&.
+The file name in the first column of the base entry can contain contain variables as defined in the \fIvariables\&.conf\fR file\&. A variable expands to one or more alternative path segments that relate to the same program or file\&. permctl will look in each possible path resulting from the variable expansion and apply the permissions accordingly\&.
 .sp
-The variables\&.conf file will ignore empty lines, whitespace only lines or comment lines starting with \fI#\fR\&. All other lines must contain variable definitions that follow the syntax \fBmyvar = /path/1 /path/2\fR\&. This example will declare a variable identified as myvar that will expand to both specified path segments\&.
+The variables\&.conf file will ignore empty lines, whitespace only lines or comment lines starting with \*(Aq#\*(Aq\&. All other lines must contain variable definitions that follow the syntax \fBmyvar = /path/1 /path/2\fR\&. This example will declare a variable identified as myvar that will expand to both specified path segments\&.
 .sp
 Path segments appearing in variable assignments need to be separated by whitespace characters\&. The path values cannot contain whitespace themselves\&. The variable identifier is limited to alphanumeric characters and the underscore character\&.
 .sp
-To reference a variable in a permissions file it needs to be dereferenced using the %{myvar} syntax\&. The variable needs to appear as a single path component and cannot be mixed with other literal characters\&. Multiple variables per path are allowed\&. The following are valid variable uses:
+To reference a variable in a permissions file, it needs to be dereferenced using the %{myvar} syntax\&. The variable needs to appear as a single path component and cannot be mixed with other literal characters\&. Multiple variables per path are allowed\&. The following are valid uses of variables:
 .sp
 .if n \{\
 .RS 4
@@ -138,9 +134,58 @@ While the following are invalid:
 .if n \{\
 .RE
 .\}
+.SS "Configuration File Locations"
+.sp
+The permctl program, when run in \-\-system mode, will assemble a set of configuration entries depending on the profiles configured in \fI/etc/sysconfig/security\fR\&. The order of files parsed (with increasing priority) is as follows:
+.PP
+\fB/usr/share/permissions/permissions\fR
+.RS 4
+contains fixed entries independent of the active profile\&.
+.RE
+.PP
+\fB/usr/share/permissions/permissions\&.<profile>\fR
+.RS 4
+contains the per\-profile configuration of files\&.
+.RE
+.PP
+\fB/usr/share/permissions/packages\&.d/\fR*
+.RS 4
+contains per\-package drop\-in configuration files, which can also exist in fixed or in different profile variants\&.
+.RE
+.PP
+\fB/etc/permissions\&.local\fR
+.RS 4
+contains local per\-system extra entries or overrides managed by the system administrator\&.
+.RE
+.SS "Available Predefined Profiles"
+.sp
+The permissions package ships the following predefines profiles:
+.PP
+\fBeasy\fR
+.RS 4
+security settings targeted towards single user workstations, where the only user is also the administrator\&. This profile is tailored towards more simplicity (less configuration and authorization requirements) at the possible expense of security in some areas\&.
+.RE
+.PP
+\fBsecure\fR
+.RS 4
+this is a balanced profile for servers or multi\-user workstations that contains more secure settings at the expense of additional configuration or authorization requirements in some areas\&.
+.RE
+.PP
+\fBparanoid\fR
+.RS 4
+this is a profile that disables all
+setuid
+and
+setgid
+bits and most capabilities\&. It is intended for power users that want to add back individual
+setuid
+bits via the
+\fI/etc/permissions\&.local\fR
+file\&. This profile is not intended to be used as\-is\&.
+.RE
 .SH "EXAMPLES"
 .sp
-A specification like this:
+This is a demonstration of the use of variable expansion:
 .sp
 .if n \{\
 .RS 4
@@ -157,7 +202,7 @@ sub_dirs = prog_v1 prog_v2
 .RE
 .\}
 .sp
-Will cause permctl to try and apply the given permission to all of the following paths:
+This will cause `permctl `to try and apply the given permission to all of the following paths, if existing:
 .sp
 .if n \{\
 .RS 4
