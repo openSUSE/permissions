@@ -3,7 +3,6 @@
 #include <grp.h>
 #include <limits.h>
 #include <pwd.h>
-#include <sys/stat.h>
 
 // C++
 #include <cassert>
