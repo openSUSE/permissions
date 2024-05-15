@@ -335,6 +335,7 @@ void PermCtl::printHeader() {
 
 int PermCtl::processEntries() {
     size_t errors = 0;
+    size_t bad_entries = 0;
 
     if (m_apply_changes && !m_have_proc) {
         if (m_allow_no_proc) {
@@ -356,13 +357,18 @@ int PermCtl::processEntries() {
         if (!needToCheck(processor.path()))
             continue;
 
-        if (!processor.process(m_have_proc))
+        if (const auto res = processor.process(m_have_proc); res == EntryProcessor::Result::FAILED)
             errors++;
+        else if (res == EntryProcessor::Result::ENTRY_BAD)
+            bad_entries++;
     }
 
     if (errors) {
         std::cerr << "ERROR: not all operations were successful." << std::endl;
         return 1;
+    } else if (bad_entries && !m_apply_changes) {
+        // indicate that entries need fixing if m_args.only_warn is set.
+        return 2;
     }
 
     return 0;
