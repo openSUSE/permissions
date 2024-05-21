@@ -14,6 +14,16 @@
  * would be performed. Or it can actually apply necessary changes.
  **/
 class EntryProcessor {
+public: // types
+
+    enum class Result {
+        ENTRY_GOOD,    ///< The entry was validated and file status is good.
+        ENTRY_BAD,     ///< The entry would need fixing but apply_changes is not set.
+        ENTRY_FIXED,   ///< The entry needed fixing and has been fixed.
+        ENTRY_SKIPPED, ///< The entry was skipped, because the file is not present or otherwise checking it was not possible.
+        FAILED         ///< a fatal error condition was encountered, entry status is unknown.
+    };
+
 public: // functions
 
     EntryProcessor(const ProfileEntry &entry, const CmdlineArgs &args, const bool apply_changes);
@@ -28,7 +38,7 @@ public: // functions
      * \param[in] have_proc Whether a /proc mount is available. If not then
      * no changes will be applied in the file system for security reasons.
      **/
-    bool process(const bool have_proc);
+    Result process(const bool have_proc);
 
 protected: // types
 

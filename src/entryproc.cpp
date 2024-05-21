@@ -22,15 +22,15 @@ EntryProcessor::EntryProcessor(const ProfileEntry &entry, const CmdlineArgs &arg
     m_path = entry.file.substr(args.root_path.getValue().length());
 }
 
-bool EntryProcessor::process(const bool have_proc) {
+EntryProcessor::Result EntryProcessor::process(const bool have_proc) {
         if (!resolveOwnership()) {
             // these don't count as errors currently, could be that some
             // package is just not installed and thus user/groups are missing.
-            return true;
+            return Result::ENTRY_SKIPPED;
         }
 
         if (const auto res = safeOpen(); res != OpenRes::CONTINUE) {
-            return res == OpenRes::SKIP ? true : false;
+            return res == OpenRes::SKIP ? Result::ENTRY_SKIPPED : Result::FAILED;
         }
 
         assert (m_fd.valid());
@@ -52,7 +52,7 @@ bool EntryProcessor::process(const bool have_proc) {
         }
 
         if (!getCapabilities()) {
-            return false;
+            return Result::FAILED;
         }
 
         if (!m_acl.setFromFile(m_safe_path)) {
@@ -63,7 +63,7 @@ bool EntryProcessor::process(const bool have_proc) {
 
         if (!checkNeedsFixing()) {
             // nothing to do
-            return true;
+            return Result::ENTRY_GOOD;
         }
 
         /*
@@ -74,11 +74,11 @@ bool EntryProcessor::process(const bool have_proc) {
 
         if (!m_apply_changes) {
             // we don't need to do anything more
-            return true;
+            return Result::ENTRY_BAD;
         }
 
         if (!isSafeToApply()) {
-            return false;
+            return Result::FAILED;
         }
 
         if (m_euid != 0) {
@@ -88,7 +88,7 @@ bool EntryProcessor::process(const bool have_proc) {
             m_need_fix_ownership = false;
         }
 
-        return applyChanges();
+        return applyChanges() ? Result::ENTRY_FIXED : Result::FAILED;
 }
 
 bool EntryProcessor::resolveOwnership() {

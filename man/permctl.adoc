@@ -66,6 +66,13 @@ ENVIRONMENT VARIABLES
   that must only be used in controlled environments where unprivileged users
   can't influence file system operation.
 
+EXIT STATUS
+-----------
+
+permctl returns 1 if any fatal errors have been encountered that prevented it
+from determining or adjusting file permissions. It returns 2 if *--warn* was
+given and one or more entries need fixing. In all other cases it returns 0.
+
 EXAMPLES
 --------
 
