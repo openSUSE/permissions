@@ -2,12 +2,12 @@
 .\"     Title: permctl
 .\"    Author: [see the "AUTHORS" section]
 .\" Generator: DocBook XSL Stylesheets v1.79.1 <http://docbook.sf.net/>
-.\"      Date: 05/15/2024
+.\"      Date: 05/22/2024
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "PERMCTL" "8" "05/15/2024" "\ \&" "\ \&"
+.TH "PERMCTL" "8" "05/22/2024" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -109,19 +109,19 @@ permctl \-\-set /usr/share/permissions/permissions /usr/share/permissions/permis
 .RE
 .\}
 .sp
-Parses the files /usr/share/permissions/permissions and /usr/share/permissions/permissions and sets the file permissions for all files listed there\&.
+Parses the supplied permission configuration files and applies the permission settings for all files listed there\&.
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-permctl \-\-system /bin/ping
+permctl \-\-system /usr/bin/ping
 .fi
 .if n \{\
 .RE
 .\}
 .sp
-Run in system mode and only correct permissions of /bin/ping\&.
+Run in system mode and only correct permissions of /usr/bin/ping\&.
 .SH "SEE ALSO"
 .sp
 permissions(5)

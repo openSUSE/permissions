@@ -80,15 +80,14 @@ EXAMPLES
 permctl --set /usr/share/permissions/permissions /usr/share/permissions/permissions.secure
 ----
 
-Parses the files /usr/share/permissions/permissions and
-/usr/share/permissions/permissions and sets the file permissions for all files
-listed there.
+Parses the supplied permission configuration files and applies the permission
+settings for all files listed there.
 
 ----
-permctl --system /bin/ping
+permctl --system /usr/bin/ping
 ----
 
-Run in system mode and only correct permissions of /bin/ping.
+Run in system mode and only correct permissions of /usr/bin/ping.
 
 SEE ALSO
 --------
