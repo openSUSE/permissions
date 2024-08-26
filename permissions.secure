@@ -516,8 +516,8 @@
 /usr/lib/enlightenment/utils/enlightenment_system       root:root  4755
 /usr/lib64/enlightenment/utils/enlightenment_system     root:root  4755
 
-# setuid bit for cockpit (bsc#1169614 bsc#1228548)
-/usr/lib/cockpit/cockpit-session                        root:cockpit-wsinstance  4750
+# setuid bit for cockpit (bsc#1169614 bsc#1228548 bsc#1229329)
+/usr/lib/cockpit-session                                root:cockpit-wsinstance  4750
 
 # ksysguard network helper (bsc#1151190)
 /usr/lib/libexec/ksysguard/ksgrd_network_helper             root:root       0755
