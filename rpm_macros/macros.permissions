@@ -1,17 +1,11 @@
 
 %set_permissions(f:) \
-  if [ -x /usr/bin/permctl ]; then \
-    /usr/bin/permctl -n --set --system %{**} || : \
-  elif [ -x /usr/bin/chkstat ]; then \
-    /usr/bin/chkstat -n --set --system %{**} || : \
-  fi \
-  %nil
+   if [ -x /usr/bin/permctl ]; then \
+     /usr/bin/permctl -n --set --system %{**} || : \
+   fi \
+   %nil
 
 %verify_permissions(e:f:) \
-   if [ -x /usr/bin/permctl ]; then \
-     /usr/bin/permctl -n --warn --system %{**} 1>&2 \
-   else \
-     /usr/bin/chkstat -n --warn --system %{**} 1>&2 \
-   fi \
+   /usr/bin/permctl -n --warn --system %{**} 1>&2 \
    %nil
 
