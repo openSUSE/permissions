@@ -75,3 +75,4 @@ install_data(sources: 'zypper-plugin/permissions.py', install_dir: 'lib/zypp/plu
 install_data(sources: ['etc/variables.conf', 'etc/permissions', 'profiles/permissions.easy', 'profiles/permissions.secure', 'profiles/permissions.paranoid'], install_dir: 'share/permissions')
 install_data(sources: 'etc/permissions.local', install_dir: '/etc')
 install_subdir('permissions.d', install_dir: 'share/permissions')
+install_data(sources: 'rpm_macros/macros.permissions', install_dir: 'lib/rpm/macros.d')
