@@ -65,6 +65,7 @@ int have_fscaps = -1;
 char** permfiles = NULL;
 size_t npermfiles = 0;
 char* force_level;
+const char ALLOW_NO_PROC_ENVVAR[] = "CHKSTAT_ALLOW_INSECURE_MODE_IF_NO_PROC";
 
 struct perm*
 add_permlist(char *file, char *owner, char *group, mode_t mode)
@@ -801,6 +802,8 @@ main(int argc, char **argv)
   int fd = -1;
   int errors = 0;
   cap_t caps = NULL;
+  bool allow_no_proc = false;
+  bool complained_no_proc = false;
 
   while (argc > 1)
     {
@@ -999,6 +1002,11 @@ main(int argc, char **argv)
 
   if  (do_set == -1)
     do_set = 0;
+
+  if (secure_getenv(ALLOW_NO_PROC_ENVVAR) != NULL)
+    {
+      allow_no_proc = true;
+    }
 
   // add fake list entries for all files to check
   for (i = 0; i < nchecklist; i++)
@@ -1222,9 +1230,24 @@ main(int argc, char **argv)
 
       if (do_set && fd_path != fd_path_buf)
         {
-          fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
-          errors++;
-          do_set = false;
+          if (allow_no_proc)
+            {
+              if (!complained_no_proc)
+                {
+                  fprintf(stderr, "WARNING: /proc is not available, continuing in insecure mode because %s is set.\n", ALLOW_NO_PROC_ENVVAR);
+                  complained_no_proc = true;
+                }
+            }
+          else
+            {
+              if (!complained_no_proc)
+                {
+                  fprintf(stderr, "ERROR: /proc is not available - unable to fix policy violations.\n");
+                  do_set = false;
+                  complained_no_proc = true;
+                }
+              errors++;
+            }
         }
 
       if (!do_set)
