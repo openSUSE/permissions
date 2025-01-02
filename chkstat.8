@@ -67,6 +67,14 @@ and instead of all files listed in the permissions files.
 .IR \-\-root\ directory
 Check files relative to the specified directory.
 .PP
+.SH ENVIRONMENT VARIABLES
+.PP
+\fBCHKSTAT_ALLOW_INSECURE_MODE_IF_NO_PROC\fR
+.RS 4
+Allow to operate without mounted /proc file system. This is an
+unsafe mode that must only be used in controlled environments where
+unprivileged users can’t influence file system operation.
+.RE
 .SH EXAMPLES
 .PP
 .B chkstat --set /etc/permissions /etc/permissions.secure
