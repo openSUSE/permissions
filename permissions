@@ -48,9 +48,7 @@
 
 /var/tmp/                                               root:root         1777
 /var/spool/mqueue/                                      root:root          700
-/var/spool/news/                                        news:news          775
 /var/spool/uucp/                                        uucp:uucp          755
-/var/spool/voice/                                       root:root          755
 /var/spool/mail/                                        root:root         1777
 /var/yp/                                                root:root          755
 /var/run/nscd/socket					root:root	   666
