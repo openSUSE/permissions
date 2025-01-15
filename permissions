@@ -53,8 +53,6 @@
 /var/yp/                                                root:root          755
 /var/run/nscd/socket					root:root	   666
 /run/nscd/socket					root:root	   666
-/var/run/sudo/                                          root:root          700
-/run/sudo/                                          	root:root          700
 
 #
 # /etc
