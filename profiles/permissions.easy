@@ -315,3 +315,6 @@
 
 # libgtop(bsc#1218921)
 /usr/libexec/libgtop_server2                            root:root 4755
+
+# nvidia-modprobe (bsc#1230950)
+/usr/bin/nvidia-modprobe                                root:root 4755
