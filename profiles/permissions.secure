@@ -228,9 +228,6 @@
 /usr/bin/dumpcap					root:wireshark	  0750
  +capabilities cap_net_raw,cap_net_admin=ep
 
-# singularity version 3 (bsc#1128598)
-/usr/libexec/singularity/bin/starter-suid               root:singularity  4750
-
 /usr/bin/su                                             root:root         4755
 /usr/bin/mount                                          root:root         4755
 /usr/bin/umount                                         root:root         4755
