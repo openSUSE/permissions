@@ -40,6 +40,8 @@
 
 /var/spool/uucp/                                        uucp:uucp          755
 /var/yp/                                                root:root          755
+/var/run/nscd/socket                                    root:root          666
+/run/nscd/socket                                        root:root          666
 
 #
 # /etc
