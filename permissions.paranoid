@@ -492,3 +492,6 @@
 
 # postfix (bsc#1201385)
 /usr/sbin/postlog                                       root:maildrop 0755
+
+# nvidia-modprobe (bsc#1230950 bsc#1246776)
+/usr/bin/nvidia-modprobe                                root:root 0755
