@@ -319,3 +319,7 @@
 
 # nvidia-modprobe (bsc#1230950)
 /usr/bin/nvidia-modprobe                                root:root 0755
+
+# OpenSMTPD (bsc#1247781)
+/usr/libexec/opensmtpd/lockspool                        root:root 0755
+/usr/sbin/smtpctl                                       root:_smtpq 0555
