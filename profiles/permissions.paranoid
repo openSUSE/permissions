@@ -53,11 +53,6 @@
 /usr/bin/crontab                                        root:trusted      0755
 /usr/bin/gpasswd                                        root:shadow       0755
 /usr/bin/newgrp                                         root:root         0755
-/usr/bin/passwd                                         root:shadow       0755
-/usr/bin/chfn                                           root:shadow       0755
-/usr/bin/chage                                          root:shadow       0755
-/usr/bin/chsh                                           root:shadow       0755
-/usr/bin/expiry                                         root:shadow       0755
 /usr/bin/sudo                                           root:root         0755
 /usr/sbin/su-wrapper                                    root:root         0755
 # #331020
@@ -232,10 +227,6 @@
 # suexec2 is a symlink for now, leave as-is
 #
 /usr/sbin/suexec            				root:root       0755
-
-# newgidmap / newuidmap (bsc#979282, bsc#1048645, bsc#1208309)
-/usr/bin/newgidmap					root:root	0755
-/usr/bin/newuidmap					root:root	0755
 
 # kwayland (bsc#1062182)
 /usr/bin/kwin_wayland					root:root	0755
