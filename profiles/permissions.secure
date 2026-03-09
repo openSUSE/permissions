@@ -18,9 +18,6 @@
 :package: netcfg
 /etc/exports                                            root:root          644
 
-:package: nfs-kernel-server # from nfs-utils
-/var/lib/nfs/rmtab                                      root:root          644
-
 :package: syslogd
 /etc/syslog.conf                                        root:root          600
 
