@@ -84,7 +84,7 @@
 
 :package: iputils # needs privileged socket access
 /usr/bin/clockdiff                                      root:root         0755
- +capabilities cap_net_raw=p
+ +capabilities cap_net_raw,cap_sys_nice=ep
 :package: mtr
 /usr/sbin/mtr-packet                                    root:root         0755
  +capabilities cap_net_raw=ep
