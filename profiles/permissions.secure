@@ -123,7 +123,7 @@
 # networking (need root for the privileged socket)
 #
 /usr/bin/clockdiff                                      root:root         0755
- +capabilities cap_net_raw=p
+ +capabilities cap_net_raw,cap_sys_nice=ep
 # mtr
 /usr/sbin/mtr-packet                                    root:root         0755
 
