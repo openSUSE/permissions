@@ -281,3 +281,7 @@
 :package: OpenSMTPD # bsc#1247781
 /usr/libexec/opensmtpd/lockspool                        root:root 4755
 /usr/sbin/smtpctl                                       root:_smtpq 2755
+
+:package: ksystemstats6 # bsc1262779
+/usr/libexec/ksystemstats_intel_helper                  root:root 0755
+ +capabilities cap_perfmon=ep
