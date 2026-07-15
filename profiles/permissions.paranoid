@@ -281,3 +281,7 @@
 
 :package: ksystemstats6 # bsc1262779
 /usr/libexec/ksystemstats_intel_helper                  root:root 0755
+
+:package: ttl # bsc#1270714
+/usr/bin/ttl                                            root:root 0755
+
