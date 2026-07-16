@@ -284,3 +284,5 @@
 /usr/bin/ttl                                            root:root 0755
  +capabilities cap_net_raw=ep
 
+:package: apptainer-suid # (formerly Singularity) bsc#1128598, bsc#1196145, bsc#1268675
+/usr/libexec/apptainer/bin/starter-suid                 root:apptainer    4750
