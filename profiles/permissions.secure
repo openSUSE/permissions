@@ -286,3 +286,7 @@
 
 :package: apptainer-suid # (formerly Singularity) bsc#1128598, bsc#1196145, bsc#1268675
 /usr/libexec/apptainer/bin/starter-suid                 root:apptainer    4750
+
+:package: noisetorch # bsc#1270715
+/usr/bin/noisetorch                                     root:root 0755
+ +capabilities cap_sys_resource=ep

@@ -282,7 +282,7 @@
 /usr/libexec/opensmtpd/lockspool                        root:root 4755
 /usr/sbin/smtpctl                                       root:_smtpq 2755
 
-:package: ksystemstats6 # bsc1262779
+:package: ksystemstats6 # bsc#1262779
 /usr/libexec/ksystemstats_intel_helper                  root:root 0755
  +capabilities cap_perfmon=ep
 
@@ -292,3 +292,7 @@
 
 :package: apptainer-suid # (formerly Singularity) bsc#1128598, bsc#1196145, bsc#1268675
 /usr/libexec/apptainer/bin/starter-suid                 root:apptainer    4750
+
+:package: noisetorch # bsc#1270715
+/usr/bin/noisetorch                                     root:root 0755
+ +capabilities cap_sys_resource=ep
