@@ -296,3 +296,8 @@
 :package: noisetorch # bsc#1270715
 /usr/bin/noisetorch                                     root:root 0755
  +capabilities cap_sys_resource=ep
+
+:package: cloud-hypervisor # bsc#1270717
+/usr/bin/cloud-hypervisor                               root:root 0755
+ +capabilities cap_net_admin=ep
+
