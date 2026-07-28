@@ -298,3 +298,5 @@
 /usr/bin/cloud-hypervisor                               root:root 0755
  +capabilities cap_net_admin=ep
 
+:package: selinux-sandbox # bsc#1268256
+/usr/bin/seunshare                                      root:wheel 4750

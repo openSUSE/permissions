@@ -291,3 +291,5 @@
 :package: cloud-hypervisor # bsc#1270717
 /usr/bin/cloud-hypervisor                               root:root 0755
 
+:package: selinux-sandbox # bsc#1268256
+/usr/bin/seunshare                                      root:root 0755
