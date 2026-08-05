@@ -117,8 +117,8 @@
 /usr/libexec/mgetty+sendfax/faxq-helper                 fax:trusted       4750
 /var/spool/fax/outgoing/                                fax:root          0755
 
-:package: uucp
-/var/spool/uucppublic/                                  root:uucp         1770
+:package: uucp # bsc#1273735
+/var/spool/uucppublic/                                  uucp:uucp         1770
 /usr/bin/uucp                                           uucp:uucp         6555
 /usr/bin/uuname                                         uucp:uucp         6555
 /usr/bin/uustat                                         uucp:uucp         6555
