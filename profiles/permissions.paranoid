@@ -322,3 +322,6 @@
 
 # nvidia-modprobe (bsc#1230950)
 /usr/bin/nvidia-modprobe                                root:root 0755
+
+# selinux-sandbox (bsc#1268256)
+/usr/bin/seunshare                                      root:root 0755
