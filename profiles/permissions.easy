@@ -300,3 +300,7 @@
 
 :package: selinux-sandbox # bsc#1268256
 /usr/bin/seunshare                                      root:wheel 4750
+
+:package: cacti-spine # bsc#1273300
+/usr/bin/spine                                          root:root 0755
+ +capabilities cap_net_raw=ep
