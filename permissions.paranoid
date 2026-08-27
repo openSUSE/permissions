@@ -492,3 +492,6 @@
 
 # postfix (bsc#1201385)
 /usr/sbin/postlog                                       root:maildrop 0755
+
+# cacti-spine (bsc#1273300)
+/usr/bin/spine                                          root:root 0755
