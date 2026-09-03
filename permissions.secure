@@ -531,3 +531,6 @@
 # cacti-spine (bsc#1273300)
 /usr/bin/spine                                          root:root 0755
  +capabilities cap_net_raw=ep
+
+# nvidia-modprobe (bsc#1230950 bsc#1278351)
+/usr/bin/nvidia-modprobe                                root:root 4755
