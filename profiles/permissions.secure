@@ -266,6 +266,13 @@
 :package: libgtop # bsc#1218921
 /usr/libexec/libgtop_server2                            root:root 4755
 
+# nvidia-modprobe is a special case that should be kept whitelisted even though
+# the binary is not shipped in Factory anymore. The typical use case is to use
+# Nvidia's official openSUSE repositories, provided by a package that
+# **is** in Factory: `openSUSE-repos-Tumbleweed-NVIDIA`.
+# See also:
+# - https://en.opensuse.org/SDB:NVIDIA_drivers
+# - https://build.opensuse.org/request/show/1374974
 :package: nvidia-modprobe # bsc#1230950
 /usr/bin/nvidia-modprobe                                root:root 4755
 
