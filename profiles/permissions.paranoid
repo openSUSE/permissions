@@ -283,8 +283,9 @@
 /usr/libexec/opensmtpd/lockspool                        root:root 0755
 /usr/sbin/smtpctl                                       root:_smtpq 0555
 
-:package: ksystemstats6 # bsc#1262779
+:package: ksystemstats6 # bsc#1262779, bsc#1280113
 /usr/libexec/ksystemstats_intel_helper                  root:root 0755
+/usr/libexec/ksystemstats_xe_helper                     root:root 0755
 
 :package: ttl # bsc#1270714
 /usr/bin/ttl                                            root:root 0755
