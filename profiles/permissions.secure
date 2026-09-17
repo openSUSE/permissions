@@ -280,8 +280,10 @@
 /usr/libexec/opensmtpd/lockspool                        root:root 4755
 /usr/sbin/smtpctl                                       root:_smtpq 2755
 
-:package: ksystemstats6 # bsc#1262779
+:package: ksystemstats6 # bsc#1262779, bsc#1280113
 /usr/libexec/ksystemstats_intel_helper                  root:root 0755
+ +capabilities cap_perfmon=ep
+/usr/libexec/ksystemstats_xe_helper                     root:root 0755
  +capabilities cap_perfmon=ep
 
 :package: ttl # bsc#1270714
